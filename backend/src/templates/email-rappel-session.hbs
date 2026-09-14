@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Rappel : formation à venir</title>
+</head>
+<body style="margin:0;padding:0;background:#FFF8F2;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8F2;padding:30px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#FFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(255,121,0,0.1);">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#FF7900,#E65100);padding:40px 30px;text-align:center;">
+              <div style="font-size:48px;margin-bottom:10px;">⏰</div>
+              <h1 style="color:#FFF;margin:0;font-size:24px;font-weight:700;">
+                Votre formation approche !
+              </h1>
+              <p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:14px;">
+                Plus que {{joursRestants}} jour{{#if (eq joursRestants 1)}}{{else}}s{{/if}}
+              </p>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding:40px 30px;">
+              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Bonjour <strong>{{nomParticipant}}</strong>,
+              </p>
+
+              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Nous vous rappelons que votre formation
+                <strong style="color:#E65100;">« {{formationTitre}} »</strong>
+                débute bientôt.
+              </p>
+
+              <div style="background:#FFF8F2;border-left:4px solid #FF7900;padding:20px;border-radius:6px;margin:25px 0;">
+                <div style="font-size:11px;color:#6B6B6B;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+                  Détails
+                </div>
+                <div style="font-size:14px;color:#1A1A1A;margin:8px 0;">
+                  📅 <strong>Début :</strong> {{formatDate dateDebut}}
+                </div>
+                <div style="font-size:14px;color:#1A1A1A;margin:8px 0;">
+                  📍 <strong>Lieu :</strong> {{lieu}}
+                </div>
+              </div>
+
+              <p style="color:#1A1A1A;font-size:14px;font-weight:600;margin:25px 0 12px;">
+                📌 À prévoir
+              </p>
+              <ul style="color:#6B6B6B;font-size:13px;line-height:1.8;padding-left:20px;margin:0 0 20px;">
+                <li>Votre pièce d'identité</li>
+                <li>Un ordinateur portable (si applicable)</li>
+                <li>De quoi prendre des notes</li>
+              </ul>
+
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{sessionUrl}}"
+                       style="display:inline-block;background:#FF7900;color:#FFF;text-decoration:none;padding:14px 35px;border-radius:8px;font-weight:600;font-size:15px;">
+                      Voir les détails de la session
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color:#6B6B6B;font-size:12px;line-height:1.6;margin:20px 0 0;">
+                En cas d'empêchement, merci de nous prévenir au plus tôt.
+              </p>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background:#F5F5F5;padding:25px 30px;text-align:center;">
+              <p style="color:#6B6B6B;font-size:12px;margin:0 0 8px;">
+                <strong style="color:#FF7900;">Orange Digital Center</strong>
+              </p>
+              <p style="color:#6B6B6B;font-size:11px;margin:0;">
+                Antananarivo, Madagascar • contact@odc.mg
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

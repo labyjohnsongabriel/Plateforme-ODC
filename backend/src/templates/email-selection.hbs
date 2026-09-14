@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Résultat de votre candidature</title>
+</head>
+<body style="margin:0;padding:0;background:#FFF8F2;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8F2;padding:30px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#FFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(255,121,0,0.1);">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background:linear-gradient(135deg,{{#if accepte}}#FF7900,#E65100{{else}}#6B6B6B,#1A1A1A{{/if}});padding:40px 30px;text-align:center;">
+              <div style="font-size:48px;margin-bottom:10px;">
+                {{#if accepte}}🎉{{else}}📋{{/if}}
+              </div>
+              <h1 style="color:#FFF;margin:0;font-size:24px;font-weight:700;">
+                {{#if accepte}}Candidature acceptée{{else}}Candidature non retenue{{/if}}
+              </h1>
+              <p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:14px;">
+                {{formationTitre}}
+              </p>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding:40px 30px;">
+              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Bonjour <strong>{{nomParticipant}}</strong>,
+              </p>
+
+              {{#if accepte}}
+                <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                  Nous avons le plaisir de vous informer que votre candidature
+                  pour la formation
+                  <strong style="color:#E65100;">« {{formationTitre}} »</strong>
+                  a été <strong style="color:#2E7D32;">acceptée</strong>.
+                </p>
+
+                <div style="background:#F1F8E9;border-left:4px solid #2E7D32;padding:20px;border-radius:6px;margin:25px 0;">
+                  <div style="font-size:11px;color:#6B6B6B;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">
+                    📅 Détails de la session
+                  </div>
+                  <div style="font-size:14px;color:#1A1A1A;margin:8px 0;">
+                    <strong>Début :</strong> {{formatDate dateDebut}}
+                  </div>
+                  <div style="font-size:14px;color:#1A1A1A;margin:8px 0;">
+                    <strong>Lieu :</strong> {{lieu}}
+                  </div>
+                </div>
+
+                <p style="color:#1A1A1A;font-size:14px;font-weight:600;margin:25px 0 12px;">
+                  ✨ Prochaines étapes
+                </p>
+                <ol style="color:#6B6B6B;font-size:13px;line-height:1.8;padding-left:20px;margin:0 0 20px;">
+                  <li>Confirmez votre présence en vous connectant à votre espace</li>
+                  <li>Consultez les ressources préparatoires</li>
+                  <li>Présentez-vous à la session à l'heure indiquée</li>
+                </ol>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{dashboardUrl}}"
+                         style="display:inline-block;background:#FF7900;color:#FFF;text-decoration:none;padding:14px 35px;border-radius:8px;font-weight:600;font-size:15px;">
+                        Confirmer ma présence
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              {{else}}
+                <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                  Nous vous remercions pour votre intérêt pour la formation
+                  <strong style="color:#E65100;">« {{formationTitre}} »</strong>.
+                </p>
+
+                <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                  Après examen de votre candidature, nous ne sommes malheureusement
+                  pas en mesure de donner une suite favorable à votre demande.
+                </p>
+
+                {{#if motif}}
+                <div style="background:#FFF3F3;border-left:4px solid #C62828;padding:16px;border-radius:6px;margin:25px 0;">
+                  <div style="font-size:11px;color:#6B6B6B;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">
+                    Motif
+                  </div>
+                  <p style="color:#1A1A1A;font-size:13px;line-height:1.6;margin:0;">
+                    {{motif}}
+                  </p>
+                </div>
+                {{/if}}
+
+                <p style="color:#1A1A1A;font-size:14px;font-weight:600;margin:25px 0 12px;">
+                  💡 Ne vous découragez pas !
+                </p>
+                <p style="color:#6B6B6B;font-size:13px;line-height:1.6;margin:0 0 20px;">
+                  De nombreuses autres formations sont régulièrement proposées par l'ODC.
+                  Nous vous invitons à consulter notre catalogue et à postuler à nouveau.
+                </p>
+
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{catalogueUrl}}"
+                         style="display:inline-block;background:#FF7900;color:#FFF;text-decoration:none;padding:14px 35px;border-radius:8px;font-weight:600;font-size:15px;">
+                        Découvrir les autres formations
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              {{/if}}
+
+              <p style="color:#6B6B6B;font-size:12px;line-height:1.6;margin:20px 0 0;">
+                Pour toute question, contactez-nous à contact@odc.mg.
+              </p>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background:#F5F5F5;padding:25px 30px;text-align:center;">
+              <p style="color:#6B6B6B;font-size:12px;margin:0 0 8px;">
+                <strong style="color:#FF7900;">Orange Digital Center</strong>
+              </p>
+              <p style="color:#6B6B6B;font-size:11px;margin:0;">
+                Antananarivo, Madagascar • odc.orange.mg
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <p style="color:#999;font-size:11px;margin-top:20px;">
+          Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

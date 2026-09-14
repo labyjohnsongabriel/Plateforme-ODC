@@ -1,0 +1,113 @@
+{
+  "info": {
+    "name": "ODC Platform API",
+    "description": "Collection complète de l'API ODC Platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "token", "value": "" },
+    { "key": "refreshToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"email\": \"jean@odc.mg\",\n  \"motDePasse\": \"Password123\",\n  \"roleNom\": \"PARTICIPANT\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.data && data.data.accessToken) {",
+                  "  pm.collectionVariables.set('token', data.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', data.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@odc.mg\",\n  \"motDePasse\": \"Password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Formations",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/formations?page=1&limit=10"
+          }
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/formations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Initiation à React\",\n  \"description\": \"Apprendre React pas à pas\",\n  \"domaine\": \"WEB\",\n  \"dureeHeures\": 30,\n  \"niveau\": \"DEBUTANT\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attestations",
+      "item": [
+        {
+          "name": "Verify (public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/attestations/verify/ODC-2026-WEB-A1B2C3"
+          }
+        },
+        {
+          "name": "Générer pour session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/attestations/session/{{sessionId}}/generer-tout"
+          }
+        }
+      ]
+    }
+  ]
+}

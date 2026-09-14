@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Attestation {{numero}}</title>
+  <link rel="stylesheet" href="attestation.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #FFF8F2;
+      width: 297mm;
+      height: 210mm;
+      padding: 10mm;
+      color: #1A1A1A;
+      position: relative;
+    }
+
+    .attestation {
+      width: 100%;
+      height: 100%;
+      background: #FFFFFF;
+      border: 4px solid #FF7900;
+      border-radius: 12px;
+      padding: 15mm;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bande-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 8mm;
+      background: linear-gradient(90deg, #FF7900 0%, #E65100 100%);
+    }
+    .bande-bottom {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 8mm;
+      background: linear-gradient(90deg, #E65100 0%, #FF7900 100%);
+    }
+
+    .watermark {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 120px;
+      font-weight: 700;
+      color: rgba(255, 121, 0, 0.05);
+      font-family: 'Poppins', sans-serif;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #FFE0B2;
+      padding-bottom: 8mm;
+      margin-bottom: 10mm;
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-block { display: flex; align-items: center; gap: 5mm; }
+
+    .logo-odc {
+      width: 20mm; height: 20mm;
+      background: #FF7900;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #FFF;
+      font-weight: 700;
+      font-size: 18px;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .org-name {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .org-sub { font-size: 11px; color: #6B6B6B; margin-top: 2px; }
+
+    .numero-block { text-align: right; }
+    .numero-label {
+      font-size: 10px;
+      color: #6B6B6B;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .numero-value {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: 600;
+      color: #FF7900;
+      margin-top: 2px;
+    }
+
+    .titre { text-align: center; margin: 8mm 0; position: relative; z-index: 1; }
+    .titre-principal {
+      font-family: 'Poppins', sans-serif;
+      font-size: 36px;
+      font-weight: 700;
+      color: #FF7900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .titre-sous {
+      font-size: 13px;
+      color: #6B6B6B;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .corps {
+      text-align: center;
+      padding: 5mm 15mm;
+      position: relative;
+      z-index: 1;
+    }
+
+    .intro { font-size: 13px; color: #6B6B6B; margin-bottom: 6mm; }
+
+    .nom-participant {
+      font-family: 'Poppins', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: #1A1A1A;
+      padding: 4mm 0;
+      border-bottom: 2px dashed #FFE0B2;
+      border-top: 2px dashed #FFE0B2;
+      margin: 4mm 0;
+      display: inline-block;
+      min-width: 60%;
+    }
+
+    .formation-titre {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: #E65100;
+      margin: 6mm 0 3mm;
+    }
+
+    .details {
+      display: flex;
+      justify-content: center;
+      gap: 10mm;
+      margin: 6mm 0;
+      flex-wrap: wrap;
+    }
+
+    .detail-item {
+      background: #FFF8F2;
+      border-left: 3px solid #FF7900;
+      padding: 3mm 6mm;
+      border-radius: 4px;
+      text-align: left;
+    }
+    .detail-label {
+      font-size: 9px;
+      color: #6B6B6B;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .detail-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1A1A1A;
+      margin-top: 2px;
+    }
+
+    .note-badge {
+      display: inline-block;
+      background: #FF7900;
+      color: #FFF;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 3mm 8mm;
+      border-radius: 25px;
+      margin: 4mm 0;
+    }
+
+    .mention {
+      font-size: 12px;
+      line-height: 1.6;
+      margin-top: 8mm;
+      padding: 0 10mm;
+    }
+
+    .cachet {
+      position: absolute;
+      bottom: 25mm;
+      right: 45mm;
+      width: 35mm;
+      height: 35mm;
+      border: 3px double #FF7900;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(-15deg);
+      opacity: 0.85;
+      z-index: 2;
+    }
+    .cachet-inner {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 700;
+      font-size: 8px;
+      color: #FF7900;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 20mm;
+      left: 15mm;
+      right: 15mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      z-index: 1;
+    }
+
+    .signature-block { text-align: center; }
+    .signature-line {
+      width: 50mm;
+      border-top: 1px solid #1A1A1A;
+      margin-top: 15mm;
+      padding-top: 2mm;
+    }
+    .signature-nom {
+      font-family: 'Poppins', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .signature-fonction { font-size: 9px; color: #6B6B6B; }
+
+    .qr-block { text-align: center; }
+    .qr-image {
+      width: 30mm;
+      height: 30mm;
+      border: 2px solid #FFE0B2;
+      border-radius: 6px;
+      padding: 2mm;
+    }
+    .qr-label { font-size: 8px; color: #6B6B6B; margin-top: 2mm; }
+
+    .hash-footer {
+      position: absolute;
+      bottom: 10mm;
+      left: 15mm;
+      right: 15mm;
+      text-align: center;
+      font-family: monospace;
+      font-size: 7px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="attestation">
+    <div class="bande-top"></div>
+    <div class="bande-bottom"></div>
+    <div class="watermark">ODC CERTIFIED</div>
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="logo-block">
+        <div class="logo-odc">ODC</div>
+        <div>
+          <div class="org-name">{{odcName}}</div>
+          <div class="org-sub">{{odcAdresse}} • {{odcWebsite}}</div>
+        </div>
+      </div>
+      <div class="numero-block">
+        <div class="numero-label">N° Attestation</div>
+        <div class="numero-value">{{numero}}</div>
+      </div>
+    </div>
+
+    <!-- TITRE -->
+    <div class="titre">
+      <div class="titre-principal">Attestation</div>
+      <div class="titre-sous">de réussite de formation</div>
+    </div>
+
+    <!-- CORPS -->
+    <div class="corps">
+      <div class="intro">Nous certifions que</div>
+
+      <div class="nom-participant">
+        {{participantPrenom}} {{uppercase participantNom}}
+      </div>
+
+      <div class="intro">a suivi avec succès la formation</div>
+
+      <div class="formation-titre">« {{formationTitre}} »</div>
+
+      <div class="details">
+        <div class="detail-item">
+          <div class="detail-label">Domaine</div>
+          <div class="detail-value">{{formationDomaine}}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Durée</div>
+          <div class="detail-value">{{formationDuree}} heures</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Période</div>
+          <div class="detail-value">{{formatDate sessionDateDebut}} → {{formatDate sessionDateFin}}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Assiduité</div>
+          <div class="detail-value">{{tauxPresence}} %</div>
+        </div>
+      </div>
+
+      <div class="note-badge">Note finale : {{note}} / 20</div>
+
+      <div class="mention">
+        Cette attestation est délivrée à l'issue de l'évaluation finale,
+        sous la responsabilité de <strong>{{formateurNom}}</strong>, formateur
+        de la session, et validée par la direction de l'ODC.
+      </div>
+    </div>
+
+    <!-- CACHET -->
+    <div class="cachet">
+      <div class="cachet-inner">
+        ORANGE<br>DIGITAL<br>CENTER<br>★<br>OFFICIEL
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="signature-block">
+        <div class="signature-line"></div>
+        <div class="signature-nom">{{signataireNom}}</div>
+        <div class="signature-fonction">{{signataireFonction}}</div>
+      </div>
+
+      <div class="qr-block">
+        <img src="{{qrCodeDataUrl}}" alt="QR Code" class="qr-image"/>
+        <div class="qr-label">Vérifier l'authenticité</div>
+      </div>
+    </div>
+
+    <div class="hash-footer">
+      Hash : {{hash}} • Émis le {{formatDate dateEmission}}
+    </div>
+  </div>
+</body>
+</html>
