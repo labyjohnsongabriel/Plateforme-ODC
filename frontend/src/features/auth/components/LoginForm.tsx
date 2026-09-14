@@ -62,7 +62,7 @@ export function LoginForm() {
           </div>
 
           <h1 className="font-heading text-3xl font-bold text-odc-text-light dark:text-odc-text-dark mb-2">
-            Bienvenue 👋
+            Bienvenue 
           </h1>
           <p className="text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark max-w-xs mx-auto leading-relaxed">
             Connectez-vous à votre espace personnel
