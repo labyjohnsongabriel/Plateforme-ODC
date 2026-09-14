@@ -9,6 +9,7 @@ import { logger } from './config/logger';
 
 import {
   initializeDatabase,
+  ensureRoles,
 } from './config/database';
 
 import {
@@ -32,6 +33,7 @@ async function bootstrap(): Promise<void> {
      */
 
     await initializeDatabase();
+    await ensureRoles();
 
     /**
      * ==========================================
