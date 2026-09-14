@@ -2,6 +2,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import path from 'path';
 import { env } from './env';
 import { logger } from './logger';
+import { Role, RoleName } from '../models/Role.entity';
 
 /**
  * Construction de la config selon DB_CONNECTION
@@ -144,5 +145,24 @@ export async function checkDatabaseHealth(): Promise<{
       latency: Date.now() - start,
       details: { error: err.message },
     };
+  }
+}
+
+export async function ensureRoles(): Promise<void> {
+  const roleRepo = AppDataSource.getRepository(Role);
+  const roles = [
+    { nom: RoleName.ADMIN, description: 'Administrateur de la plateforme' },
+    { nom: RoleName.STAFF, description: 'Personnel ODC' },
+    { nom: RoleName.FORMATEUR, description: 'Formateur' },
+    { nom: RoleName.PARTICIPANT, description: 'Participant aux formations' },
+    { nom: RoleName.PARTENAIRE, description: 'Partenaire externe' },
+  ];
+
+  for (const roleData of roles) {
+    const role = await roleRepo.findOne({ where: { nom: roleData.nom } });
+    if (!role) {
+      await roleRepo.save(roleRepo.create(roleData));
+      logger.info(`✅ Rôle initialisé : ${roleData.nom}`);
+    }
   }
 }
