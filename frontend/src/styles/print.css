@@ -1,0 +1,150 @@
+/* ============================================================================
+   ODC PLATFORM — Styles d'impression
+   ============================================================================ */
+
+@media print {
+  /* Reset */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  @page landscape {
+    size: A4 landscape;
+  }
+
+  /* Cacher les éléments non-imprimables */
+  .no-print,
+  nav,
+  aside,
+  header,
+  footer,
+  button,
+  .no-print *,
+  [role='navigation'],
+  .sidebar,
+  .header,
+  .footer {
+    display: none !important;
+  }
+
+  /* Body */
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  /* Liens */
+  a {
+    color: #000000 !important;
+    text-decoration: underline;
+  }
+
+  a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 10pt;
+    color: #666666;
+  }
+
+  /* Images */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tableaux */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    border: 1px solid #000000;
+    padding: 4pt 6pt;
+    text-align: left;
+  }
+
+  th {
+    background: #F0F0F0 !important;
+    font-weight: bold;
+  }
+
+  /* Éviter les coupures */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  p, blockquote {
+    page-break-inside: avoid;
+  }
+
+  /* Attestation */
+  .attestation-print {
+    page-break-after: always;
+    width: 100%;
+    height: 100%;
+  }
+
+  .attestation-print .bande-top,
+  .attestation-print .bande-bottom {
+    display: block !important;
+  }
+
+  .attestation-print .watermark {
+    color: rgba(255, 121, 0, 0.08) !important;
+  }
+
+  /* Badges et tags */
+  .badge, .odc-badge {
+    border: 1px solid #000000;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  /* Cartes */
+  .odc-card {
+    box-shadow: none !important;
+    border: 1px solid #000000;
+    page-break-inside: avoid;
+  }
+
+  /* Utilitaires */
+  .page-break {
+    page-break-before: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  .landscape {
+    page: landscape;
+  }
+
+  /* Footer de page */
+  .print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: #666666;
+  }
+
+  /* Numérotation */
+  .print-page-number::after {
+    counter-increment: page;
+    content: 'Page ' counter(page);
+  }
+}

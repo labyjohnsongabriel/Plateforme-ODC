@@ -1,0 +1,206 @@
+/* ============================================================================
+   ODC PLATFORM — Variables CSS
+   Palette Orange + Light/Dark
+   ============================================================================ */
+
+:root {
+  /* ========================================================================
+     COULEURS PRINCIPALES ODC
+     ======================================================================== */
+  --odc-primary: #FF7900;
+  --odc-primary-dark: #E65100;
+  --odc-primary-light: #FFB74D;
+  --odc-primary-soft: #FFE0B2;
+  --odc-primary-soft-rgb: 255, 224, 178;
+
+  /* ========================================================================
+     FONDS
+     ======================================================================== */
+  --odc-background: #FFF8F2;
+  --odc-surface: #FFFFFF;
+  --odc-surface-alt: #F5F5F5;
+  --odc-elevated: #FFFFFF;
+  --odc-overlay: rgba(0, 0, 0, 0.5);
+  --odc-overlay-blur: rgba(0, 0, 0, 0.6);
+
+  /* ========================================================================
+     TEXTES
+     ======================================================================== */
+  --odc-text-primary: #1A1A1A;
+  --odc-text-secondary: #4A4A4A;
+  --odc-text-muted: #6B6B6B;
+  --odc-text-inverse: #FFFFFF;
+  --odc-text-disabled: #BDBDBD;
+
+  /* ========================================================================
+     BORDURES
+     ======================================================================== */
+  --odc-border: #E0E0E0;
+  --odc-border-light: #F0F0F0;
+  --odc-border-strong: #BDBDBD;
+  --odc-border-focus: var(--odc-primary);
+
+  /* ========================================================================
+     ÉTATS
+     ======================================================================== */
+  --odc-success: #2E7D32;
+  --odc-success-bg: #E8F5E9;
+  --odc-success-border: #A5D6A7;
+
+  --odc-warning: #F57C00;
+  --odc-warning-bg: #FFF3E0;
+  --odc-warning-border: #FFCC80;
+
+  --odc-error: #C62828;
+  --odc-error-bg: #FFEBEE;
+  --odc-error-border: #EF9A9A;
+
+  --odc-info: #0277BD;
+  --odc-info-bg: #E1F5FE;
+  --odc-info-border: #81D4FA;
+
+  --odc-purple: #7B1FA2;
+  --odc-purple-bg: #F3E5F5;
+  --odc-purple-border: #CE93D8;
+
+  /* ========================================================================
+     OMBRES
+     ======================================================================== */
+  --odc-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --odc-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --odc-shadow-md: 0 4px 6px rgba(255, 121, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --odc-shadow-lg: 0 10px 25px rgba(255, 121, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.05);
+  --odc-shadow-xl: 0 20px 40px rgba(255, 121, 0, 0.15);
+  --odc-shadow-focus: 0 0 0 4px rgba(255, 121, 0, 0.15);
+  --odc-shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+
+  /* ========================================================================
+     RAYONS
+     ======================================================================== */
+  --odc-radius-xs: 2px;
+  --odc-radius-sm: 4px;
+  --odc-radius-md: 8px;
+  --odc-radius-lg: 12px;
+  --odc-radius-xl: 16px;
+  --odc-radius-2xl: 20px;
+  --odc-radius-3xl: 24px;
+  --odc-radius-full: 9999px;
+
+  /* ========================================================================
+     ESPACEMENTS
+     ======================================================================== */
+  --odc-space-0: 0;
+  --odc-space-1: 0.25rem;   /* 4px */
+  --odc-space-2: 0.5rem;    /* 8px */
+  --odc-space-3: 0.75rem;   /* 12px */
+  --odc-space-4: 1rem;      /* 16px */
+  --odc-space-5: 1.25rem;   /* 20px */
+  --odc-space-6: 1.5rem;    /* 24px */
+  --odc-space-8: 2rem;      /* 32px */
+  --odc-space-10: 2.5rem;   /* 40px */
+  --odc-space-12: 3rem;     /* 48px */
+  --odc-space-16: 4rem;     /* 64px */
+  --odc-space-20: 5rem;     /* 80px */
+
+  /* ========================================================================
+     TRANSITIONS
+     ======================================================================== */
+  --odc-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --odc-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --odc-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --odc-transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ========================================================================
+     Z-INDEX
+     ======================================================================== */
+  --odc-z-base: 0;
+  --odc-z-dropdown: 1000;
+  --odc-z-sticky: 1020;
+  --odc-z-fixed: 1030;
+  --odc-z-modal-backdrop: 1040;
+  --odc-z-modal: 1050;
+  --odc-z-popover: 1060;
+  --odc-z-tooltip: 1070;
+  --odc-z-toast: 1080;
+
+  /* ========================================================================
+     GRADIENTS
+     ======================================================================== */
+  --odc-gradient-primary: linear-gradient(135deg, #FF7900 0%, #E65100 100%);
+  --odc-gradient-primary-reverse: linear-gradient(135deg, #E65100 0%, #FF7900 100%);
+  --odc-gradient-soft: linear-gradient(135deg, #FFF8F2 0%, #FFE0B2 100%);
+  --odc-gradient-dark: linear-gradient(135deg, #1A1A1A 0%, #0F0F0F 100%);
+
+  /* ========================================================================
+     CONFIGURATION SYSTÈME
+     ======================================================================== */
+  color-scheme: light;
+}
+
+/* ============================================================================
+   MODE SOMBRE
+   ============================================================================ */
+
+.dark {
+  /* Couleurs principales (inchangées) */
+  --odc-primary: #FF7900;
+  --odc-primary-dark: #E65100;
+  --odc-primary-light: #FFB74D;
+  --odc-primary-soft: #3D2A1A;
+  --odc-primary-soft-rgb: 61, 42, 26;
+
+  /* Fonds sombres */
+  --odc-background: #0F0F0F;
+  --odc-surface: #1A1A1A;
+  --odc-surface-alt: #242424;
+  --odc-elevated: #2A2A2A;
+  --odc-overlay: rgba(0, 0, 0, 0.7);
+  --odc-overlay-blur: rgba(0, 0, 0, 0.8);
+
+  /* Textes */
+  --odc-text-primary: #F5F5F5;
+  --odc-text-secondary: #D0D0D0;
+  --odc-text-muted: #A0A0A0;
+  --odc-text-inverse: #1A1A1A;
+  --odc-text-disabled: #4A4A4A;
+
+  /* Bordures */
+  --odc-border: #333333;
+  --odc-border-light: #2A2A2A;
+  --odc-border-strong: #4A4A4A;
+
+  /* États */
+  --odc-success: #4CAF50;
+  --odc-success-bg: #1B3D1E;
+  --odc-success-border: #2E7D32;
+
+  --odc-warning: #FF9800;
+  --odc-warning-bg: #3D2A00;
+  --odc-warning-border: #F57C00;
+
+  --odc-error: #EF5350;
+  --odc-error-bg: #3D1A1A;
+  --odc-error-border: #C62828;
+
+  --odc-info: #29B6F6;
+  --odc-info-bg: #1A2F3D;
+  --odc-info-border: #0277BD;
+
+  --odc-purple: #BA68C8;
+  --odc-purple-bg: #2D1B3D;
+  --odc-purple-border: #7B1FA2;
+
+  /* Ombres plus prononcées */
+  --odc-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --odc-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --odc-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --odc-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --odc-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.7);
+  --odc-shadow-focus: 0 0 0 4px rgba(255, 121, 0, 0.25);
+
+  /* Gradients sombres */
+  --odc-gradient-primary: linear-gradient(135deg, #FF7900 0%, #E65100 100%);
+  --odc-gradient-soft: linear-gradient(135deg, #1A1A1A 0%, #3D2A1A 100%);
+
+  color-scheme: dark;
+}
