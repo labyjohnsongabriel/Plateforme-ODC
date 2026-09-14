@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Inscription confirmée</title>
+</head>
+<body style="margin:0;padding:0;background:#FFF8F2;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8F2;padding:30px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#FFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(255,121,0,0.1);">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#FF7900,#E65100);padding:40px 30px;text-align:center;">
+              <div style="font-size:48px;margin-bottom:10px;">✅</div>
+              <h1 style="color:#FFF;margin:0;font-size:24px;font-weight:700;">
+                Inscription confirmée
+              </h1>
+              <p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:14px;">
+                Votre demande a bien été enregistrée
+              </p>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="padding:40px 30px;">
+              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Bonjour <strong>{{nomParticipant}}</strong>,
+              </p>
+
+              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Votre inscription à la formation
+                <strong style="color:#E65100;">« {{formationTitre}} »</strong>
+                a bien été prise en compte.
+              </p>
+
+              <div style="background:#FFF8F2;border-left:4px solid #FF7900;padding:20px;border-radius:6px;margin:25px 0;">
+                <div style="font-size:11px;color:#6B6B6B;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+                  Détails de la session
+                </div>
+                <div style="font-size:14px;color:#1A1A1A;margin:6px 0;">
+                  📅 <strong>Début :</strong> {{formatDate dateDebut}}
+                </div>
+                <div style="font-size:14px;color:#1A1A1A;margin:6px 0;">
+                  📍 <strong>Lieu :</strong> {{lieu}}
+                </div>
+              </div>
+
+              <p style="color:#6B6B6B;font-size:13px;line-height:1.6;margin:20px 0;">
+                Votre candidature sera examinée par notre équipe.
+                Vous recevrez une notification dès qu'une décision sera prise.
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{loginUrl}}"
+                       style="display:inline-block;background:#FF7900;color:#FFF;text-decoration:none;padding:14px 35px;border-radius:8px;font-weight:600;font-size:15px;">
+                      Accéder à mon espace
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background:#F5F5F5;padding:25px 30px;text-align:center;">
+              <p style="color:#6B6B6B;font-size:12px;margin:0 0 8px;">
+                <strong style="color:#FF7900;">Orange Digital Center</strong>
+              </p>
+              <p style="color:#6B6B6B;font-size:11px;margin:0;">
+                Antananarivo, Madagascar • contact@odc.mg
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <p style="color:#999;font-size:11px;margin-top:20px;">
+          Cet email a été envoyé automatiquement, merci de ne pas y répondre.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

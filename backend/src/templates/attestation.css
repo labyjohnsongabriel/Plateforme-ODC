@@ -1,0 +1,84 @@
+/* ============================================
+   Attestation ODC — Styles complémentaires
+   ============================================ */
+
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Polices */
+@font-face {
+  font-family: 'Poppins';
+  src: local('Poppins');
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: local('Inter');
+}
+
+/* Impression */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    padding: 0 !important;
+  }
+
+  .attestation {
+    border: 4px solid #FF7900 !important;
+    page-break-inside: avoid;
+  }
+
+  .bande-top,
+  .bande-bottom {
+    display: block !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .logo-odc,
+  .note-badge {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Utilitaires */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+
+.text-primary { color: #FF7900; }
+.text-dark { color: #1A1A1A; }
+.text-muted { color: #6B6B6B; }
+
+.bg-primary { background-color: #FF7900; }
+.bg-light { background-color: #FFF8F2; }
+
+/* Animations (écran seulement) */
+@media screen {
+  .attestation {
+    box-shadow: 0 10px 40px rgba(255, 121, 0, 0.15);
+  }
+
+  .cachet {
+    animation: stampPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes stampPulse {
+    0%, 100% { transform: rotate(-15deg) scale(1); }
+    50% { transform: rotate(-15deg) scale(1.05); }
+  }
+}
+
+/* Éviter les coupures de page */
+.no-break {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
