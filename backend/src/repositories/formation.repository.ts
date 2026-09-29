@@ -1,4 +1,4 @@
-import { BaseRepository } from './BaseRepository';
+import { BaseRepository } from '../repositories/BaseRepository';
 import { Formation } from '../models/Formation.entity';
 
 export class FormationRepository extends BaseRepository<Formation> {
