@@ -49,13 +49,14 @@ export class Formation extends BaseEntity {
   @Column({ type: 'int', default: 0, name: 'nb_participants_max' })
   nbParticipantsMax: number;
 
-  @ManyToOne(() => Domaine, (d) => d.formations, { nullable: true })
-  @JoinColumn({ name: 'domaine_id' })
-  domaineRelation: Domaine;
-
-  @Column({ name: 'domaine_id', nullable: true })
-  domaineId: string;
-
+  @ManyToOne(() => Domaine, (d) => d.formations, {
+     nullable: true, 
+     onDelete: 'SET NULL',
+     eager: true
+    })
+  @JoinColumn({name: 'domaine_id'})
+  domaineRelation: Domaine | null ;
+  
   @OneToMany(() => Session, (s) => s.formation)
   sessions: Session[];
 }
