@@ -17,7 +17,7 @@ export class Formation extends BaseEntity {
   titre: string;
 
   @Column({ type: 'text', nullable: true })
-  description: string| null;;
+  description: string | null;;
 
   @Column({ type: 'varchar', length: 100 })
   domaine: string;
@@ -29,16 +29,16 @@ export class Formation extends BaseEntity {
   niveau: NiveauFormation;
 
   @Column({ type: 'text', nullable: true })
-  prerequis: string;
+  prerequis: string | null;
 
   @Column({ type: 'text', nullable: true })
-  objectifs: string;
+  objectifs: string | null;
 
   @Column({ type: 'text', nullable: true })
-  programme: string;
+  programme: string | null ;
 
   @Column({ type: 'text', nullable: true, name: 'image_url' })
-  imageUrl: string;
+  imageUrl: string | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   prix: number;
