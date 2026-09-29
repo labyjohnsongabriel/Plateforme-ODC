@@ -17,7 +17,7 @@ export class Formation extends BaseEntity {
   titre: string;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description: string| null;;
 
   @Column({ type: 'varchar', length: 100 })
   domaine: string;
