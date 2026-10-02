@@ -1,4 +1,4 @@
-import { BaseRepository } from '../repositories/BaseRepository';
+import { BaseRepository } from './BaseRepository';
 import { Formation } from '../models/Formation.entity';
 
 export class FormationRepository extends BaseRepository<Formation> {
@@ -9,7 +9,7 @@ export class FormationRepository extends BaseRepository<Formation> {
   async findWithSessions(id: string): Promise<Formation | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ['sessions', 'sessions.formateur', 'sessions.formateur.role'],
+      relations: ['sessions', 'sessions.formateur',],
     });
   }
 
@@ -23,7 +23,8 @@ export class FormationRepository extends BaseRepository<Formation> {
   }) {
     const qb = this.repository
       .createQueryBuilder('f')
-      .leftJoinAndSelect('f.sessions', 's');
+      .leftJoinAndSelect('f.sessions', 's')
+      .where('f.deleted_at IS NULL'); 
 
     if (params.actif !== undefined) {
       qb.andWhere('f.actif = :actif', { actif: params.actif });
@@ -46,18 +47,24 @@ export class FormationRepository extends BaseRepository<Formation> {
       .take(params.limit);
 
     const [data, total] = await qb.getManyAndCount();
-    return { data, total };
+    return { data,
+             total,
+             page : params.page, 
+            limit: params.limit
+    };
   }
 
   async findTop(limit = 5): Promise<any[]> {
     return this.repository
       .createQueryBuilder('f')
-      .leftJoin('f.sessions', 's')
-      .leftJoin('s.inscriptions', 'i')
+      .innerJoin('f.sessions', 's')
+      .innerJoin('s.inscriptions', 'i')
       .select('f.titre', 'titre')
       .addSelect('COUNT(i.id)', 'inscriptions')
       .where('i.statut = :statut', { statut: 'ACCEPTEE' })
-      .groupBy('f.titre')
+      .andWhere('f.actif = true')
+      .groupBy('f.id')
+      .addGroupBy('f.titre')
       .orderBy('inscriptions', 'DESC')
       .limit(limit)
       .getRawMany();
@@ -68,7 +75,8 @@ export class FormationRepository extends BaseRepository<Formation> {
       .createQueryBuilder('f')
       .select('f.domaine', 'domaine')
       .addSelect('COUNT(f.id)', 'count')
-      .where('f.actif = true')
+      .where('f.actif = :actif', { actif: true })
+      .andWhere('f.deleted_Cat IS NULL')
       .groupBy('f.domaine')
       .getRawMany();
   }
