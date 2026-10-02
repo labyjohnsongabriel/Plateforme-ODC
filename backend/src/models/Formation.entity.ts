@@ -40,9 +40,6 @@ export class Formation extends BaseEntity {
   @Column({ type: 'text', nullable: true, name: 'image_url' })
   imageUrl: string | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  prix: number;
-
   @Column({ type: 'boolean', default: true })
   actif: boolean;
 
