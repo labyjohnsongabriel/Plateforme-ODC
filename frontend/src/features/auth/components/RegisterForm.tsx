@@ -13,7 +13,9 @@ import { Checkbox } from '@/components/common/Checkbox';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
 import { Alert } from '@/components/common/Alert';
+import { Select } from '@/components/common/Select';
 import { cn } from '@/utils/cn';
+import logoOdc from '@/assets/images/logo_odc.png';
 
 // ============================================================================
 //  CONFIG
@@ -38,6 +40,13 @@ const STRENGTH_TEXT_COLORS = [
   'text-odc-info',
   'text-odc-success',
 ] as const;
+
+const ROLE_OPTIONS = [
+  { value: 'PARTICIPANT', label: 'Participant — Suivre des formations' },
+  { value: 'FORMATEUR', label: 'Formateur — Animer des formations' },
+  { value: 'STAFF_ODC', label: 'Staff ODC — Gérer les formations' },
+  { value: 'PARTENAIRE', label: 'Partenaire — Collaborer avec l\'ODC' },
+];
 
 interface PasswordCheck {
   key: string;
@@ -87,13 +96,14 @@ export function RegisterForm() {
         padding="lg"
         className="animate-fade-in shadow-2xl border-odc-border-light/50 dark:border-odc-border-dark/50 backdrop-blur-sm"
       >
-        {/* ============================================================ */}
-        {/* HEADER                                                        */}
-        {/* ============================================================ */}
+        {/* HEADER */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-20 h-20 rounded-3xl bg-gradient-to-br from-odc-primary via-odc-primary to-odc-primary-dark items-center justify-center text-white font-bold text-3xl shadow-odc-lg mb-5 relative overflow-hidden group">
-            <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            <span className="relative z-10">ODC</span>
+          <div className="inline-flex w-24 h-24 items-center justify-center mb-5">
+            <img
+              src={logoOdc}
+              alt="Logo ODC"
+              className="w-full h-full object-contain drop-shadow-lg"
+            />
           </div>
 
           <h1 className="font-heading text-3xl font-bold text-odc-text-light dark:text-odc-text-dark mb-2">
@@ -104,9 +114,7 @@ export function RegisterForm() {
           </p>
         </div>
 
-        {/* ============================================================ */}
-        {/* ERREUR GLOBALE                                                */}
-        {/* ============================================================ */}
+        {/* ERREUR GLOBALE */}
         {authError && (
           <Alert variant="error" className="mb-5">
             <div className="flex items-start gap-2.5">
@@ -116,13 +124,9 @@ export function RegisterForm() {
           </Alert>
         )}
 
-        {/* ============================================================ */}
-        {/* FORMULAIRE                                                    */}
-        {/* ============================================================ */}
+        {/* FORMULAIRE */}
         <form onSubmit={onSubmit} className="space-y-5" noValidate>
-          {/* ============================================ */}
-          {/* SECTION 1 : Identité                          */}
-          {/* ============================================ */}
+          {/* SECTION 1 : Identité */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-odc-text-muted-light dark:text-odc-text-muted-dark uppercase tracking-wider">
               <div className="w-1 h-4 bg-odc-primary rounded-full" />
@@ -132,7 +136,7 @@ export function RegisterForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 label="Prénom"
-                placeholder="Jean"
+                placeholder="Amelia"
                 icon={<User size={16} />}
                 error={errors.prenom?.message}
                 autoComplete="given-name"
@@ -141,7 +145,7 @@ export function RegisterForm() {
               />
               <Input
                 label="Nom"
-                placeholder="Dupont"
+                placeholder="FANIRY"
                 icon={<User size={16} />}
                 error={errors.nom?.message}
                 autoComplete="family-name"
@@ -153,7 +157,7 @@ export function RegisterForm() {
             <Input
               label="Adresse email"
               type="email"
-              placeholder="jean@odc.mg"
+              placeholder="amelia@gmail.com"
               icon={<Mail size={16} />}
               error={errors.email?.message}
               autoComplete="email"
@@ -164,154 +168,157 @@ export function RegisterForm() {
             <Input
               label="Téléphone (optionnel)"
               type="tel"
-              placeholder="+261 34 12 345 67"
+              placeholder="+261 32 12 345 67"
               icon={<Phone size={16} />}
               error={errors.telephone?.message}
-              helper="Format malgache : +261 ou 034..."
+              helper="Format malgache : +261 ou 032..."
               autoComplete="tel"
               {...register('telephone')}
             />
+
+            {/* ✅ SÉLECTEUR DE RÔLE */}
+            <Select
+              label="Je m'inscris en tant que"
+              options={ROLE_OPTIONS}
+              error={errors.roleNom?.message}
+              required
+              {...register('roleNom')}
+            />
           </div>
 
-          {/* ============================================ */}
-          {/* SECTION 2 : Sécurité                          */}
-          {/* ============================================ */}
+          {/* SECTION 2 : Sécurité */}
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-xs font-semibold text-odc-text-muted-light dark:text-odc-text-muted-dark uppercase tracking-wider">
               <div className="w-1 h-4 bg-odc-primary rounded-full" />
               Sécurité
             </div>
 
-            {/* Mot de passe */}
-            <div>
-              <Input
-                label="Mot de passe"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                icon={<Lock size={16} />}
-                error={errors.motDePasse?.message}
-                autoComplete="new-password"
-                required
-                {...register('motDePasse')}
-                suffix={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                }
-              />
+            {/* ✅ GRILLE : Mot de passe + Confirmation côte à côte */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Mot de passe */}
+              <div>
+                <Input
+                  label="Mot de passe"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  icon={<Lock size={16} />}
+                  error={errors.motDePasse?.message}
+                  autoComplete="new-password"
+                  required
+                  {...register('motDePasse')}
+                  suffix={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  }
+                />
 
-              {/* Indicateur de force */}
-              {motDePasse && (
-                <div className="mt-3 space-y-2.5">
-                  {/* Barres */}
-                  <div className="flex gap-1.5">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          'h-1.5 flex-1 rounded-full transition-all duration-300',
-                          i < passwordStrength
-                            ? strengthColor
-                            : 'bg-odc-border-light dark:bg-odc-border-dark'
-                        )}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Label */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
-                      Force du mot de passe
-                    </span>
-                    <span className={cn('text-xs font-bold', strengthTextColor)}>
-                      {strengthLabel}
-                    </span>
-                  </div>
-
-                  {/* Checklist */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    {passwordChecks.map((item) => (
-                      <div
-                        key={item.key}
-                        className={cn(
-                          'flex items-center gap-1.5 text-xs transition-colors',
-                          item.check
-                            ? 'text-odc-success'
-                            : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
-                        )}
-                      >
+                {motDePasse && (
+                  <div className="mt-3 space-y-2.5">
+                    <div className="flex gap-1.5">
+                      {[0, 1, 2, 3].map((i) => (
                         <div
+                          key={i}
                           className={cn(
-                            'w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-                            item.check
-                              ? 'bg-odc-success text-white'
+                            'h-1.5 flex-1 rounded-full transition-all duration-300',
+                            i < passwordStrength
+                              ? strengthColor
                               : 'bg-odc-border-light dark:bg-odc-border-dark'
                           )}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
+                        Force
+                      </span>
+                      <span className={cn('text-xs font-bold', strengthTextColor)}>
+                        {strengthLabel}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {passwordChecks.map((item) => (
+                        <div
+                          key={item.key}
+                          className={cn(
+                            'flex items-center gap-1.5 text-xs transition-colors',
+                            item.check
+                              ? 'text-odc-success'
+                              : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
+                          )}
                         >
-                          {item.check ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
+                          <div
+                            className={cn(
+                              'w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
+                              item.check
+                                ? 'bg-odc-success text-white'
+                                : 'bg-odc-border-light dark:bg-odc-border-dark'
+                            )}
+                          >
+                            {item.check ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
+                          </div>
+                          {item.label}
                         </div>
-                        {item.label}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Confirmation */}
-            <div>
-              <Input
-                label="Confirmer le mot de passe"
-                type={showConfirm ? 'text' : 'password'}
-                placeholder="••••••••"
-                icon={<Lock size={16} />}
-                error={errors.confirmMotDePasse?.message}
-                autoComplete="new-password"
-                required
-                {...register('confirmMotDePasse')}
-                suffix={
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
-                    tabIndex={-1}
-                  >
-                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                }
-              />
+              {/* Confirmation */}
+              <div>
+                <Input
+                  label="Confirmer le mot de passe"
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  icon={<Lock size={16} />}
+                  error={errors.confirmMotDePasse?.message}
+                  autoComplete="new-password"
+                  required
+                  {...register('confirmMotDePasse')}
+                  suffix={
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                      className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
+                      tabIndex={-1}
+                    >
+                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  }
+                />
 
-              {/* Indicateur de correspondance */}
-              {confirmMotDePasse && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs">
-                  {passwordsMatch ? (
-                    <>
-                      <CheckCircle2 size={14} className="text-odc-success" />
-                      <span className="text-odc-success font-medium">
-                        Les mots de passe correspondent
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle size={14} className="text-odc-error" />
-                      <span className="text-odc-error font-medium">
-                        Les mots de passe ne correspondent pas
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
+                {confirmMotDePasse && (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs">
+                    {passwordsMatch ? (
+                      <>
+                        <CheckCircle2 size={14} className="text-odc-success" />
+                        <span className="text-odc-success font-medium">
+                          Correspondent
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle size={14} className="text-odc-error" />
+                        <span className="text-odc-error font-medium">
+                          Ne correspondent pas
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* ============================================ */}
-          {/* SECTION 3 : Termes                            */}
-          {/* ============================================ */}
+          {/* SECTION 3 : Termes */}
           <div className="pt-2 space-y-2">
             <Controller
               name="acceptTerms"
@@ -363,9 +370,7 @@ export function RegisterForm() {
             )}
           </div>
 
-          {/* ============================================ */}
-          {/* Submit                                        */}
-          {/* ============================================ */}
+          {/* Submit */}
           <Button
             type="submit"
             variant="primary"
@@ -379,9 +384,7 @@ export function RegisterForm() {
           </Button>
         </form>
 
-        {/* ============================================================ */}
-        {/* SÉPARATEUR                                                    */}
-        {/* ============================================================ */}
+        {/* SÉPARATEUR */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-odc-border-light dark:border-odc-border-dark" />
@@ -393,9 +396,7 @@ export function RegisterForm() {
           </div>
         </div>
 
-        {/* ============================================================ */}
-        {/* LIEN LOGIN                                                    */}
-        {/* ============================================================ */}
+        {/* LIEN LOGIN */}
         <Link
           to="/login"
           className="block text-center text-sm text-odc-primary hover:underline font-semibold group"
