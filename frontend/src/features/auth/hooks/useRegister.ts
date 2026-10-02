@@ -21,6 +21,7 @@ export function useRegister() {
       prenom: '',
       email: '',
       telephone: '',
+      roleNom: 'PARTICIPANT',   // 🆕 AJOUTÉ
       motDePasse: '',
       confirmMotDePasse: '',
       acceptTerms: false,
