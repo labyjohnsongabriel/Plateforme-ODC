@@ -25,10 +25,15 @@ export interface LoginData {
   motDePasse: string;
 }
 
+// 🔒 Rôles autorisés à l'inscription (ADMIN exclu volontairement)
+const ROLES_AUTORISES_INSCRIPTION: RoleName[] = [
+  RoleName.PARTICIPANT,
+  RoleName.FORMATEUR,
+  RoleName.STAFF_ODC,
+  RoleName.PARTENAIRE,
+];
+
 export class AuthService {
-  /**
-   * Inscription d'un nouvel utilisateur
-   */
   static async register(data: RegisterData) {
     const userRepo = AppDataSource.getRepository(User);
     const roleRepo = AppDataSource.getRepository(Role);
@@ -39,9 +44,20 @@ export class AuthService {
       throw new ConflictError(MESSAGES.AUTH.EMAIL_EXISTS);
     }
 
+    // Filtrer le rôle (sécurité)
+    const roleNomDemande = (data.roleNom as RoleName) || RoleName.PARTICIPANT;
+    const roleNom = ROLES_AUTORISES_INSCRIPTION.includes(roleNomDemande)
+      ? roleNomDemande
+      : RoleName.PARTICIPANT;
+
+    if (data.roleNom && data.roleNom !== roleNom) {
+      logger.warn(
+        `🚨 Tentative d'inscription avec rôle interdit : ${data.roleNom} (${data.email})`
+      );
+    }
+
     // Récupérer le rôle
-    const roleNom = data.roleNom || RoleName.PARTICIPANT;
-    const role = await roleRepo.findOne({ where: { nom: roleNom as RoleName } });
+    const role = await roleRepo.findOne({ where: { nom: roleNom } });
     if (!role) {
       throw new NotFoundError('Rôle introuvable');
     }
@@ -63,15 +79,17 @@ export class AuthService {
 
     await userRepo.save(user);
 
-    // Recharger avec le rôle
     const createdUser = await userRepo.findOne({
       where: { id: user.id },
       relations: ['role'],
     });
 
-    logger.info(`✅ Nouvel utilisateur inscrit : ${user.email}`);
+    if (!createdUser) {
+      throw new NotFoundError('Utilisateur introuvable après création');
+    }
 
-    // Générer tokens
+    logger.info(` Nouvel utilisateur inscrit : ${user.email} (rôle: ${roleNom})`);
+
     const tokens = generateTokens({
       userId: user.id,
       email: user.email,
@@ -79,18 +97,14 @@ export class AuthService {
     });
 
     return {
-      user: this.sanitizeUser(createdUser!),
+      user: this.sanitizeUser(createdUser),
       ...tokens,
     };
   }
 
-  /**
-   * Connexion utilisateur
-   */
   static async login(data: LoginData) {
     const userRepo = AppDataSource.getRepository(User);
 
-    // Récupérer l'utilisateur avec mot de passe
     const user = await userRepo
       .createQueryBuilder('user')
       .addSelect('user.motDePasse')
@@ -106,19 +120,16 @@ export class AuthService {
       throw new UnauthorizedError('Compte désactivé. Contactez l\'administrateur.');
     }
 
-    // Comparer mot de passe
     const valid = await comparePassword(data.motDePasse, user.motDePasse);
     if (!valid) {
       throw new UnauthorizedError(MESSAGES.AUTH.LOGIN_FAILED);
     }
 
-    // Mettre à jour dernière connexion
     user.derniereConnexion = new Date();
     await userRepo.save(user);
 
-    logger.info(`✅ Connexion réussie : ${user.email}`);
+    logger.info(`✅ Connexion réussie : ${user.email} (${user.role.nom})`);
 
-    // Générer tokens
     const tokens = generateTokens({
       userId: user.id,
       email: user.email,
@@ -131,9 +142,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Rafraîchir le token d'accès
-   */
   static async refresh(refreshToken: string) {
     try {
       const payload = verifyRefreshToken(refreshToken);
@@ -159,9 +167,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Récupérer le profil courant
-   */
   static async getProfile(userId: string) {
     const userRepo = AppDataSource.getRepository(User);
     const user = await userRepo.findOne({
@@ -174,15 +179,13 @@ export class AuthService {
     return this.sanitizeUser(user);
   }
 
-  /**
-   * Changer le mot de passe
-   */
   static async changePassword(
     userId: string,
     ancienMotDePasse: string,
     nouveauMotDePasse: string
   ) {
     const userRepo = AppDataSource.getRepository(User);
+
     const user = await userRepo
       .createQueryBuilder('user')
       .addSelect('user.motDePasse')
@@ -199,12 +202,9 @@ export class AuthService {
     user.motDePasse = await hashPassword(nouveauMotDePasse);
     await userRepo.save(user);
 
-    logger.info(`✅ Mot de passe changé pour : ${user.email}`);
+    logger.info(` Mot de passe changé pour : ${user.email}`);
   }
 
-  /**
-   * Retire les champs sensibles
-   */
   private static sanitizeUser(user: User) {
     const { motDePasse, ...rest } = user;
     return rest;
