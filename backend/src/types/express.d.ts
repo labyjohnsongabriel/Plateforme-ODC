@@ -1,4 +1,4 @@
-import { User } from '../models/User.entity';
+import { User } from '../entities/User.entity';
 
 declare global {
   namespace Express {
@@ -10,4 +10,4 @@ declare global {
   }
 }
 
-export {};
+export { };

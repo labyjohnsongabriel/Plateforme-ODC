@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
-import { Inscription, StatutInscription } from '../models/Inscription.entity';
-import { Session, StatutSession } from '../models/Session.entity';
-import { User } from '../models/User.entity';
+import { Inscription, StatutInscription } from '../entities/Inscription.entity';
+import { Session, StatutSession } from '../entities/Session.entity';
+import { User } from '../entities/User.entity';
 import { successResponse, paginatedResponse } from '../utils/response.util';
 import { getPagination } from '../utils/pagination.util';
 import { NotFoundError, ConflictError } from '../errors/AppError';
 import { NotificationService } from '../services/notification.service';
-import { TypeNotification } from '../models/Notification.entity';
+import { TypeNotification } from '../entities/Notification.entity';
 import { logger } from '../config/logger';
 import { In } from 'typeorm';
 
@@ -62,9 +62,9 @@ export class SelectionController {
         placesRestantes: Math.max(
           0,
           session.capacite -
-            (await AppDataSource.getRepository(Inscription).count({
-              where: { sessionId, statut: StatutInscription.ACCEPTEE },
-            }))
+          (await AppDataSource.getRepository(Inscription).count({
+            where: { sessionId, statut: StatutInscription.ACCEPTEE },
+          }))
         ),
       };
 
@@ -159,20 +159,20 @@ export class SelectionController {
             statut === StatutInscription.ACCEPTEE
               ? '🎉 Inscription acceptée'
               : statut === StatutInscription.REFUSEE
-              ? '❌ Inscription refusée'
-              : '⏳ Liste d\'attente',
+                ? '❌ Inscription refusée'
+                : '⏳ Liste d\'attente',
           message:
             statut === StatutInscription.ACCEPTEE
               ? `Vous êtes accepté pour « ${session.formation.titre} »`
               : statut === StatutInscription.REFUSEE
-              ? `Votre inscription a été refusée. Motif: ${motifRefus || 'Non précisé'}`
-              : `Vous êtes en liste d'attente pour « ${session.formation.titre} »`,
+                ? `Votre inscription a été refusée. Motif: ${motifRefus || 'Non précisé'}`
+                : `Vous êtes en liste d'attente pour « ${session.formation.titre} »`,
           type:
             statut === StatutInscription.ACCEPTEE
               ? TypeNotification.SUCCESS
               : statut === StatutInscription.REFUSEE
-              ? TypeNotification.ERROR
-              : TypeNotification.WARNING,
+                ? TypeNotification.ERROR
+                : TypeNotification.WARNING,
           metadata: { sessionId, inscriptionId: inscription.id },
         });
 

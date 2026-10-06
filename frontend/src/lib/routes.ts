@@ -1,0 +1,135 @@
+/* ============================================================================
+   ROUTES TYPÉES
+   ============================================================================ */
+export const ROUTES = {
+  public: {
+    home: '/',
+    aPropos: '/a-propos',
+    formations: '/formations',
+    formationDetail: (slug: string) => `/formations/${slug}`,
+    domaines: '/domaines',
+    domaineDetail: (slug: string) => `/domaines/${slug}`,
+    sessions: '/sessions',
+    sessionDetail: (code: string) => `/sessions/${code}`,
+    partenaires: '/partenaires',
+    partenaireDetail: (slug: string) => `/partenaires/${slug}`,
+    inscriptionEnLigne: '/inscription-en-ligne',
+    verifierAttestation: '/verifier-attestation',
+    verifierAttestationNumero: (numero: string) => `/verifier-attestation/${numero}`,
+    actualites: '/actualites',
+    contact: '/contact',
+    communauteY2C: '/communaute-y2c',
+  },
+
+  auth: {
+    connexion: '/connexion',
+    inscription: '/inscription',
+    motDePasseOublie: '/mot-de-passe-oublie',
+    reinitialiserMotDePasse: (token: string) => `/reinitialiser-mot-de-passe/${token}`,
+  },
+
+  admin: {
+    dashboard: '/admin/dashboard',
+    utilisateurs: '/admin/utilisateurs',
+    utilisateurDetail: (id: string) => `/admin/utilisateurs/${id}`,
+    roles: '/admin/roles',
+    roleDetail: (id: string) => `/admin/roles/${id}`,
+    domaines: '/admin/domaines',
+    domaineNouveau: '/admin/domaines/nouveau',
+    domaineDetail: (id: string) => `/admin/domaines/${id}`,
+    formations: '/admin/formations',
+    formationNouvelle: '/admin/formations/nouveau',
+    formationDetail: (id: string) => `/admin/formations/${id}`,
+    sessions: '/admin/sessions',
+    sessionNouvelle: '/admin/sessions/nouveau',
+    sessionDetail: (id: string) => `/admin/sessions/${id}`,
+    partenaires: '/admin/partenaires',
+    partenaireNouveau: '/admin/partenaires/nouveau',
+    partenaireDetail: (id: string) => `/admin/partenaires/${id}`,
+    attestations: '/admin/attestations',
+    auditLogs: '/admin/audit-logs',
+    exports: '/admin/exports',
+    parametres: '/admin/parametres',
+  },
+
+  staff: {
+    dashboard: '/staff/dashboard',
+    formations: '/staff/formations',
+    formationNouvelle: '/staff/formations/nouveau',
+    formationDetail: (id: string) => `/staff/formations/${id}`,
+    sessions: '/staff/sessions',
+    sessionNouvelle: '/staff/sessions/nouveau',
+    sessionDetail: (id: string) => `/staff/sessions/${id}`,
+    selections: '/staff/selections',
+    selectionSession: (id: string) => `/staff/selections/${id}`,
+    presences: '/staff/presences',
+    presenceSession: (id: string) => `/staff/presences/${id}`,
+    evaluations: '/staff/evaluations',
+    evaluationNouvelle: '/staff/evaluations/nouveau',
+    notes: '/staff/notes',
+    attestations: '/staff/attestations',
+    ressources: '/staff/ressources',
+    partenaires: '/staff/partenaires',
+    profil: '/staff/profil',
+  },
+
+  formateur: {
+    dashboard: '/formateur/dashboard',
+    sessions: '/formateur/sessions',
+    sessionDetail: (id: string) => `/formateur/sessions/${id}`,
+    presences: '/formateur/presences',
+    presenceSession: (id: string) => `/formateur/presences/${id}`,
+    evaluations: '/formateur/evaluations',
+    evaluationNouvelle: '/formateur/evaluations/nouveau',
+    evaluationDetail: (id: string) => `/formateur/evaluations/${id}`,
+    notes: '/formateur/notes',
+    ressources: '/formateur/ressources',
+    profil: '/formateur/profil',
+  },
+
+  participant: {
+    dashboard: '/participant/dashboard',
+    profil: '/participant/profil',
+    inscriptions: '/participant/inscriptions',
+    presences: '/participant/presences',
+    scanner: '/participant/presences/scanner',
+    evaluations: '/participant/evaluations',
+    evaluationDetail: (id: string) => `/participant/evaluations/${id}`,
+    notes: '/participant/notes',
+    attestations: '/participant/attestations',
+    ressources: '/participant/ressources',
+    reseauAnnuaire: '/participant/reseau/annuaire',
+    reseauConnexions: '/participant/reseau/connexions',
+    reseauDemandesEnAttente: '/participant/reseau/demandes/en-attente',
+    reseauDemandesEnvoyees: '/participant/reseau/demandes/envoyees',
+    reseauSuggestions: '/participant/reseau/suggestions',
+  },
+
+  partenaire: {
+    dashboard: '/partenaire/dashboard',
+    formations: '/partenaire/formations',
+    formationDetail: (slug: string) => `/partenaire/formations/${slug}`,
+    sessions: '/partenaire/sessions',
+    sessionDetail: (code: string) => `/partenaire/sessions/${code}`,
+    fiche: '/partenaire/fiche',
+    profil: '/partenaire/profil',
+  },
+
+  common: {
+    notifications: '/notifications',
+    messagerie: '/messagerie',
+    messagerieConversation: (id: string) => `/messagerie/${id}`,
+    parametres: '/parametres',
+  },
+} as const;
+
+/* ============================================================================
+   DASHBOARDS PAR RÔLE
+   ============================================================================ */
+export const ROLE_DASHBOARD: Record<string, string> = {
+  ADMINISTRATEUR: ROUTES.admin.dashboard,
+  STAFF_ODC: ROUTES.staff.dashboard,
+  FORMATEUR: ROUTES.formateur.dashboard,
+  PARTICIPANT: ROUTES.participant.dashboard,
+  PARTENAIRE: ROUTES.partenaire.dashboard,
+};

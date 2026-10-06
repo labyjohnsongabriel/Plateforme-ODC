@@ -1,5 +1,5 @@
 import { AppDataSource } from '../config/database';
-import { Session, StatutSession } from '../models/Session.entity';
+import { Session, StatutSession } from '../entities/Session.entity';
 import { logger } from '../config/logger';
 
 export class SessionStatutJob {

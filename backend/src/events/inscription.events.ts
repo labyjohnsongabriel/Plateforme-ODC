@@ -1,10 +1,10 @@
 import { eventEmitter, EVENTS } from './index';
 import { logger } from '../config/logger';
 import { NotificationService } from '../services/notification.service';
-import { TypeNotification } from '../models/Notification.entity';
+import { TypeNotification } from '../entities/Notification.entity';
 import { MailService } from '../services/mail.service';
 import { AppDataSource } from '../config/database';
-import { Inscription } from '../models/Inscription.entity';
+import { Inscription } from '../entities/Inscription.entity';
 
 /**
  * Enregistre les écouteurs d'événements liés aux inscriptions

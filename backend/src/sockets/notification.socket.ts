@@ -1,7 +1,7 @@
 import { Namespace, Socket } from 'socket.io';
 import { logger } from '../config/logger';
 import { AppDataSource } from '../config/database';
-import { Notification } from '../models/Notification.entity';
+import { Notification } from '../entities/Notification.entity';
 import { NotificationService } from '../services/notification.service';
 
 /**
@@ -195,7 +195,7 @@ export function emitNotification(
     .then((count) => {
       notifNs.to(`user:${userId}`).emit('notifications:count', { count });
     })
-    .catch(() => {});
+    .catch(() => { });
 }
 
 /**

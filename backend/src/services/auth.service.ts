@@ -1,212 +1,191 @@
-import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
-import { Role, RoleName } from '../models/Role.entity';
-import { hashPassword, comparePassword } from '../utils/password.util';
-import { generateTokens, verifyRefreshToken } from '../utils/jwt.util';
-import {
-  ConflictError,
-  UnauthorizedError,
-  NotFoundError,
-} from '../errors/AppError';
-import { MESSAGES } from '../constants/messages';
+// src/services/auth.service.ts
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { userRepository } from '../repositories/user.repository';
+import { roleRepository } from '../repositories/RoleRepository';
+import { User } from '../entities/User.entity';
+import { RoleName } from '../entities/enums';
+import { UnauthorizedError, ConflictError, NotFoundError, BadRequestError } from '../errors/AppError';
+import { emailService } from './mail.service';
 import { logger } from '../config/logger';
 
-export interface RegisterData {
+export interface RegisterInput {
   nom: string;
   prenom: string;
   email: string;
   motDePasse: string;
   telephone?: string;
-  roleNom?: string;
+  roleNom?: RoleName;
 }
 
-export interface LoginData {
+export interface LoginInput {
   email: string;
   motDePasse: string;
 }
 
+export interface JwtPayload {
+  userId: string;
+  email: string;
+  role: RoleName;
+  roleId: string;
+  permissions: string[];
+}
+
 export class AuthService {
-  /**
-   * Inscription d'un nouvel utilisateur
-   */
-  static async register(data: RegisterData) {
-    const userRepo = AppDataSource.getRepository(User);
-    const roleRepo = AppDataSource.getRepository(Role);
-
-    // Vérifier email unique
-    const existing = await userRepo.findOne({ where: { email: data.email } });
-    if (existing) {
-      throw new ConflictError(MESSAGES.AUTH.EMAIL_EXISTS);
+  /** Inscription — seul PARTICIPANT ou PARTENAIRE autorisé en auto-inscription */
+  static async register(input: RegisterInput) {
+    if (await userRepository.exists({ email: input.email } as any)) {
+      throw new ConflictError('Cet email est déjà utilisé');
     }
 
-    // Récupérer le rôle
-    const roleNom = data.roleNom || RoleName.PARTICIPANT;
-    const role = await roleRepo.findOne({ where: { nom: roleNom as RoleName } });
-    if (!role) {
-      throw new NotFoundError('Rôle introuvable');
-    }
+    // Sécurité : on n'autorise en auto-inscription que PARTICIPANT/PARTENAIRE
+    const roleName =
+      input.roleNom === RoleName.PARTENAIRE ? RoleName.PARTENAIRE : RoleName.PARTICIPANT;
 
-    // Hasher le mot de passe
-    const hashedPassword = await hashPassword(data.motDePasse);
+    const role = await roleRepository.findByName(roleName);
+    if (!role) throw new NotFoundError(`Rôle ${roleName} non initialisé`);
 
-    // Créer l'utilisateur
-    const user = userRepo.create({
-      nom: data.nom,
-      prenom: data.prenom,
-      email: data.email,
-      motDePasse: hashedPassword,
-      telephone: data.telephone,
+    const hashed = await bcrypt.hash(input.motDePasse, 12);
+    const user = await userRepository.create({
+      nom: input.nom,
+      prenom: input.prenom,
+      email: input.email.toLowerCase(),
+      motDePasse: hashed,
+      telephone: input.telephone,
       roleId: role.id,
-      actif: true,
-      emailVerifie: false,
     });
 
-    await userRepo.save(user);
+    // TODO: envoyer email de vérification
+    // await emailService.sendWelcome(user);
 
-    // Recharger avec le rôle
-    const createdUser = await userRepo.findOne({
-      where: { id: user.id },
-      relations: ['role'],
-    });
-
-    logger.info(`✅ Nouvel utilisateur inscrit : ${user.email}`);
-
-    // Générer tokens
-    const tokens = generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: roleNom,
-    });
-
-    return {
-      user: this.sanitizeUser(createdUser!),
-      ...tokens,
-    };
+    logger.info(`👤 Inscription : ${user.email} (${roleName})`);
+    return this.buildAuthResponse(user, role);
   }
 
-  /**
-   * Connexion utilisateur
-   */
-  static async login(data: LoginData) {
-    const userRepo = AppDataSource.getRepository(User);
+  /** Connexion */
+  static async login(input: LoginInput) {
+    const user = await userRepository.findByEmailWithPassword(input.email.toLowerCase());
+    if (!user) throw new UnauthorizedError('Email ou mot de passe incorrect');
+    if (!user.actif) throw new UnauthorizedError('Compte désactivé');
 
-    // Récupérer l'utilisateur avec mot de passe
-    const user = await userRepo
-      .createQueryBuilder('user')
-      .addSelect('user.motDePasse')
-      .leftJoinAndSelect('user.role', 'role')
-      .where('user.email = :email', { email: data.email })
-      .getOne();
+    const ok = await bcrypt.compare(input.motDePasse, user.motDePasse);
+    if (!ok) throw new UnauthorizedError('Email ou mot de passe incorrect');
 
-    if (!user) {
-      throw new UnauthorizedError(MESSAGES.AUTH.LOGIN_FAILED);
-    }
-
-    if (!user.actif) {
-      throw new UnauthorizedError('Compte désactivé. Contactez l\'administrateur.');
-    }
-
-    // Comparer mot de passe
-    const valid = await comparePassword(data.motDePasse, user.motDePasse);
-    if (!valid) {
-      throw new UnauthorizedError(MESSAGES.AUTH.LOGIN_FAILED);
-    }
-
-    // Mettre à jour dernière connexion
     user.derniereConnexion = new Date();
-    await userRepo.save(user);
+    await userRepository.save(user);
 
-    logger.info(`✅ Connexion réussie : ${user.email}`);
-
-    // Générer tokens
-    const tokens = generateTokens({
-      userId: user.id,
-      email: user.email,
-      role: user.role.nom,
-    });
-
-    return {
-      user: this.sanitizeUser(user),
-      ...tokens,
-    };
+    logger.info(`🔓 Connexion : ${user.email} (${user.role.nom})`);
+    return this.buildAuthResponse(user, user.role);
   }
 
-  /**
-   * Rafraîchir le token d'accès
-   */
+  /** Rafraîchir le token */
   static async refresh(refreshToken: string) {
     try {
-      const payload = verifyRefreshToken(refreshToken);
-      const userRepo = AppDataSource.getRepository(User);
-      const user = await userRepo.findOne({
-        where: { id: payload.userId },
-        relations: ['role'],
-      });
-
-      if (!user || !user.actif) {
-        throw new UnauthorizedError(MESSAGES.AUTH.UNAUTHORIZED);
-      }
-
-      const tokens = generateTokens({
-        userId: user.id,
-        email: user.email,
-        role: user.role.nom,
-      });
-
-      return tokens;
+      const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as { userId: string };
+      const user = await userRepository.findById(payload.userId, ['role', 'role.permissions']);
+      if (!user || !user.actif) throw new UnauthorizedError('Utilisateur invalide');
+      return this.buildAuthResponse(user, user.role);
     } catch {
-      throw new UnauthorizedError(MESSAGES.AUTH.TOKEN_INVALID);
+      throw new UnauthorizedError('Refresh token invalide ou expiré');
     }
   }
 
-  /**
-   * Récupérer le profil courant
-   */
+  /** Profil utilisateur */
   static async getProfile(userId: string) {
-    const userRepo = AppDataSource.getRepository(User);
-    const user = await userRepo.findOne({
-      where: { id: userId },
-      relations: ['role'],
-    });
-
-    if (!user) throw new NotFoundError(MESSAGES.USER.NOT_FOUND);
-
-    return this.sanitizeUser(user);
+    const user = await userRepository.findById(userId, ['role', 'role.permissions']);
+    if (!user) throw new NotFoundError('Utilisateur introuvable');
+    return this.sanitize(user);
   }
 
-  /**
-   * Changer le mot de passe
-   */
-  static async changePassword(
-    userId: string,
-    ancienMotDePasse: string,
-    nouveauMotDePasse: string
-  ) {
-    const userRepo = AppDataSource.getRepository(User);
-    const user = await userRepo
-      .createQueryBuilder('user')
-      .addSelect('user.motDePasse')
-      .where('user.id = :id', { id: userId })
+  /** Changement de mot de passe */
+  static async changePassword(userId: string, ancien: string, nouveau: string) {
+    const user = await userRepository.raw
+      .createQueryBuilder('u')
+      .addSelect('u.motDePasse')
+      .where('u.id = :id', { id: userId })
+      .getOne();
+    if (!user) throw new NotFoundError('Utilisateur introuvable');
+
+    const ok = await bcrypt.compare(ancien, user.motDePasse);
+    if (!ok) throw new UnauthorizedError('Ancien mot de passe incorrect');
+
+    if (nouveau.length < 8) throw new BadRequestError('Le mot de passe doit contenir au moins 8 caractères');
+    user.motDePasse = await bcrypt.hash(nouveau, 12);
+    await userRepository.save(user);
+
+    logger.info(`🔐 Mot de passe modifié : ${user.email}`);
+  }
+
+  /** Mot de passe oublié */
+  static async forgotPassword(email: string) {
+    const user = await userRepository.findByEmail(email.toLowerCase());
+    if (!user) return; // Ne pas révéler si l'email existe
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 60); // 1h
+    user.resetToken = token;
+    user.resetTokenExpires = expires;
+    await userRepository.save(user);
+
+    await emailService.sendPasswordReset(user, token);
+    logger.info(`📧 Email de réinitialisation envoyé : ${user.email}`);
+  }
+
+  /** Réinitialiser le mot de passe */
+  static async resetPassword(token: string, nouveau: string) {
+    const user = await userRepository.raw
+      .createQueryBuilder('u')
+      .addSelect('u.resetToken')
+      .addSelect('u.resetTokenExpires')
+      .where('u.resetToken = :token', { token })
       .getOne();
 
-    if (!user) throw new NotFoundError(MESSAGES.USER.NOT_FOUND);
-
-    const valid = await comparePassword(ancienMotDePasse, user.motDePasse);
-    if (!valid) {
-      throw new UnauthorizedError('Ancien mot de passe incorrect');
+    if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) {
+      throw new BadRequestError('Token invalide ou expiré');
     }
 
-    user.motDePasse = await hashPassword(nouveauMotDePasse);
-    await userRepo.save(user);
+    user.motDePasse = await bcrypt.hash(nouveau, 12);
+    user.resetToken = null as any;
+    user.resetTokenExpires = null as any;
+    await userRepository.save(user);
 
-    logger.info(`✅ Mot de passe changé pour : ${user.email}`);
+    logger.info(`🔐 Mot de passe réinitialisé : ${user.email}`);
   }
 
-  /**
-   * Retire les champs sensibles
-   */
-  private static sanitizeUser(user: User) {
-    const { motDePasse, ...rest } = user;
-    return rest;
+  // =====================================================================
+  // HELPERS PRIVÉS
+  // =====================================================================
+  private static buildAuthResponse(user: User, role: any) {
+    const permissions = (role.permissions ?? []).map((p: any) => p.code);
+
+    const payload: JwtPayload = {
+      userId: user.id,
+      email: user.email,
+      role: role.nom,
+      roleId: role.id,
+      permissions,
+    };
+
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+    });
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_REFRESH_SECRET!,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' },
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: process.env.JWT_EXPIRES_IN || '1d',
+      user: this.sanitize(user),
+    };
+  }
+
+  private static sanitize(user: User) {
+    const { motDePasse, resetToken, resetTokenExpires, ...safe } = user as any;
+    return safe;
   }
 }

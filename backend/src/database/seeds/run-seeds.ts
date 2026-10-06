@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import AppDataSource from '../data-source';
-import { Role, RoleName } from '../../models/Role.entity';
-import { User } from '../../models/User.entity';
-import { Formation, NiveauFormation } from '../../models/Formation.entity';
-import { Session, StatutSession } from '../../models/Session.entity';
-import { Partenaire } from '../../models/Partenaire.entity';
+import { Role, RoleName } from '../../entities/Role.entity';
+import { User } from '../../entities/User.entity';
+import { Formation, NiveauFormation } from '../../entities/Formation.entity';
+import { Session, StatutSession } from '../../entities/Session.entity';
+import { Partenaire } from '../../entities/Partenaire.entity';
 import { hashPassword } from '../../utils/password.util';
 import { logger } from '../../config/logger';
 

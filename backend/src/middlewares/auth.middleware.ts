@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, JwtPayload } from '../utils/jwt.util';
 import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
+import { User } from '../entities/User.entity';
 import { UnauthorizedError } from '../errors/AppError';
 import { MESSAGES } from '../constants/messages';
 

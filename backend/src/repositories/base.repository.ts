@@ -1,141 +1,147 @@
+// src/repositories/BaseRepository.ts
 import {
   Repository,
-  ObjectLiteral,
   FindOptionsWhere,
   FindManyOptions,
   DeepPartial,
+  ObjectLiteral,
+  SelectQueryBuilder,
 } from 'typeorm';
 import { AppDataSource } from '../config/database';
-import { PAGINATION } from '../config/constants.config';
+import { NotFoundError } from '../errors/AppError';
+import { BaseEntity } from '../entities/BaseEntity';
+
+export interface PaginationOptions {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 /**
- * Repository générique avec opérations CRUD communes
+ * Repository générique réutilisable pour toutes les entités.
+ * Fournit les opérations CRUD + pagination + soft delete.
  */
-export abstract class BaseRepository<T extends ObjectLiteral> {
-  protected repository: Repository<T>;
+export abstract class BaseRepository<T extends BaseEntity & ObjectLiteral> {
+  protected repo: Repository<T>;
 
   constructor(entity: new () => T) {
-    this.repository = AppDataSource.getRepository(entity);
+    this.repo = AppDataSource.getRepository(entity);
   }
 
-  /**
-   * Crée une entité
-   */
-  async create(data: DeepPartial<T>): Promise<T> {
-    const entity = this.repository.create(data);
-    return this.repository.save(entity);
-  }
-
-  /**
-   * Crée plusieurs entités
-   */
-  async createMany(data: DeepPartial<T>[]): Promise<T[]> {
-    const entities = this.repository.create(data);
-    return this.repository.save(entities);
-  }
-
-  /**
-   * Trouve par ID
-   */
+  // ============================================================
+  // LECTURE
+  // ============================================================
   async findById(id: string, relations: string[] = []): Promise<T | null> {
-    return this.repository.findOne({
+    return this.repo.findOne({
       where: { id } as FindOptionsWhere<T>,
       relations,
     });
   }
 
-  /**
-   * Trouve un par critères
-   */
-  async findOne(
-    where: FindOptionsWhere<T>,
-    relations: string[] = []
-  ): Promise<T | null> {
-    return this.repository.findOne({ where, relations });
+  async findByIdOrFail(id: string, relations: string[] = []): Promise<T> {
+    const entity = await this.findById(id, relations);
+    if (!entity) throw new NotFoundError('Ressource introuvable');
+    return entity;
   }
 
-  /**
-   * Trouve tous
-   */
-  async findAll(
-    options: FindManyOptions<T> = {}
-  ): Promise<T[]> {
-    return this.repository.find(options);
+  async findOne(where: FindOptionsWhere<T>, relations: string[] = []): Promise<T | null> {
+    return this.repo.findOne({ where, relations });
   }
 
-  /**
-   * Trouve avec pagination
-   */
-  async findPaginated(
-    page = PAGINATION.DEFAULT_PAGE,
-    limit = PAGINATION.DEFAULT_LIMIT,
-    options: FindManyOptions<T> = {}
-  ): Promise<{ data: T[]; total: number; page: number; limit: number }> {
-    const p = Math.max(1, page);
-    const l = Math.min(PAGINATION.MAX_LIMIT, Math.max(1, limit));
+  async findMany(options: FindManyOptions<T> = {}): Promise<T[]> {
+    return this.repo.find(options);
+  }
 
-    const [data, total] = await this.repository.findAndCount({
+  async count(where: FindOptionsWhere<T> = {}): Promise<number> {
+    return this.repo.count({ where });
+  }
+
+  async exists(where: FindOptionsWhere<T>): Promise<boolean> {
+    return this.repo.exists({ where });
+  }
+
+  // ============================================================
+  // PAGINATION
+  // ============================================================
+  async paginate(
+    options: FindManyOptions<T> & PaginationOptions = {},
+  ): Promise<PaginatedResult<T>> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(options.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.repo.findAndCount({
       ...options,
-      skip: (p - 1) * l,
-      take: l,
+      skip,
+      take: limit,
     });
 
-    return { data, total, page: p, limit: l };
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
-  /**
-   * Compte
-   */
-  async count(where?: FindOptionsWhere<T>): Promise<number> {
-    return this.repository.count({ where });
+  // ============================================================
+  // ÉCRITURE
+  // ============================================================
+  async create(data: DeepPartial<T>): Promise<T> {
+    const entity = this.repo.create(data);
+    return this.repo.save(entity);
   }
 
-  /**
-   * Existe
-   */
-  async exists(where: FindOptionsWhere<T>): Promise<boolean> {
-    const count = await this.repository.count({ where });
-    return count > 0;
-  }
-
-  /**
-   * Met à jour
-   */
-  async update(id: string, data: DeepPartial<T>): Promise<T | null> {
-    const entity = await this.findById(id);
-    if (!entity) return null;
+  async update(id: string, data: DeepPartial<T>): Promise<T> {
+    const entity = await this.findByIdOrFail(id);
     Object.assign(entity, data);
-    return this.repository.save(entity);
+    return this.repo.save(entity);
   }
 
-  /**
-   * Supprime (soft delete si activé)
-   */
-  async delete(id: string): Promise<boolean> {
-    const result = await this.repository.softDelete(id);
-    return (result.affected ?? 0) > 0;
+  async save(entity: T): Promise<T> {
+    return this.repo.save(entity);
   }
 
-  /**
-   * Supprime définitivement
-   */
-  async hardDelete(id: string): Promise<boolean> {
-    const result = await this.repository.delete(id);
-    return (result.affected ?? 0) > 0;
+  async saveMany(entities: T[]): Promise<T[]> {
+    return this.repo.save(entities);
   }
 
-  /**
-   * Restaure
-   */
-  async restore(id: string): Promise<boolean> {
-    const result = await this.repository.restore(id);
-    return (result.affected ?? 0) > 0;
+  // ============================================================
+  // SUPPRESSION
+  // ============================================================
+  async softDelete(id: string): Promise<void> {
+    const result = await this.repo.softDelete(id);
+    if (!result.affected) throw new NotFoundError('Ressource introuvable');
   }
 
-  /**
-   * QueryBuilder
-   */
-  createQueryBuilder(alias: string) {
-    return this.repository.createQueryBuilder(alias);
+  async hardDelete(id: string): Promise<void> {
+    const result = await this.repo.delete(id);
+    if (!result.affected) throw new NotFoundError('Ressource introuvable');
+  }
+
+  async restore(id: string): Promise<void> {
+    await this.repo.restore(id);
+  }
+
+  // ============================================================
+  // QUERY BUILDER HELPER
+  // ============================================================
+  protected qb(alias: string): SelectQueryBuilder<T> {
+    return this.repo.createQueryBuilder(alias);
+  }
+
+  /** Expose le repo TypeORM sous-jacent si nécessaire */
+  get raw(): Repository<T> {
+    return this.repo;
   }
 }

@@ -1,9 +1,9 @@
 import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
-import { Formation } from '../models/Formation.entity';
-import { Session } from '../models/Session.entity';
-import { Inscription } from '../models/Inscription.entity';
-import { Attestation } from '../models/Attestation.entity';
+import { User } from '../entities/User.entity';
+import { Formation } from '../entities/Formation.entity';
+import { Session } from '../entities/Session.entity';
+import { Inscription } from '../entities/Inscription.entity';
+import { Attestation } from '../entities/Attestation.entity';
 import { logger } from '../config/logger';
 import fs from 'fs/promises';
 import path from 'path';

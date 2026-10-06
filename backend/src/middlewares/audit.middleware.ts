@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
-import { AuditLog, ActionAudit } from '../models/AuditLog.entity';
+import { AuditLog, ActionAudit } from '../entities/AuditLog.entity';
 import { logger } from '../config/logger';
 
 /**

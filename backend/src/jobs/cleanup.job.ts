@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { AppDataSource } from '../config/database';
-import { Notification } from '../models/Notification.entity';
-import { AuditLog } from '../models/AuditLog.entity';
+import { Notification } from '../entities/Notification.entity';
+import { AuditLog } from '../entities/AuditLog.entity';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 

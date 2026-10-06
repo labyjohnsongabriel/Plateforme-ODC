@@ -4,7 +4,7 @@ import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { verifyAccessToken } from '../utils/jwt.util';
 import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
+import { User } from '../entities/User.entity';
 
 import { setupMessagerieSocket } from './messagerie.socket';
 import { setupNotificationSocket } from './notification.socket';

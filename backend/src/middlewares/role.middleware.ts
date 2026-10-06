@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../errors/AppError';
-import { RoleName } from '../models/Role.entity';
+import { RoleName } from '../entities/Role.entity';
 import { MESSAGES } from '../constants/messages';
 
 /**

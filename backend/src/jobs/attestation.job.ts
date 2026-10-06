@@ -1,5 +1,5 @@
 import { AppDataSource } from '../config/database';
-import { Session, StatutSession } from '../models/Session.entity';
+import { Session, StatutSession } from '../entities/Session.entity';
 import { AttestationService } from '../services/attestation.service';
 import { logger } from '../config/logger';
 import { LessThan } from 'typeorm';

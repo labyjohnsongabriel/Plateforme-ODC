@@ -1,9 +1,9 @@
 import { AppDataSource } from '../config/database';
-import { Session, StatutSession } from '../models/Session.entity';
-import { Inscription, StatutInscription } from '../models/Inscription.entity';
+import { Session, StatutSession } from '../entities/Session.entity';
+import { Inscription, StatutInscription } from '../entities/Inscription.entity';
 import { MailService } from '../services/mail.service';
 import { NotificationService } from '../services/notification.service';
-import { TypeNotification } from '../models/Notification.entity';
+import { TypeNotification } from '../entities/Notification.entity';
 import { logger } from '../config/logger';
 import { Between } from 'typeorm';
 

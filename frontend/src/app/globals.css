@@ -1,0 +1,282 @@
+/* ============================================================================
+   ODC PLATFORM — Styles globaux
+   ============================================================================ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   VARIABLES CSS — Light par défaut
+   ============================================================================ */
+:root {
+  /* ---------- COULEURS ODC ---------- */
+  --odc-primary: #FF7900;
+  --odc-primary-dark: #E65100;
+  --odc-primary-light: #FFB74D;
+  --odc-primary-soft: #FFE0B2;
+
+  /* ---------- FONDS ---------- */
+  --odc-background: #FFF8F2;
+  --odc-surface: #FFFFFF;
+  --odc-surface-alt: #F5F5F5;
+  --odc-elevated: #FFFFFF;
+
+  /* ---------- TEXTES ---------- */
+  --odc-text-primary: #1A1A1A;
+  --odc-text-secondary: #4A4A4A;
+  --odc-text-muted: #6B6B6B;
+  --odc-text-inverse: #FFFFFF;
+
+  /* ---------- BORDURES ---------- */
+  --odc-border: #E0E0E0;
+  --odc-border-light: #F0F0F0;
+  --odc-border-strong: #BDBDBD;
+
+  /* ---------- ÉTATS ---------- */
+  --odc-success: #2E7D32;
+  --odc-success-bg: #E8F5E9;
+  --odc-warning: #F57C00;
+  --odc-warning-bg: #FFF3E0;
+  --odc-error: #C62828;
+  --odc-error-bg: #FFEBEE;
+  --odc-info: #0277BD;
+  --odc-info-bg: #E1F5FE;
+  --odc-purple: #7B1FA2;
+  --odc-purple-bg: #F3E5F5;
+
+  /* ---------- OMBRES ---------- */
+  --odc-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --odc-shadow-md: 0 4px 6px rgba(255, 121, 0, 0.08);
+  --odc-shadow-lg: 0 10px 25px rgba(255, 121, 0, 0.12);
+  --odc-shadow-xl: 0 20px 40px rgba(255, 121, 0, 0.15);
+  --odc-shadow-focus: 0 0 0 4px rgba(255, 121, 0, 0.15);
+
+  /* ---------- shadcn/ui mapping ---------- */
+  --background: 30 100% 98%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+  --primary: 24 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 30 100% 94%;
+  --secondary-foreground: 24 100% 20%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 42%;
+  --accent: 30 100% 94%;
+  --accent-foreground: 24 100% 20%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 88%;
+  --input: 0 0% 88%;
+  --ring: 24 100% 50%;
+  --radius: 0.5rem;
+
+  color-scheme: light;
+}
+
+/* ============================================================================
+   MODE SOMBRE
+   ============================================================================ */
+.dark {
+  --odc-primary: #FF7900;
+  --odc-primary-dark: #E65100;
+  --odc-primary-light: #FFB74D;
+  --odc-primary-soft: #3D2A1A;
+
+  --odc-background: #0F0F0F;
+  --odc-surface: #1A1A1A;
+  --odc-surface-alt: #242424;
+  --odc-elevated: #2A2A2A;
+
+  --odc-text-primary: #F5F5F5;
+  --odc-text-secondary: #D0D0D0;
+  --odc-text-muted: #A0A0A0;
+  --odc-text-inverse: #1A1A1A;
+
+  --odc-border: #333333;
+  --odc-border-light: #2A2A2A;
+  --odc-border-strong: #4A4A4A;
+
+  --odc-success: #4CAF50;
+  --odc-success-bg: #1B3D1E;
+  --odc-warning: #FF9800;
+  --odc-warning-bg: #3D2A00;
+  --odc-error: #EF5350;
+  --odc-error-bg: #3D1A1A;
+  --odc-info: #29B6F6;
+  --odc-info-bg: #1A2F3D;
+  --odc-purple: #BA68C8;
+  --odc-purple-bg: #2D1B3D;
+
+  --odc-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --odc-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
+  --odc-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.6);
+  --odc-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.7);
+  --odc-shadow-focus: 0 0 0 4px rgba(255, 121, 0, 0.25);
+
+  --background: 0 0% 6%;
+  --foreground: 0 0% 96%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 96%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 96%;
+  --primary: 24 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 0 0% 96%;
+  --muted: 0 0% 14%;
+  --muted-foreground: 0 0% 63%;
+  --accent: 24 40% 15%;
+  --accent-foreground: 24 100% 70%;
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 24 100% 50%;
+
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   STYLES DE BASE — CSS PUR (pas de @apply)
+   ============================================================================ */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--odc-background);
+  color: var(--odc-text-primary);
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+}
+
+/* Reset de bordures */
+*,
+*::before,
+*::after {
+  border-color: var(--odc-border);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--odc-surface-alt);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--odc-border-strong);
+  border-radius: 5px;
+  border: 2px solid var(--odc-surface-alt);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--odc-primary);
+}
+
+::selection {
+  background-color: var(--odc-primary);
+  color: white;
+}
+
+:focus-visible {
+  outline: 2px solid var(--odc-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============================================================================
+   COMPOSANTS UTILITAIRES
+   ============================================================================ */
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .container-page {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container-page {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  .card-odc {
+    border-radius: 0.5rem;
+    border: 1px solid var(--odc-border);
+    background-color: var(--odc-surface);
+    box-shadow: var(--odc-shadow-sm);
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-odc:hover {
+    box-shadow: var(--odc-shadow-md);
+  }
+
+  .link-odc {
+    color: var(--odc-primary);
+    font-weight: 500;
+    transition: color 150ms;
+  }
+
+  .link-odc:hover {
+    color: var(--odc-primary-dark);
+    text-decoration: underline;
+  }
+}
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+.animate-slide-in-up { animation: slideInUp 0.4s ease-out; }
+.animate-slide-in-down { animation: slideInDown 0.4s ease-out; }
+.animate-scale-in { animation: scaleIn 0.2s ease-out; }
+
+/* ============================================================================
+   ACCESSIBILITÉ
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

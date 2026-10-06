@@ -1,63 +1,91 @@
-import { AppDataSource } from '../config/database';
-import { Session, StatutSession } from '../models/Session.entity';
-import { Formation } from '../models/Formation.entity';
-import { User } from '../models/User.entity';
-import { NotFoundError, ConflictError } from '../errors/AppError';
-import { getPagination } from '../utils/pagination.util';
+// src/services/session.service.ts
+import crypto from 'crypto';
+import { sessionRepository } from '../repositories/session.repository';
+import { formationRepository } from '../repositories/formation.repository';
+import { StatutSession } from '../entities/enums';
+import { NotFoundError, BadRequestError, ConflictError } from '../errors/AppError';
 import { logger } from '../config/logger';
 
 export class SessionService {
-  private static get repo() { return AppDataSource.getRepository(Session); }
-
-  static async create(data: any) {
-    const formation = await AppDataSource.getRepository(Formation).findOne({ where: { id: data.formationId } });
-    if (!formation) throw new NotFoundError('Formation introuvable');
-    if (new Date(data.dateDebut) >= new Date(data.dateFin)) throw new ConflictError('Date debut >= date fin');
-    const session = this.repo.create({ ...data, statut: StatutSession.OUVERTE }) as Session;
-    await this.repo.save(session);
-    logger.info(`Session creee : ${session.id}`);
-    return this.findById(session.id);
+  // ==================== 🌐 PUBLIC ====================
+  static async findAllPublic(filters: any) {
+    return sessionRepository.findPublic({
+      statut: filters.statut,
+      page: Number(filters.page) || 1,
+      limit: Number(filters.limit) || 10,
+    });
   }
 
-  static async findAll(params: any) {
-    const { page, limit, skip } = getPagination(params.page, params.limit);
-    const qb = this.repo.createQueryBuilder('s')
-      .leftJoinAndSelect('s.formation', 'f')
-      .leftJoinAndSelect('s.formateur', 'fo');
-    if (params.statut) qb.andWhere('s.statut = :st', { st: params.statut });
-    if (params.formationId) qb.andWhere('s.formation_id = :fid', { fid: params.formationId });
-    if (params.formateurId) qb.andWhere('s.formateur_id = :foid', { foid: params.formateurId });
-    qb.orderBy('s.dateDebut', 'DESC').skip(skip).take(limit);
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+  static async findByCodePublic(code: string) {
+    const session = await sessionRepository.findByCode(code);
+    if (!session || !session.estPubliee) {
+      throw new NotFoundError('Session introuvable');
+    }
+    return session;
+  }
+
+  // ==================== 🔒 ADMIN / STAFF ====================
+  static async create(data: any) {
+    if (!data.formationId || !data.dateDebut || !data.dateFin) {
+      throw new BadRequestError('formationId, dateDebut et dateFin requis');
+    }
+
+    const formation = await formationRepository.findById(data.formationId);
+    if (!formation) throw new NotFoundError('Formation introuvable');
+
+    const codeSession = data.codeSession || (await sessionRepository.generateCode());
+    if (await sessionRepository.findOne({ codeSession } as any)) {
+      throw new ConflictError('Code session déjà utilisé');
+    }
+
+    const session = await sessionRepository.create({
+      ...data,
+      codeSession,
+      qrCodeSecret: crypto.randomBytes(32).toString('hex'),
+    });
+
+    logger.info(`📅 Session créée : ${session.codeSession}`);
+    return session;
+  }
+
+  static async findAll(filters: any) {
+    return sessionRepository.search({
+      formationId: filters.formationId,
+      statut: filters.statut,
+      formateurId: filters.formateurId,
+      page: Number(filters.page) || 1,
+      limit: Number(filters.limit) || 10,
+    });
   }
 
   static async findById(id: string) {
-    const s = await this.repo.findOne({ where: { id }, relations: ['formation', 'formateur', 'inscriptions'] });
-    if (!s) throw new NotFoundError('Session introuvable');
-    return s;
+    return sessionRepository.findByIdOrFail(id, ['formation', 'formateur']);
   }
 
   static async update(id: string, data: any) {
-    const s = await this.findById(id);
-    Object.assign(s, data);
-    await this.repo.save(s);
-    return s;
+    return sessionRepository.update(id, data);
   }
 
   static async changerStatut(id: string, statut: StatutSession) {
-    const s = await this.findById(id);
-    s.statut = statut;
-    await this.repo.save(s);
+    const s = await sessionRepository.update(id, { statut });
+    logger.info(`🔄 Session ${s.codeSession} → ${statut}`);
     return s;
   }
 
+  static async togglePublication(id: string, estPubliee: boolean) {
+    return sessionRepository.update(id, { estPubliee });
+  }
+
+  static async ouvrirPresence(id: string, ouverte: boolean) {
+    return sessionRepository.update(id, { presenceOuverte: ouverte });
+  }
+
   static async delete(id: string) {
-    await this.findById(id);
-    await this.repo.softDelete(id);
+    await sessionRepository.softDelete(id);
+    logger.info(`🗑️ Session supprimée : ${id}`);
   }
 
   static async findMesSessions(formateurId: string) {
-    return this.repo.find({ where: { formateurId }, relations: ['formation'], order: { dateDebut: 'DESC' } });
+    return sessionRepository.findMesSessions(formateurId);
   }
 }
