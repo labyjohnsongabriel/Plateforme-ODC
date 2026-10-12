@@ -1,24 +1,39 @@
 // src/services/dashboard.service.ts
-import { Between, In } from 'typeorm';
+import { In } from 'typeorm';
+import { AppDataSource } from '../config/database';
 
-import { userRepository }        from '../repositories/user.repository';
-import { formationRepository }   from '../repositories/formation.repository';
-import { sessionRepository }     from '../repositories/session.repository';
-import { inscriptionRepository } from '../repositories/inscription.repository';
-import { attestationRepository } from '../repositories/attestation.repository';
-import { presenceRepository }    from '../repositories/presence.repository';
+import { User } from '../entities/User.entity';
+import { Formation } from '../entities/Formation.entity';
+import { Session } from '../entities/Session.entity';
+import { Inscription } from '../entities/Inscription.entity';
+import { Attestation } from '../entities/Attestation.entity';
+import { Presence } from '../entities/Presence.entity';
+import { Partenaire } from '../entities/Partenaire.entity';
 
 import {
   RoleName,
   StatutSession,
   StatutInscription,
+  StatutPresence,
 } from '../entities/enums';
 
 import { logger } from '../config/logger';
 
-// =============================================================================
-// TYPES DE RETOUR (typage strict pour le front)
-// =============================================================================
+/* ============================================================================
+   REPOSITORY FACTORIES
+   ============================================================================ */
+
+const userRepo = () => AppDataSource.getRepository(User);
+const formationRepo = () => AppDataSource.getRepository(Formation);
+const sessionRepo = () => AppDataSource.getRepository(Session);
+const inscriptionRepo = () => AppDataSource.getRepository(Inscription);
+const attestationRepo = () => AppDataSource.getRepository(Attestation);
+const presenceRepo = () => AppDataSource.getRepository(Presence);
+const partenaireRepo = () => AppDataSource.getRepository(Partenaire);
+
+/* ============================================================================
+   TYPES DE RETOUR
+   ============================================================================ */
 
 export interface KpiCard {
   value: number;
@@ -29,18 +44,39 @@ export interface KpiCard {
 export interface AdminStats {
   kpis: {
     totalUsers: number;
+    usersActifs: number;
     totalFormations: number;
+    formationsPubliees: number;
     totalSessions: number;
+    sessionsOuvertes: number;
     sessionsEnCours: number;
     totalInscriptions: number;
     inscriptionsEnAttente: number;
     totalAttestations: number;
+    totalPartenaires: number;
     tauxPresenceMoyen: number;
   };
-  usersByRole: Array<{ role: RoleName; count: number }>;
-  topFormations: Array<{ titre: string; inscriptions: number }>;
+  trends: {
+    users: number;
+    formations: number;
+    sessions: number;
+    inscriptions: number;
+  };
+  usersByRole: Array<{ role: string; count: number }>;
+  topFormations: Array<{
+    id: string;
+    titre: string;
+    slug: string;
+    domaine: string;
+    inscriptions: number;
+  }>;
   inscriptionsParMois: Array<{ mois: string; count: number }>;
-  sessionsParStatut: Array<{ statut: StatutSession; count: number }>;
+  formationsByDomaine: Array<{
+    domaine: string;
+    couleur: string;
+    count: number;
+  }>;
+  sessionsParStatut: Array<{ statut: string; count: number }>;
 }
 
 export interface StaffStats {
@@ -88,19 +124,19 @@ export interface PartenaireStats {
     totalParticipants: number;
     totalAttestations: number;
   };
-  parDomaine: Array<{ domaine: string; count: number }>;
-  sessionsPubliques: number;
   formationsPubliees: number;
+  sessionsPubliques: number;
+  parDomaine: Array<{ domaine: string; count: number }>;
 }
 
-// =============================================================================
-// SERVICE
-// =============================================================================
+/* ============================================================================
+   SERVICE
+   ============================================================================ */
 
 export class DashboardService {
-  // ==========================================================================
-  // 🎯 POINT D'ENTRÉE UNIFIÉ (utilisé par /api/dashboard/me)
-  // ==========================================================================
+  /* ==========================================================================
+     🎯 Point d'entrée unifié
+     ========================================================================== */
   static async getStats(role: RoleName, userId: string) {
     switch (role) {
       case RoleName.ADMINISTRATEUR:
@@ -118,92 +154,146 @@ export class DashboardService {
     }
   }
 
-  // ==========================================================================
-  // 👑 ADMINISTRATEUR — statistiques globales
-  // ==========================================================================
+  /* ==========================================================================
+     👑 ADMINISTRATEUR
+     ========================================================================== */
   static async getAdminStats(): Promise<AdminStats> {
     try {
-      // --- KPIs en parallèle ---
+      /* -------------------- KPIs -------------------- */
       const [
         totalUsers,
+        usersActifs,
         totalFormations,
+        formationsPubliees,
         totalSessions,
+        sessionsOuvertes,
         sessionsEnCours,
         totalInscriptions,
         inscriptionsEnAttente,
         totalAttestations,
+        totalPartenaires,
         tauxPresenceMoyen,
       ] = await Promise.all([
-        userRepository.count({ actif: true } as any),
-        formationRepository.count({ actif: true } as any),
-        sessionRepository.count(),
-        sessionRepository.count({ statut: StatutSession.EN_COURS } as any),
-        inscriptionRepository.count(),
-        inscriptionRepository.count({ statut: StatutInscription.EN_ATTENTE } as any),
-        attestationRepository.countValid(),
+        userRepo().count(),
+        userRepo().count({ where: { actif: true } }),
+        formationRepo().count(),
+        formationRepo().count({ where: { estPubliee: true } }),
+        sessionRepo().count(),
+        sessionRepo().count({ where: { statut: StatutSession.OUVERTE } }),
+        sessionRepo().count({ where: { statut: StatutSession.EN_COURS } }),
+        inscriptionRepo().count(),
+        inscriptionRepo().count({
+          where: { statut: StatutInscription.EN_ATTENTE },
+        }),
+        attestationRepo().count({ where: { valide: true } }),
+        partenaireRepo().count(),
         this.calculerTauxPresenceGlobal(),
       ]);
 
-      // --- Répartition par rôle ---
+      /* -------------------- Users by role -------------------- */
       const usersByRole = await this.getUsersByRole();
 
-      // --- Top 5 formations par inscriptions acceptées ---
-      const topFormations = await inscriptionRepository.raw
-        .createQueryBuilder('i')
-        .leftJoin('i.session', 's')
-        .leftJoin('s.formation', 'f')
-        .select('f.titre', 'titre')
+      /* -------------------- Top formations -------------------- */
+      const topFormations = await formationRepo()
+        .createQueryBuilder('f')
+        .leftJoin('f.sessions', 's')
+        .leftJoin('s.inscriptions', 'i')
+        .leftJoin('f.domaineRelation', 'd')
+        .select('f.id', 'id')
+        .addSelect('f.titre', 'titre')
+        .addSelect('f.slug', 'slug')
+        .addSelect('d.nom', 'domaine')
         .addSelect('COUNT(i.id)', 'inscriptions')
-        .where('i.statut = :statut', { statut: StatutInscription.ACCEPTEE })
-        .groupBy('f.titre')
+        .where('f.estPubliee = :pub', { pub: true })
+        .andWhere('f.deletedAt IS NULL')
+        .groupBy('f.id')
+        .addGroupBy('f.titre')
+        .addGroupBy('f.slug')
+        .addGroupBy('d.nom')
         .orderBy('inscriptions', 'DESC')
         .limit(5)
         .getRawMany()
         .then((rows) =>
-          rows.map((r) => ({ titre: r.titre, inscriptions: Number(r.inscriptions) })),
+          rows.map((r) => ({
+            id: r.id,
+            titre: r.titre,
+            slug: r.slug,
+            domaine: r.domaine ?? 'Sans domaine',
+            inscriptions: Number(r.inscriptions),
+          })),
         );
 
-      // --- Inscriptions mensuelles (12 derniers mois) ---
-      const inscriptionsParMois = await inscriptionRepository.raw
+      /* -------------------- Inscriptions par mois -------------------- */
+      const inscriptionsParMois = await inscriptionRepo()
         .createQueryBuilder('i')
-        .select("TO_CHAR(i.date_inscription, 'YYYY-MM')", 'mois')
+        .select("TO_CHAR(i.createdAt, 'YYYY-MM')", 'mois')
         .addSelect('COUNT(i.id)', 'count')
-        .where("i.date_inscription >= NOW() - INTERVAL '12 months'")
-        .groupBy('mois')
+        .where("i.createdAt >= NOW() - INTERVAL '12 months'")
+        .groupBy("TO_CHAR(i.createdAt, 'YYYY-MM')")
         .orderBy('mois', 'ASC')
         .getRawMany()
         .then((rows) =>
           rows.map((r) => ({ mois: r.mois, count: Number(r.count) })),
         );
 
-      // --- Répartition des sessions par statut ---
-      const sessionsParStatut = await sessionRepository.raw
-        .createQueryBuilder('s')
-        .select('s.statut', 'statut')
-        .addSelect('COUNT(s.id)', 'count')
-        .groupBy('s.statut')
+      /* -------------------- Formations par domaine -------------------- */
+      const formationsByDomaine = await formationRepo()
+        .createQueryBuilder('f')
+        .leftJoin('f.domaineRelation', 'd')
+        .select('d.nom', 'domaine')
+        .addSelect('d.couleur', 'couleur')
+        .addSelect('COUNT(f.id)', 'count')
+        .where('f.estPubliee = :pub', { pub: true })
+        .andWhere('f.deletedAt IS NULL')
+        .groupBy('d.nom')
+        .addGroupBy('d.couleur')
         .getRawMany()
         .then((rows) =>
           rows.map((r) => ({
-            statut: r.statut as StatutSession,
+            domaine: r.domaine ?? 'Sans domaine',
+            couleur: r.couleur ?? '#6B7280',
             count: Number(r.count),
           })),
         );
 
+      /* -------------------- Sessions par statut -------------------- */
+      const sessionsParStatut = await sessionRepo()
+        .createQueryBuilder('s')
+        .select('s.statut', 'statut')
+        .addSelect('COUNT(s.id)', 'count')
+        .where('s.deletedAt IS NULL')
+        .groupBy('s.statut')
+        .getRawMany()
+        .then((rows) =>
+          rows.map((r) => ({
+            statut: r.statut as string,
+            count: Number(r.count),
+          })),
+        );
+
+      /* -------------------- Trends -------------------- */
+      const trends = await this.computeTrends();
+
       return {
         kpis: {
           totalUsers,
+          usersActifs,
           totalFormations,
+          formationsPubliees,
           totalSessions,
+          sessionsOuvertes,
           sessionsEnCours,
           totalInscriptions,
           inscriptionsEnAttente,
           totalAttestations,
+          totalPartenaires,
           tauxPresenceMoyen,
         },
+        trends,
         usersByRole,
         topFormations,
         inscriptionsParMois,
+        formationsByDomaine,
         sessionsParStatut,
       };
     } catch (e: any) {
@@ -212,9 +302,9 @@ export class DashboardService {
     }
   }
 
-  // ==========================================================================
-  // 👔 STAFF ODC — statistiques opérationnelles
-  // ==========================================================================
+  /* ==========================================================================
+     👔 STAFF ODC
+     ========================================================================== */
   static async getStaffStats(): Promise<StaffStats> {
     const [
       inscriptionsEnAttente,
@@ -222,8 +312,12 @@ export class DashboardService {
       inscriptionsDuJour,
       tauxPresenceMoyen,
     ] = await Promise.all([
-      inscriptionRepository.count({ statut: StatutInscription.EN_ATTENTE } as any),
-      sessionRepository.count({ statut: StatutSession.EN_COURS } as any),
+      inscriptionRepo().count({
+        where: { statut: StatutInscription.EN_ATTENTE },
+      }),
+      sessionRepo().count({
+        where: { statut: StatutSession.EN_COURS },
+      }),
       this.compterInscriptionsDuJour(),
       this.calculerTauxPresenceGlobal(),
     ]);
@@ -237,11 +331,11 @@ export class DashboardService {
     };
   }
 
-  // ==========================================================================
-  // 👨‍🏫 FORMATEUR — mes sessions et participants
-  // ==========================================================================
+  /* ==========================================================================
+     👨‍🏫 FORMATEUR
+     ========================================================================== */
   static async getFormateurStats(formateurId: string): Promise<FormateurStats> {
-    const mesSessions = await sessionRepository.raw.find({
+    const mesSessions = await sessionRepo().find({
       where: { formateurId },
       relations: ['formation'],
       order: { dateDebut: 'DESC' },
@@ -257,23 +351,30 @@ export class DashboardService {
       (s) => s.statut === StatutSession.TERMINEE,
     ).length;
 
-    // --- Total participants acceptés sur toutes mes sessions ---
+    /* -------------------- Total participants -------------------- */
     const sessionIds = mesSessions.map((s) => s.id);
     let totalParticipants = 0;
     if (sessionIds.length > 0) {
-      totalParticipants = await inscriptionRepository.count({
-        sessionId: In(sessionIds),
-        statut: StatutInscription.ACCEPTEE,
-      } as any);
+      totalParticipants = await inscriptionRepo().count({
+        where: {
+          sessionId: In(sessionIds),
+          statut: StatutInscription.ACCEPTEE,
+        },
+      });
     }
 
-    // --- Taux de présence moyen sur mes sessions ---
-    const tauxPresenceMoyen = await this.calculerTauxPresenceParFormateur(formateurId);
+    /* -------------------- Taux présence -------------------- */
+    const tauxPresenceMoyen = await this.calculerTauxPresenceParFormateur(
+      formateurId,
+    );
 
-    // --- Prochaines sessions triées par date ---
+    /* -------------------- Prochaines sessions -------------------- */
     const prochainesSessions = mesSessions
       .filter((s) => new Date(s.dateDebut) > now)
-      .sort((a, b) => new Date(a.dateDebut).getTime() - new Date(b.dateDebut).getTime())
+      .sort(
+        (a, b) =>
+          new Date(a.dateDebut).getTime() - new Date(b.dateDebut).getTime(),
+      )
       .slice(0, 5)
       .map((s) => ({
         id: s.id,
@@ -293,14 +394,16 @@ export class DashboardService {
     };
   }
 
-  // ==========================================================================
-  // 🎓 PARTICIPANT — mon parcours
-  // ==========================================================================
-  static async getParticipantStats(participantId: string): Promise<ParticipantStats> {
-    const mesInscriptions = await inscriptionRepository.raw.find({
+  /* ==========================================================================
+     🎓 PARTICIPANT
+     ========================================================================== */
+  static async getParticipantStats(
+    participantId: string,
+  ): Promise<ParticipantStats> {
+    const mesInscriptions = await inscriptionRepo().find({
       where: { participantId },
       relations: ['session', 'session.formation'],
-      order: { dateInscription: 'DESC' },
+      order: { createdAt: 'DESC' },
     });
 
     const now = new Date();
@@ -313,20 +416,22 @@ export class DashboardService {
       (i) => i.session?.statut === StatutSession.TERMINEE,
     ).length;
 
-    // --- Attestations valides uniquement ---
-    const attestationsObtenues = await attestationRepository.count({
-      participantId,
-      valide: true,
-    } as any);
+    /* -------------------- Attestations -------------------- */
+    const attestationsObtenues = await attestationRepo().count({
+      where: { participantId, valide: true },
+    });
 
-    // --- Taux de présence moyen sur toutes mes sessions ---
-    const tauxPresenceMoyen = await this.calculerTauxPresenceParParticipant(participantId);
+    /* -------------------- Taux présence -------------------- */
+    const tauxPresenceMoyen =
+      await this.calculerTauxPresenceParParticipant(participantId);
 
-    // --- Prochaines sessions triées ---
+    /* -------------------- Prochaines sessions -------------------- */
     const prochainesSessions = mesInscriptions
       .filter((i) => i.session && new Date(i.session.dateDebut) > now)
-      .sort((a, b) =>
-        new Date(a.session.dateDebut).getTime() - new Date(b.session.dateDebut).getTime(),
+      .sort(
+        (a, b) =>
+          new Date(a.session.dateDebut).getTime() -
+          new Date(b.session.dateDebut).getTime(),
       )
       .slice(0, 5)
       .map((i) => ({
@@ -347,9 +452,9 @@ export class DashboardService {
     };
   }
 
-  // ==========================================================================
-  // 🤝 PARTENAIRE — statistiques publiques (anonymisées)
-  // ==========================================================================
+  /* ==========================================================================
+     🤝 PARTENAIRE
+     ========================================================================== */
   static async getPartenaireStats(): Promise<PartenaireStats> {
     const [
       totalFormations,
@@ -359,27 +464,33 @@ export class DashboardService {
       totalParticipants,
       totalAttestations,
     ] = await Promise.all([
-      formationRepository.count({ actif: true } as any),
-      formationRepository.count({ estPubliee: true, actif: true } as any),
-      sessionRepository.count(),
-      sessionRepository.count({ estPubliee: true } as any),
-      inscriptionRepository.count({ statut: StatutInscription.ACCEPTEE } as any),
-      attestationRepository.countValid(),
+      formationRepo().count(),
+      formationRepo().count({ where: { estPubliee: true } }),
+      sessionRepo().count(),
+      sessionRepo().count({ where: { estPubliee: true } }),
+      inscriptionRepo().count({
+        where: { statut: StatutInscription.ACCEPTEE },
+      }),
+      attestationRepo().count({ where: { valide: true } }),
     ]);
 
-    // Répartition par domaine
-    const parDomaine = await formationRepository.raw
+    /* -------------------- Par domaine -------------------- */
+    const parDomaine = await formationRepo()
       .createQueryBuilder('f')
       .leftJoin('f.domaineRelation', 'd')
-      .select('COALESCE(d.nom, f.domaine)', 'domaine')
+      .select('COALESCE(d.nom, :default)', 'domaine')
       .addSelect('COUNT(f.id)', 'count')
-      .where('f.actif = true')
-      .andWhere('f.est_publiee = true')
-      .groupBy('COALESCE(d.nom, f.domaine)')
+      .where('f.estPubliee = :pub', { pub: true })
+      .andWhere('f.deletedAt IS NULL')
+      .setParameter('default', 'Sans domaine')
+      .groupBy('COALESCE(d.nom, :default)')
       .orderBy('count', 'DESC')
       .getRawMany()
       .then((rows) =>
-        rows.map((r) => ({ domaine: r.domaine, count: Number(r.count) })),
+        rows.map((r) => ({
+          domaine: r.domaine ?? 'Sans domaine',
+          count: Number(r.count),
+        })),
       );
 
     return {
@@ -395,77 +506,196 @@ export class DashboardService {
     };
   }
 
-  // ==========================================================================
-  // 🔒 HELPERS PRIVÉS
-  // ==========================================================================
+  /* ==========================================================================
+     🔒 HELPERS PRIVÉS
+     ========================================================================== */
 
   /** Répartition des utilisateurs par rôle */
-  private static async getUsersByRole(): Promise<Array<{ role: RoleName; count: number }>> {
-    const rows = await userRepository.raw
+  private static async getUsersByRole(): Promise<
+    Array<{ role: string; count: number }>
+  > {
+    const rows = await userRepo()
       .createQueryBuilder('u')
       .leftJoin('u.role', 'r')
       .select('r.nom', 'role')
       .addSelect('COUNT(u.id)', 'count')
       .where('u.actif = true')
+      .andWhere('u.deletedAt IS NULL')
       .groupBy('r.nom')
       .getRawMany();
 
     return rows.map((r) => ({
-      role: r.role as RoleName,
+      role: r.role as string,
       count: Number(r.count),
     }));
   }
 
   /** Nombre d'inscriptions créées aujourd'hui */
   private static async compterInscriptionsDuJour(): Promise<number> {
-    return inscriptionRepository.raw
+    return inscriptionRepo()
       .createQueryBuilder('i')
-      .where('DATE(i.date_inscription) = CURRENT_DATE')
+      .where('DATE(i.createdAt) = CURRENT_DATE')
       .getCount();
   }
 
+  /* ==========================================================================
+     ⭐⭐ CORRECTION CRITIQUE — Taux de présence
+     ==========================================================================
+     
+     ❌ AVANT : `p.present = true` (colonne inexistante)
+     ✅ APRÈS : `p.statut = 'PRESENT'` (enum StatutPresence)
+     
+     ========================================================================== */
+
   /**
-   * Taux de présence GLOBAL (toutes sessions confondues).
-   * Formule correcte : présents / total * 100
+   * Taux de présence global (toutes sessions confondues)
    */
   private static async calculerTauxPresenceGlobal(): Promise<number> {
-    const raw = await presenceRepository.raw
+    const raw = await presenceRepo()
       .createQueryBuilder('p')
       .select('COUNT(p.id)', 'total')
-      .addSelect('SUM(CASE WHEN p.present = true THEN 1 ELSE 0 END)', 'presents')
+      .addSelect(
+        `SUM(CASE WHEN p.statut = :present THEN 1 ELSE 0 END)`,
+        'presents',
+      )
+      .setParameter('present', StatutPresence.PRESENT)
       .getRawOne();
 
     const total = Number(raw?.total ?? 0);
     const presents = Number(raw?.presents ?? 0);
+
     return total === 0 ? 0 : Math.round((presents / total) * 10000) / 100;
   }
 
-  /** Taux de présence moyen sur les sessions d'un formateur */
-  private static async calculerTauxPresenceParFormateur(formateurId: string): Promise<number> {
-    const raw = await presenceRepository.raw
+  /**
+   * Taux de présence par formateur
+   */
+  private static async calculerTauxPresenceParFormateur(
+    formateurId: string,
+  ): Promise<number> {
+    const raw = await presenceRepo()
       .createQueryBuilder('p')
       .leftJoin('p.session', 's')
       .select('COUNT(p.id)', 'total')
-      .addSelect('SUM(CASE WHEN p.present = true THEN 1 ELSE 0 END)', 'presents')
-      .where('s.formateur_id = :fid', { fid: formateurId })
+      .addSelect(
+        `SUM(CASE WHEN p.statut = :present THEN 1 ELSE 0 END)`,
+        'presents',
+      )
+      .where('s.formateurId = :fid', { fid: formateurId })
+      .setParameter('present', StatutPresence.PRESENT)
       .getRawOne();
 
     const total = Number(raw?.total ?? 0);
     const presents = Number(raw?.presents ?? 0);
+
     return total === 0 ? 0 : Math.round((presents / total) * 10000) / 100;
   }
 
-  /** Taux de présence moyen d'un participant */
-  private static async calculerTauxPresenceParParticipant(participantId: string): Promise<number> {
-    const raw = await presenceRepository.raw
+  /**
+   * Taux de présence par participant
+   */
+  private static async calculerTauxPresenceParParticipant(
+    participantId: string,
+  ): Promise<number> {
+    const raw = await presenceRepo()
       .createQueryBuilder('p')
       .select('COUNT(p.id)', 'total')
-      .addSelect('SUM(CASE WHEN p.present = true THEN 1 ELSE 0 END)', 'presents')
-      .where('p.participant_id = :pid', { pid: participantId })
+      .addSelect(
+        `SUM(CASE WHEN p.statut = :present THEN 1 ELSE 0 END)`,
+        'presents',
+      )
+      .where('p.participantId = :pid', { pid: participantId })
+      .setParameter('present', StatutPresence.PRESENT)
       .getRawOne();
 
     const total = Number(raw?.total ?? 0);
     const presents = Number(raw?.presents ?? 0);
+
     return total === 0 ? 0 : Math.round((presents / total) * 10000) / 100;
+  }
+
+  /* ==========================================================================
+     Trends : comparaison mois courant vs mois précédent
+     ========================================================================== */
+  private static async computeTrends() {
+    try {
+      const now = new Date();
+      const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startLastMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() - 1,
+        1,
+      );
+
+      const [
+        usersThis,
+        usersLast,
+        formationsThis,
+        formationsLast,
+        sessionsThis,
+        sessionsLast,
+        inscriptionsThis,
+        inscriptionsLast,
+      ] = await Promise.all([
+        userRepo()
+          .createQueryBuilder('u')
+          .where('u.createdAt >= :d', { d: startThisMonth })
+          .getCount(),
+        userRepo()
+          .createQueryBuilder('u')
+          .where('u.createdAt >= :d1 AND u.createdAt < :d2', {
+            d1: startLastMonth,
+            d2: startThisMonth,
+          })
+          .getCount(),
+        formationRepo()
+          .createQueryBuilder('f')
+          .where('f.createdAt >= :d', { d: startThisMonth })
+          .getCount(),
+        formationRepo()
+          .createQueryBuilder('f')
+          .where('f.createdAt >= :d1 AND f.createdAt < :d2', {
+            d1: startLastMonth,
+            d2: startThisMonth,
+          })
+          .getCount(),
+        sessionRepo()
+          .createQueryBuilder('s')
+          .where('s.createdAt >= :d', { d: startThisMonth })
+          .getCount(),
+        sessionRepo()
+          .createQueryBuilder('s')
+          .where('s.createdAt >= :d1 AND s.createdAt < :d2', {
+            d1: startLastMonth,
+            d2: startThisMonth,
+          })
+          .getCount(),
+        inscriptionRepo()
+          .createQueryBuilder('i')
+          .where('i.createdAt >= :d', { d: startThisMonth })
+          .getCount(),
+        inscriptionRepo()
+          .createQueryBuilder('i')
+          .where('i.createdAt >= :d1 AND i.createdAt < :d2', {
+            d1: startLastMonth,
+            d2: startThisMonth,
+          })
+          .getCount(),
+      ]);
+
+      const calc = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - previous) / previous) * 100);
+      };
+
+      return {
+        users: calc(usersThis, usersLast),
+        formations: calc(formationsThis, formationsLast),
+        sessions: calc(sessionsThis, sessionsLast),
+        inscriptions: calc(inscriptionsThis, inscriptionsLast),
+      };
+    } catch {
+      return { users: 0, formations: 0, sessions: 0, inscriptions: 0 };
+    }
   }
 }
