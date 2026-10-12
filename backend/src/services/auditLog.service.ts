@@ -5,6 +5,10 @@ import { NotFoundError, BadRequestError } from '../errors/AppError';
 import { logger } from '../config/logger';
 import { AuditLog } from '../entities/AuditLog.entity';
 
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
 export interface AuditSearchFilters {
   userId?: string;
   action?: string;
@@ -16,15 +20,18 @@ export interface AuditSearchFilters {
   limit?: number;
 }
 
+/* ============================================================================
+   SERVICE
+   ============================================================================ */
+
 export class AuditLogService {
-  // ==========================================================================
-  // ✍️ ENREGISTREMENT
-  // ==========================================================================
+  /* ==========================================================================
+     ✍️ ENREGISTREMENT
+     ========================================================================== */
 
   /**
-   * Enregistre une action dans le journal d'audit.
-   * Conçu pour être appelé depuis n'importe quel contrôleur/service.
-   * Ne lève jamais d'erreur (fail-safe).
+   * Enregistre une action depuis une requête Express.
+   * Ne lève JAMAIS d'erreur (fail-safe).
    */
   static async log(
     req: Request,
@@ -34,15 +41,15 @@ export class AuditLogService {
     details?: Record<string, any>,
   ): Promise<void> {
     try {
-      await auditLogRepository.create({
-        userId: req.userId ?? null,
+      await auditLogRepository.createLog({
+        userId: (req as any).user?.sub ?? (req as any).userId ?? null,
         action,
         entite,
         entiteId: entiteId ?? null,
         details: details ?? null,
         ipAddress: this.extractIp(req),
-        userAgent: req.headers['user-agent'] ?? null,
-      } as any);
+        userAgent: (req.headers['user-agent'] as string) ?? null,
+      });
     } catch (e: any) {
       // ⚠️ Ne jamais bloquer le flux métier à cause de l'audit
       logger.error(`❌ Échec audit log [${action}] : ${e.message}`);
@@ -50,19 +57,19 @@ export class AuditLogService {
   }
 
   /**
-   * Version sans `Request` (utile pour les jobs/cron/tests).
+   * Enregistre sans Request (jobs, crons, tests).
    */
   static async logDirect(params: {
-    userId?: string;
+    userId?: string | null;
     action: string;
     entite: string;
-    entiteId?: string;
-    details?: Record<string, any>;
-    ipAddress?: string;
-    userAgent?: string;
+    entiteId?: string | null;
+    details?: Record<string, any> | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
   }): Promise<void> {
     try {
-      await auditLogRepository.create({
+      await auditLogRepository.createLog({
         userId: params.userId ?? null,
         action: params.action,
         entite: params.entite,
@@ -70,15 +77,17 @@ export class AuditLogService {
         details: params.details ?? null,
         ipAddress: params.ipAddress ?? null,
         userAgent: params.userAgent ?? null,
-      } as any);
+      });
     } catch (e: any) {
-      logger.error(`❌ Échec audit log direct [${params.action}] : ${e.message}`);
+      logger.error(
+        `❌ Échec audit log direct [${params.action}] : ${e.message}`,
+      );
     }
   }
 
-  // ==========================================================================
-  // 📋 LECTURE
-  // ==========================================================================
+  /* ==========================================================================
+     📋 LECTURE
+     ========================================================================== */
 
   static async search(filters: AuditSearchFilters = {}) {
     const page = Math.max(1, filters.page ?? 1);
@@ -104,7 +113,7 @@ export class AuditLogService {
   }
 
   static async findById(id: string): Promise<AuditLog> {
-    const log = await auditLogRepository.findById(id);
+    const log = await auditLogRepository.findByIdWithUser(id);
     if (!log) throw new NotFoundError('Entrée d\'audit introuvable');
     return log;
   }
@@ -114,38 +123,39 @@ export class AuditLogService {
     return auditLogRepository.findByUser(userId, 200);
   }
 
-  static async findByEntite(entite: string, entiteId: string): Promise<AuditLog[]> {
+  static async findByEntite(
+    entite: string,
+    entiteId: string,
+  ): Promise<AuditLog[]> {
     if (!entite || !entiteId) {
       throw new BadRequestError('entite et entiteId requis');
     }
     return auditLogRepository.findByEntite(entite, entiteId, 200);
   }
 
-  // ==========================================================================
-  // 📊 STATISTIQUES
-  // ==========================================================================
+  /* ==========================================================================
+     📊 STATISTIQUES
+     ========================================================================== */
 
   static async stats(range: { dateDebut?: string; dateFin?: string }) {
     return auditLogRepository.stats(range);
   }
 
-  // ==========================================================================
-  // 🧹 MAINTENANCE
-  // ==========================================================================
+  /* ==========================================================================
+     🧹 MAINTENANCE
+     ========================================================================== */
 
-  /**
-   * Purge les entrées antérieures à N jours.
-   * @returns Nombre de lignes supprimées.
-   */
   static async cleanup(days: number): Promise<number> {
     const deleted = await auditLogRepository.deleteOlderThan(days);
-    logger.info(`🧹 Purge audit : ${deleted} entrée(s) supprimée(s) (> ${days}j)`);
+    logger.info(
+      `🧹 Purge audit : ${deleted} entrée(s) supprimée(s) (> ${days}j)`,
+    );
     return deleted;
   }
 
-  // ==========================================================================
-  // 🔒 HELPERS
-  // ==========================================================================
+  /* ==========================================================================
+     🔒 HELPERS
+     ========================================================================== */
 
   private static extractIp(req: Request): string | null {
     const forwarded = req.headers['x-forwarded-for'];
