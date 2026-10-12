@@ -1,9 +1,14 @@
 // src/repositories/AuditLogRepository.ts
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { AuditLog } from '../entities/AuditLog.entity';
+import { BaseRepository } from './base.repository';
+import { In } from 'typeorm';
 
-export interface AuditSearchParams {
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
+export interface AuditSearchOptions {
   userId?: string;
   action?: string;
   entite?: string;
@@ -14,68 +19,86 @@ export interface AuditSearchParams {
   limit?: number;
 }
 
-export class AuditLogRepository {
-  private repo: Repository<AuditLog>;
+/* ============================================================================
+   REPOSITORY
+   ============================================================================ */
 
+export class AuditLogRepository extends BaseRepository<AuditLog> {
   constructor() {
-    this.repo = AppDataSource.getRepository(AuditLog);
+    super(AuditLog);
   }
 
-  // ==========================================================================
-  // ✍️ ÉCRITURE
-  // ==========================================================================
-  async create(data: Partial<AuditLog>): Promise<AuditLog> {
-    const log = this.repo.create(data);
+  /* ==========================================================================
+     CREATE
+     ========================================================================== */
+  async createLog(data: {
+    userId?: string | null;
+    action: string;
+    entite?: string | null;
+    entiteId?: string | null;
+    details?: Record<string, any> | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  }): Promise<AuditLog> {
+    const log = this.repo.create({
+      userId: data.userId ?? null,
+      action: data.action,
+      entite: data.entite ?? null,
+      entiteId: data.entiteId ?? null,
+      details: data.details ?? null,
+      ipAddress: data.ipAddress ?? null,
+      userAgent: data.userAgent ?? null,
+    });
+
     return this.repo.save(log);
   }
 
-  // ==========================================================================
-  // 📋 LECTURE
-  // ==========================================================================
-  async findById(id: string): Promise<AuditLog | null> {
-    return this.repo.findOne({ where: { id } });
-  }
+  /* ==========================================================================
+     SEARCH avec pagination
+     ========================================================================== */
+  async search(options: AuditSearchOptions = {}): Promise<{
+    data: AuditLog[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(100, Math.max(1, options.limit ?? 20));
+    const skip = (page - 1) * limit;
 
-  async findByUser(userId: string, limit = 200): Promise<AuditLog[]> {
-    return this.repo.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-      take: limit,
-    });
-  }
+    const qb = this.repo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.user', 'u')
+      .where('a.deletedAt IS NULL');
 
-  async findByEntite(entite: string, entiteId: string, limit = 200): Promise<AuditLog[]> {
-    return this.repo.find({
-      where: { entite, entiteId },
-      order: { createdAt: 'DESC' },
-      take: limit,
-    });
-  }
-
-  // ==========================================================================
-  // 🔍 RECHERCHE PAGINÉE
-  // ==========================================================================
-  async search(params: AuditSearchParams = {}) {
-    const page = Math.max(1, params.page ?? 1);
-    const limit = Math.min(100, Math.max(1, params.limit ?? 20));
-
-    const qb = this.repo.createQueryBuilder('a');
-
-    if (params.userId)   qb.andWhere('a.user_id = :uid',   { uid: params.userId });
-    if (params.action)   qb.andWhere('a.action = :ac',     { ac: params.action });
-    if (params.entite)   qb.andWhere('a.entite = :en',     { en: params.entite });
-    if (params.entiteId) qb.andWhere('a.entite_id = :eid', { eid: params.entiteId });
-
-    if (params.dateDebut) {
-      qb.andWhere('a.created_at >= :dd', { dd: new Date(params.dateDebut) });
-    }
-    if (params.dateFin) {
-      qb.andWhere('a.created_at <= :df', { df: new Date(params.dateFin) });
+    if (options.userId) {
+      qb.andWhere('a.userId = :uid', { uid: options.userId });
     }
 
-    qb.orderBy('a.created_at', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+    if (options.action) {
+      qb.andWhere('a.action = :action', { action: options.action });
+    }
+
+    if (options.entite) {
+      qb.andWhere('a.entite = :entite', { entite: options.entite });
+    }
+
+    if (options.entiteId) {
+      qb.andWhere('a.entiteId = :entiteId', { entiteId: options.entiteId });
+    }
+
+    if (options.dateDebut) {
+      qb.andWhere('a.createdAt >= :dateDebut', {
+        dateDebut: options.dateDebut,
+      });
+    }
+
+    if (options.dateFin) {
+      qb.andWhere('a.createdAt <= :dateFin', { dateFin: options.dateFin });
+    }
+
+    qb.orderBy('a.createdAt', 'DESC').skip(skip).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
 
@@ -88,93 +111,186 @@ export class AuditLogRepository {
     };
   }
 
-  // ==========================================================================
-  // 📊 STATISTIQUES
-  // ==========================================================================
-  async stats(range: { dateDebut?: string; dateFin?: string }) {
-    const baseQb = this.repo.createQueryBuilder('a');
-
-    if (range.dateDebut) {
-      baseQb.andWhere('a.created_at >= :dd', { dd: new Date(range.dateDebut) });
-    }
-    if (range.dateFin) {
-      baseQb.andWhere('a.created_at <= :df', { df: new Date(range.dateFin) });
-    }
-
-    // Top 10 actions
-    const topActions = await baseQb
-      .clone()
-      .select('a.action', 'action')
-      .addSelect('COUNT(a.id)', 'count')
-      .groupBy('a.action')
-      .orderBy('count', 'DESC')
-      .limit(10)
-      .getRawMany()
-      .then((rows) => rows.map((r) => ({ action: r.action, count: Number(r.count) })));
-
-    // Top 10 utilisateurs actifs
-    const topUsers = await baseQb
-      .clone()
-      .select('a.user_id', 'userId')
-      .addSelect('COUNT(a.id)', 'count')
-      .where('a.user_id IS NOT NULL')
-      .groupBy('a.user_id')
-      .orderBy('count', 'DESC')
-      .limit(10)
-      .getRawMany()
-      .then((rows) => rows.map((r) => ({ userId: r.userId, count: Number(r.count) })));
-
-    // Top 10 entités touchées
-    const topEntites = await baseQb
-      .clone()
-      .select('a.entite', 'entite')
-      .addSelect('COUNT(a.id)', 'count')
-      .where('a.entite IS NOT NULL')
-      .groupBy('a.entite')
-      .orderBy('count', 'DESC')
-      .limit(10)
-      .getRawMany()
-      .then((rows) => rows.map((r) => ({ entite: r.entite, count: Number(r.count) })));
-
-    // Activité par jour (30 derniers jours)
-    const activityByDay = await baseQb
-      .clone()
-      .select("TO_CHAR(a.created_at, 'YYYY-MM-DD')", 'jour')
-      .addSelect('COUNT(a.id)', 'count')
-      .where("a.created_at >= NOW() - INTERVAL '30 days'")
-      .groupBy('jour')
-      .orderBy('jour', 'ASC')
-      .getRawMany()
-      .then((rows) => rows.map((r) => ({ jour: r.jour, count: Number(r.count) })));
-
-    // Total global
-    const total = await baseQb.clone().getCount();
-
-    return { total, topActions, topUsers, topEntites, activityByDay };
+  /* ==========================================================================
+     FIND BY ID
+     ========================================================================== */
+  async findByIdWithUser(id: string): Promise<AuditLog | null> {
+    return this.repo.findOne({
+      where: { id },
+      relations: ['user'],
+    });
   }
 
-  // ==========================================================================
-  // 🧹 MAINTENANCE
-  // ==========================================================================
-  /**
-   * Supprime les entrées de plus de `days` jours.
-   * @returns Nombre de lignes supprimées.
-   */
+  /* ==========================================================================
+     FIND BY USER
+     ========================================================================== */
+  async findByUser(userId: string, limit = 200): Promise<AuditLog[]> {
+    return this.repo.find({
+      where: { userId },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /* ==========================================================================
+     FIND BY ENTITE
+     ========================================================================== */
+  async findByEntite(
+    entite: string,
+    entiteId: string,
+    limit = 200,
+  ): Promise<AuditLog[]> {
+    return this.repo.find({
+      where: { entite, entiteId },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  /* ==========================================================================
+     STATS
+     ========================================================================== */
+  async stats(range: { dateDebut?: string; dateFin?: string }): Promise<{
+    total: number;
+    topActions: Array<{ action: string; count: number }>;
+    topUsers: Array<{
+      userId: string;
+      email: string;
+      nom: string;
+      prenom: string;
+      count: number;
+    }>;
+  }> {
+    /* -------------------- Total -------------------- */
+    const totalQb = this.repo
+      .createQueryBuilder('a')
+      .where('a.deletedAt IS NULL');
+
+    if (range.dateDebut) {
+      totalQb.andWhere('a.createdAt >= :dateDebut', {
+        dateDebut: range.dateDebut,
+      });
+    }
+    if (range.dateFin) {
+      totalQb.andWhere('a.createdAt <= :dateFin', {
+        dateFin: range.dateFin,
+      });
+    }
+
+    /* -------------------- Top actions -------------------- */
+    const actionsQb = this.repo
+      .createQueryBuilder('a')
+      .select('a.action', 'action')
+      .addSelect('COUNT(a.id)', 'count')
+      .where('a.deletedAt IS NULL');
+
+    if (range.dateDebut) {
+      actionsQb.andWhere('a.createdAt >= :dateDebut', {
+        dateDebut: range.dateDebut,
+      });
+    }
+    if (range.dateFin) {
+      actionsQb.andWhere('a.createdAt <= :dateFin', {
+        dateFin: range.dateFin,
+      });
+    }
+
+    /* -------------------- Top users -------------------- */
+    const usersQb = this.repo
+      .createQueryBuilder('a')
+      .leftJoin('a.user', 'u')
+      .select('u.id', 'userId')
+      .addSelect('u.email', 'email')
+      .addSelect('u.nom', 'nom')
+      .addSelect('u.prenom', 'prenom')
+      .addSelect('COUNT(a.id)', 'count')
+      .where('a.userId IS NOT NULL')
+      .andWhere('a.deletedAt IS NULL');
+
+    if (range.dateDebut) {
+      usersQb.andWhere('a.createdAt >= :dateDebut', {
+        dateDebut: range.dateDebut,
+      });
+    }
+    if (range.dateFin) {
+      usersQb.andWhere('a.createdAt <= :dateFin', {
+        dateFin: range.dateFin,
+      });
+    }
+
+    /* -------------------- Exécution -------------------- */
+    const [total, topActions, topUsers] = await Promise.all([
+      totalQb.getCount(),
+      actionsQb
+        .groupBy('a.action')
+        .orderBy('count', 'DESC')
+        .limit(10)
+        .getRawMany(),
+      usersQb
+        .groupBy('u.id')
+        .addGroupBy('u.email')
+        .addGroupBy('u.nom')
+        .addGroupBy('u.prenom')
+        .orderBy('count', 'DESC')
+        .limit(10)
+        .getRawMany(),
+    ]);
+
+    return {
+      total,
+      topActions: topActions.map((a) => ({
+        action: a.action,
+        count: Number(a.count),
+      })),
+      topUsers: topUsers.map((u) => ({
+        userId: u.userId,
+        email: u.email,
+        nom: u.nom,
+        prenom: u.prenom,
+        count: Number(u.count),
+      })),
+    };
+  }
+
+  /* ==========================================================================
+     DELETE OLDER THAN
+     ========================================================================== */
   async deleteOlderThan(days: number): Promise<number> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
     const result = await this.repo
       .createQueryBuilder()
       .delete()
-      .from(AuditLog)
-      .where('created_at < :cutoff', { cutoff })
+      .where('createdAt < :cutoff', { cutoff })
       .execute();
+
     return result.affected ?? 0;
   }
 
-  /** Compte total (admin dashboard) */
-  async count(): Promise<number> {
-    return this.repo.count();
+  /* ==========================================================================
+     FIND BY ENTITY IDS (batch)
+     ========================================================================== */
+  async findByEntiteIds(
+    entite: string,
+    entiteIds: string[],
+  ): Promise<AuditLog[]> {
+    if (entiteIds.length === 0) return [];
+
+    return this.repo.find({
+      where: {
+        entite,
+        entiteId: In(entiteIds),
+      },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+    });
   }
 }
+
+/* ============================================================================
+   SINGLETON
+   ============================================================================ */
 
 export const auditLogRepository = new AuditLogRepository();
