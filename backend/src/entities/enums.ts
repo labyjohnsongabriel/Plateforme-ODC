@@ -1,7 +1,11 @@
 // src/entities/enums.ts
 
-// ⚠️ Le rôle est géré par l'entité Role (table dédiée + permissions).
-// On garde uniquement un enum de référence pour les seeds/middlewares.
+/* ============================================================================
+   RÔLES
+   ⚠️ Le rôle est géré par l'entité Role (table dédiée + permissions).
+   On garde uniquement un enum de référence pour les seeds/middlewares.
+   ============================================================================ */
+
 export enum RoleName {
   ADMINISTRATEUR = 'ADMINISTRATEUR',
   STAFF_ODC = 'STAFF_ODC',
@@ -9,6 +13,10 @@ export enum RoleName {
   PARTICIPANT = 'PARTICIPANT',
   PARTENAIRE = 'PARTENAIRE',
 }
+
+/* ============================================================================
+   SESSIONS
+   ============================================================================ */
 
 export enum StatutSession {
   PLANIFIEE = 'PLANIFIEE',
@@ -18,6 +26,17 @@ export enum StatutSession {
   ANNULEE = 'ANNULEE',
 }
 
+// ⭐ AJOUTER — Utilisé par Session.entity.ts
+export enum ModaliteSession {
+  PRESENTIEL = 'PRESENTIEL',
+  EN_LIGNE = 'EN_LIGNE',
+  HYBRIDE = 'HYBRIDE',
+}
+
+/* ============================================================================
+   INSCRIPTIONS
+   ============================================================================ */
+
 export enum StatutInscription {
   EN_ATTENTE = 'EN_ATTENTE',
   ACCEPTEE = 'ACCEPTEE',
@@ -25,6 +44,10 @@ export enum StatutInscription {
   LISTE_ATTENTE = 'LISTE_ATTENTE',
   ANNULEE = 'ANNULEE',
 }
+
+/* ============================================================================
+   PRÉSENCES
+   ============================================================================ */
 
 export enum StatutPresence {
   PRESENT = 'PRESENT',
@@ -38,6 +61,10 @@ export enum MethodePresence {
   MANUEL = 'MANUEL',
 }
 
+/* ============================================================================
+   ÉVALUATIONS
+   ============================================================================ */
+
 export enum TypeEvaluation {
   PRE_TEST = 'PRE_TEST',
   POST_TEST = 'POST_TEST',
@@ -48,11 +75,19 @@ export enum TypeEvaluation {
   ORAL = 'ORAL',
 }
 
+/* ============================================================================
+   CONNEXIONS (réseau social)
+   ============================================================================ */
+
 export enum StatutConnection {
   EN_ATTENTE = 'EN_ATTENTE',
   ACCEPTEE = 'ACCEPTEE',
   REFUSEE = 'REFUSEE',
 }
+
+/* ============================================================================
+   FORMATIONS
+   ============================================================================ */
 
 export enum NiveauFormation {
   DEBUTANT = 'DEBUTANT',
@@ -60,12 +95,20 @@ export enum NiveauFormation {
   AVANCE = 'AVANCE',
 }
 
+/* ============================================================================
+   MESSAGES
+   ============================================================================ */
+
 export enum TypeMessage {
   TEXTE = 'TEXTE',
   IMAGE = 'IMAGE',
   FICHIER = 'FICHIER',
   SYSTEME = 'SYSTEME',
 }
+
+/* ============================================================================
+   RESSOURCES
+   ============================================================================ */
 
 export enum TypeRessource {
   PDF = 'PDF',
@@ -76,6 +119,10 @@ export enum TypeRessource {
   PRESENTATION = 'PRESENTATION',
   AUTRE = 'AUTRE',
 }
+
+/* ============================================================================
+   NOTIFICATIONS
+   ============================================================================ */
 
 export enum TypeNotification {
   INFO = 'INFO',
