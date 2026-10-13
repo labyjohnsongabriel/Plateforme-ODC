@@ -1,6 +1,10 @@
+// src/lib/routes.ts
+import type { RoleName } from '@/types/role.types';
+
 /* ============================================================================
-   ROUTES TYPÉES
+   ROUTES TYPÉES (camelCase original)
    ============================================================================ */
+
 export const ROUTES = {
   public: {
     home: '/',
@@ -124,8 +128,99 @@ export const ROUTES = {
 } as const;
 
 /* ============================================================================
+   ⭐ ALIAS SCREAMING_SNAKE_CASE (compatibilité AuthContext)
+   ============================================================================ */
+
+export const ROUTES_ALIAS = {
+  PUBLIC: {
+    HOME: ROUTES.public.home,
+    ABOUT: ROUTES.public.aPropos,
+    FORMATIONS: ROUTES.public.formations,
+    FORMATION_DETAIL: ROUTES.public.formationDetail,
+    DOMAINES: ROUTES.public.domaines,
+    DOMAINE_DETAIL: ROUTES.public.domaineDetail,
+    SESSIONS: ROUTES.public.sessions,
+    SESSION_DETAIL: ROUTES.public.sessionDetail,
+    PARTENAIRES: ROUTES.public.partenaires,
+    PARTENAIRE_DETAIL: ROUTES.public.partenaireDetail,
+    CONTACT: ROUTES.public.contact,
+    ACTUALITES: ROUTES.public.actualites,
+  },
+
+  AUTH: {
+    LOGIN: ROUTES.auth.connexion,
+    REGISTER: ROUTES.auth.inscription,
+    FORGOT_PASSWORD: ROUTES.auth.motDePasseOublie,
+    RESET_PASSWORD: ROUTES.auth.reinitialiserMotDePasse,
+  },
+
+  ADMIN: {
+    DASHBOARD: ROUTES.admin.dashboard,
+    USERS: ROUTES.admin.utilisateurs,
+    ROLES: ROUTES.admin.roles,
+    DOMAINES: ROUTES.admin.domaines,
+    FORMATIONS: ROUTES.admin.formations,
+    SESSIONS: ROUTES.admin.sessions,
+    PARTENAIRES: ROUTES.admin.partenaires,
+    ATTESTATIONS: ROUTES.admin.attestations,
+    PARAMETRES: ROUTES.admin.parametres,
+  },
+
+  STAFF: {
+    DASHBOARD: ROUTES.staff.dashboard,
+    FORMATIONS: ROUTES.staff.formations,
+    SESSIONS: ROUTES.staff.sessions,
+    PRESENCES: ROUTES.staff.presences,
+    EVALUATIONS: ROUTES.staff.evaluations,
+    NOTES: ROUTES.staff.notes,
+    ATTESTATIONS: ROUTES.staff.attestations,
+    RESSOURCES: ROUTES.staff.ressources,
+    PROFIL: ROUTES.staff.profil,
+  },
+
+  FORMATEUR: {
+    DASHBOARD: ROUTES.formateur.dashboard,
+    SESSIONS: ROUTES.formateur.sessions,
+    PRESENCES: ROUTES.formateur.presences,
+    EVALUATIONS: ROUTES.formateur.evaluations,
+    NOTES: ROUTES.formateur.notes,
+    RESSOURCES: ROUTES.formateur.ressources,
+    PROFIL: ROUTES.formateur.profil,
+  },
+
+  PARTICIPANT: {
+    DASHBOARD: ROUTES.participant.dashboard,
+    PROFIL: ROUTES.participant.profil,
+    INSCRIPTIONS: ROUTES.participant.inscriptions,
+    PRESENCES: ROUTES.participant.presences,
+    SCANNER: ROUTES.participant.scanner,
+    EVALUATIONS: ROUTES.participant.evaluations,
+    NOTES: ROUTES.participant.notes,
+    ATTESTATIONS: ROUTES.participant.attestations,
+    RESSOURCES: ROUTES.participant.ressources,
+    RESEAU_ANNUAIRE: ROUTES.participant.reseauAnnuaire,
+  },
+
+  PARTENAIRE: {
+    DASHBOARD: ROUTES.partenaire.dashboard,
+    FORMATIONS: ROUTES.partenaire.formations,
+    SESSIONS: ROUTES.partenaire.sessions,
+    FICHE: ROUTES.partenaire.fiche,
+    PROFIL: ROUTES.partenaire.profil,
+  },
+
+  COMMON: {
+    NOTIFICATIONS: ROUTES.common.notifications,
+    MESSAGERIE: ROUTES.common.messagerie,
+    CONVERSATION: ROUTES.common.messagerieConversation,
+    PARAMETRES: ROUTES.common.parametres,
+  },
+} as const;
+
+/* ============================================================================
    DASHBOARDS PAR RÔLE
    ============================================================================ */
+
 export const ROLE_DASHBOARD: Record<string, string> = {
   ADMINISTRATEUR: ROUTES.admin.dashboard,
   STAFF_ODC: ROUTES.staff.dashboard,
@@ -133,3 +228,57 @@ export const ROLE_DASHBOARD: Record<string, string> = {
   PARTICIPANT: ROUTES.participant.dashboard,
   PARTENAIRE: ROUTES.partenaire.dashboard,
 };
+
+/* ============================================================================
+   ⭐ getDashboardRoute — FONCTION MANQUANTE
+   ============================================================================ */
+
+/**
+ * Retourne la route du dashboard selon le rôle.
+ *
+ * @example
+ * getDashboardRoute('PARTICIPANT')     // → '/participant/dashboard'
+ * getDashboardRoute('ADMINISTRATEUR')  // → '/admin/dashboard'
+ * getDashboardRoute(undefined)         // → '/'
+ */
+export function getDashboardRoute(role?: string | null): string {
+  if (!role) return ROUTES.public.home;
+  return ROLE_DASHBOARD[role] ?? ROUTES.public.home;
+}
+
+/* ============================================================================
+   HELPERS
+   ============================================================================ */
+
+export function isPublicRoute(pathname: string): boolean {
+  const publicPaths: string[] = [
+    ROUTES.public.home,
+    ROUTES.public.aPropos,
+    ROUTES.public.formations,
+    ROUTES.public.sessions,
+    ROUTES.public.partenaires,
+    ROUTES.public.contact,
+  ];
+  return publicPaths.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
+export function isAuthRoute(pathname: string): boolean {
+  const authPaths: string[] = [
+    ROUTES.auth.connexion,
+    ROUTES.auth.inscription,
+    ROUTES.auth.motDePasseOublie,
+  ];
+  return authPaths.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
+export function isRoleAllowed(
+  userRole: string | undefined,
+  allowedRoles: RoleName[],
+): boolean {
+  if (!userRole) return false;
+  return allowedRoles.includes(userRole as RoleName);
+}

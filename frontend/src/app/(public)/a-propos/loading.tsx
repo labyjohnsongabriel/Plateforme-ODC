@@ -3,7 +3,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function Loading() {
   return (
     <>
-      {/* Hero skeleton */}
       <div className="bg-odc-surface-alt py-16">
         <div className="container-page">
           <Skeleton className="h-4 w-48 mb-4" />
@@ -11,8 +10,6 @@ export default function Loading() {
           <Skeleton className="h-5 w-full max-w-2xl" />
         </div>
       </div>
-
-      {/* Sections skeletons */}
       <div className="container-page py-16 space-y-24">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="space-y-6">

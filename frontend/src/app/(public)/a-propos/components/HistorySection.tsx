@@ -4,9 +4,9 @@ import { Calendar, TrendingUp, Users } from 'lucide-react';
 const MILESTONES = [
   {
     year: '2020',
-    title: 'Création de l\'ODC',
+    title: "Création de l'ODC",
     description:
-      'Ouverture du premier Orange Digital Center à Antananarivo, marquant le début de notre engagement pour l\'inclusion numérique à Madagascar.',
+      "Ouverture du premier Orange Digital Center à Antananarivo, marquant le début de notre engagement pour l'inclusion numérique à Madagascar.",
     icon: Calendar,
   },
   {
@@ -32,10 +32,7 @@ export function HistorySection() {
         <span className="inline-block rounded-full bg-odc-primary-soft text-odc-primary px-4 py-1.5 text-sm font-medium mb-4">
           Notre histoire
         </span>
-        <h2
-          id="history-title"
-          className="font-display text-3xl md:text-4xl font-bold mb-4"
-        >
+        <h2 id="history-title" className="font-display text-3xl md:text-4xl font-bold mb-4">
           Un parcours au service du numérique
         </h2>
         <p className="text-odc-muted max-w-2xl mx-auto">
@@ -58,9 +55,9 @@ export function HistorySection() {
         <div className="space-y-6">
           <p className="text-odc-secondary leading-relaxed">
             L&apos;Orange Digital Center est bien plus qu&apos;un simple lieu de
-            formation. C&apos;est un écosystème complet qui accompagne les
-            porteurs de projets, les jeunes diplômés et les professionnels
-            dans leur transition numérique.
+            formation. C&apos;est un écosystème complet qui accompagne les porteurs
+            de projets, les jeunes diplômés et les professionnels dans leur
+            transition numérique.
           </p>
           <p className="text-odc-secondary leading-relaxed">
             Nos programmes couvrent l&apos;ensemble des métiers du numérique :
@@ -68,14 +65,12 @@ export function HistorySection() {
             entrepreneuriat digital et bien plus encore.
           </p>
           <p className="text-odc-secondary leading-relaxed">
-            Nous croyons fermement que l&apos;accès à la formation numérique est
-            un levier majeur de développement économique et social pour
-            Madagascar.
+            Nous croyons fermement que l&apos;accès à la formation numérique est un
+            levier majeur de développement économique et social pour Madagascar.
           </p>
         </div>
       </div>
 
-      {/* Timeline */}
       <div className="relative">
         <div
           className="absolute left-0 right-0 top-12 h-0.5 bg-gradient-to-r from-odc-200 via-odc-500 to-odc-200 dark:from-odc-900 dark:via-odc-500 dark:to-odc-900"

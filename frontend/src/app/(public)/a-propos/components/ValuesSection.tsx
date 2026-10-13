@@ -6,7 +6,7 @@ const VALUES = [
     icon: Lightbulb,
     title: 'Innovation',
     description:
-      'Nous encourageons la créativité et l\'expérimentation pour préparer aux métiers de demain.',
+      "Nous encourageons la créativité et l'expérimentation pour préparer aux métiers de demain.",
     color: 'text-yellow-500',
     bg: 'bg-yellow-100 dark:bg-yellow-950',
   },
@@ -14,7 +14,7 @@ const VALUES = [
     icon: Users,
     title: 'Inclusion',
     description:
-      'Le numérique doit être accessible à tous, sans distinction de genre, d\'origine ou de niveau.',
+      "Le numérique doit être accessible à tous, sans distinction de genre, d'origine ou de niveau.",
     color: 'text-blue-500',
     bg: 'bg-blue-100 dark:bg-blue-950',
   },
@@ -30,7 +30,7 @@ const VALUES = [
     icon: Rocket,
     title: 'Impact',
     description:
-      'Chaque formation doit générer un impact concret : emploi, création d\'entreprise, projets.',
+      "Chaque formation doit générer un impact concret : emploi, création d'entreprise, projets.",
     color: 'text-purple-500',
     bg: 'bg-purple-100 dark:bg-purple-950',
   },
@@ -38,7 +38,7 @@ const VALUES = [
     icon: Heart,
     title: 'Communauté',
     description:
-      'Nous créons un réseau solidaire d\'anciens et de nouveaux apprenants pour durer.',
+      "Nous créons un réseau solidaire d'anciens et de nouveaux apprenants pour durer.",
     color: 'text-red-500',
     bg: 'bg-red-100 dark:bg-red-950',
   },
@@ -46,7 +46,7 @@ const VALUES = [
     icon: Target,
     title: 'Engagement',
     description:
-      'Nous nous engageons pleinement aux côtés de chaque apprenant jusqu\'à sa réussite.',
+      "Nous nous engageons pleinement aux côtés de chaque apprenant jusqu'à sa réussite.",
     color: 'text-green-500',
     bg: 'bg-green-100 dark:bg-green-950',
   },
@@ -59,10 +59,7 @@ export function ValuesSection() {
         <span className="inline-block rounded-full bg-odc-primary-soft text-odc-primary px-4 py-1.5 text-sm font-medium mb-4">
           Nos valeurs
         </span>
-        <h2
-          id="values-title"
-          className="font-display text-3xl md:text-4xl font-bold mb-4"
-        >
+        <h2 id="values-title" className="font-display text-3xl md:text-4xl font-bold mb-4">
           Ce qui nous guide au quotidien
         </h2>
         <p className="text-odc-muted max-w-2xl mx-auto">

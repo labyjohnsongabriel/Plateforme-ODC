@@ -40,28 +40,48 @@ export const queryKeys = {
     bySlug: (slug: string) => ['domaines', 'slug', slug] as const,
   },
 
-  /* ---------------- Sessions ---------------- */
-  sessions: {
-    all: ['sessions'] as const,
-    list: (filters?: any) => ['sessions', 'list', filters] as const,
-    public: (filters?: any) => ['sessions', 'public', filters] as const,
-    detail: (id: string) => ['sessions', 'detail', id] as const,
-    byCode: (code: string) => ['sessions', 'code', code] as const,
-    mes: ['sessions', 'mes'] as const,
-  },
+sessions: {
+  all: ['sessions'] as const,
+
+  // Back-office
+  list: (filters?: any) => ['sessions', 'list', filters] as const,
+  infinite: (filters?: any) => ['sessions', 'infinite', filters] as const,
+  detail: (id: string) => ['sessions', 'detail', id] as const,
+  byCode: (code: string) => ['sessions', 'code', code] as const,
+  byFormation: (formationId: string) =>
+    ['sessions', 'formation', formationId] as const,
+  upcoming: (limit: number) => ['sessions', 'upcoming', limit] as const,
+  participants: (sessionId: string) =>
+    ['sessions', 'participants', sessionId] as const,
+  stats: (sessionId: string) => ['sessions', 'stats', sessionId] as const,
+  mes: ['sessions', 'mes'] as const,
+
+  // Public
+  public: (filters?: any) => ['sessions', 'public', filters] as const,
+  publicInfinite: (filters?: any) =>
+    ['sessions', 'public', 'infinite', filters] as const,
+  publicDetail: (code: string) =>
+    ['sessions', 'public', 'detail', code] as const,
+  publicUpcoming: (limit: number) =>
+    ['sessions', 'public', 'upcoming', limit] as const,
+  publicByFormation: (slug: string) =>
+    ['sessions', 'public', 'formation', slug] as const,
+},
 
   /* ---------------- Inscriptions ---------------- */
   inscriptions: {
     all: ['inscriptions'] as const,
     list: (filters?: any) => ['inscriptions', 'list', filters] as const,
     detail: (id: string) => ['inscriptions', 'detail', id] as const,
-    bySession: (sessionId: string) => ['inscriptions', 'session', sessionId] as const,
+    bySession: (sessionId: string) =>
+      ['inscriptions', 'session', sessionId] as const,
   },
 
   /* ---------------- Présences ---------------- */
   presences: {
     all: ['presences'] as const,
-    bySession: (sessionId: string) => ['presences', 'session', sessionId] as const,
+    bySession: (sessionId: string) =>
+      ['presences', 'session', sessionId] as const,
     mes: ['presences', 'mes'] as const,
     stats: (sessionId: string) => ['presences', 'stats', sessionId] as const,
   },
@@ -69,7 +89,8 @@ export const queryKeys = {
   /* ---------------- Évaluations ---------------- */
   evaluations: {
     all: ['evaluations'] as const,
-    bySession: (sessionId: string) => ['evaluations', 'session', sessionId] as const,
+    bySession: (sessionId: string) =>
+      ['evaluations', 'session', sessionId] as const,
     detail: (id: string) => ['evaluations', 'detail', id] as const,
   },
 
@@ -77,20 +98,23 @@ export const queryKeys = {
   notes: {
     all: ['notes'] as const,
     mes: ['notes', 'mes'] as const,
-    byEvaluation: (evaluationId: string) => ['notes', 'evaluation', evaluationId] as const,
+    byEvaluation: (evaluationId: string) =>
+      ['notes', 'evaluation', evaluationId] as const,
   },
 
   /* ---------------- Attestations ---------------- */
   attestations: {
     all: ['attestations'] as const,
     mes: ['attestations', 'mes'] as const,
-    byNumero: (numero: string) => ['attestations', 'numero', numero] as const,
+    byNumero: (numero: string) =>
+      ['attestations', 'numero', numero] as const,
   },
 
   /* ---------------- Ressources ---------------- */
   ressources: {
     all: ['ressources'] as const,
-    bySession: (sessionId: string) => ['ressources', 'session', sessionId] as const,
+    bySession: (sessionId: string) =>
+      ['ressources', 'session', sessionId] as const,
   },
 
   /* ---------------- Partenaires ---------------- */

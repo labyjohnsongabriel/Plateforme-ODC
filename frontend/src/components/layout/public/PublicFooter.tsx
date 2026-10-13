@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import {
   Facebook, Instagram, Linkedin, Twitter,
@@ -11,21 +13,21 @@ import { Input } from '@/components/ui/input';
    ============================================================================ */
 const FOOTER_LINKS = {
   programme: [
-    { href: '/formations',  label: 'Nos formations' },
-    { href: '/sessions',    label: 'Sessions à venir' },
-    { href: '/domaines',    label: 'Domaines' },
+    { href: '/formations',     label: 'Nos formations' },
+    { href: '/sessions',       label: 'Sessions à venir' },
+    { href: '/domaines',       label: 'Domaines' },
     { href: '/communaute-y2c', label: 'Communauté Y2C' },
   ],
   entreprise: [
-    { href: '/a-propos',   label: 'À propos' },
+    { href: '/a-propos',    label: 'À propos' },
     { href: '/partenaires', label: 'Partenaires' },
-    { href: '/actualites', label: 'Actualités' },
-    { href: '/contact',    label: 'Contact' },
+    { href: '/actualites',  label: 'Actualités' },
+    { href: '/contact',     label: 'Contact' },
   ],
   legal: [
-    { href: '/mentions-legales',     label: 'Mentions légales' },
+    { href: '/mentions-legales',          label: 'Mentions légales' },
     { href: '/politique-confidentialite', label: 'Confidentialité' },
-    { href: '/cgu',                  label: 'CGU' },
+    { href: '/cgu',                       label: 'CGU' },
   ],
 } as const;
 
@@ -55,7 +57,13 @@ export function PublicFooter() {
               </p>
             </div>
 
-            <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                // TODO: brancher l'API newsletter ici
+              }}
+            >
               <Input
                 type="email"
                 placeholder="votre@email.mg"
