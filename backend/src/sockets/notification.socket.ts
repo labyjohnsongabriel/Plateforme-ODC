@@ -1,7 +1,11 @@
 import { Namespace, Socket } from 'socket.io';
 import { logger } from '../config/logger';
 import { AppDataSource } from '../config/database';
+<<<<<<< HEAD
 import { Notification } from '../models/Notification.entity';
+=======
+import { Notification } from '../entities/Notification.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import { NotificationService } from '../services/notification.service';
 
 /**
@@ -195,7 +199,11 @@ export function emitNotification(
     .then((count) => {
       notifNs.to(`user:${userId}`).emit('notifications:count', { count });
     })
+<<<<<<< HEAD
     .catch(() => {});
+=======
+    .catch(() => { });
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 }
 
 /**

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { ID, Timestamp, PaginationParams } from './common.types';
 import { User } from './user.types';
 import { Session } from './session.types';
@@ -18,12 +19,33 @@ export interface Evaluation {
   type: TypeEvaluation;
   noteMax: number;
   noteMin: number;
+=======
+import type { Session } from './session.types';
+import type { Note } from './note.types';
+
+export type TypeEvaluation =
+  | 'PRE_TEST'
+  | 'POST_TEST'
+  | 'QUIZ'
+  | 'PROJET'
+  | 'EXAMEN'
+  | 'TP'
+  | 'ORAL';
+
+export interface Evaluation {
+  id: string;
+  titre: string;
+  type: TypeEvaluation;
+  noteMax: number;
+  noteMinPassage: number;
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   coefficient: number;
   dateEvaluation?: string;
   dureeMinutes?: number;
   description?: string;
   consignes?: string;
   publiee: boolean;
+<<<<<<< HEAD
   notes?: Note[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -81,3 +103,12 @@ export const TYPE_EVALUATION_CONFIG: Record<TypeEvaluation, { label: string; var
   [TypeEvaluation.TP]: { label: 'Travaux pratiques', variant: 'success', icon: 'wrench' },
   [TypeEvaluation.ORAL]: { label: 'Présentation orale', variant: 'warning', icon: 'microphone' },
 };
+=======
+  session: Session;
+  sessionId: string;
+  createurId?: string;
+  notes?: Note[];
+  createdAt: string;
+  updatedAt: string;
+}
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234

@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, JwtPayload } from '../utils/jwt.util';
 import { AppDataSource } from '../config/database';
+<<<<<<< HEAD
 import { User } from '../models/User.entity';
+=======
+import { User } from '../entities/User.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import { UnauthorizedError } from '../errors/AppError';
 import { MESSAGES } from '../constants/messages';
 

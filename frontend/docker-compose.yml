@@ -1,0 +1,43 @@
+# ============================================================================
+#  ODC PLATFORM — Docker Compose (Frontend)
+# ============================================================================
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000}
+    image: odc-frontend:latest
+    container_name: odc-frontend
+    restart: unless-stopped
+    ports:
+      - '5173:5173'
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-http://localhost:5000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET}
+    env_file:
+      - .env.local
+    networks:
+      - odc-network
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:5173']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  odc-network:
+    external: true
+    name: odc-network

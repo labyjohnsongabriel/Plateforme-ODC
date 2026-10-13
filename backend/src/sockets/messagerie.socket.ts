@@ -2,9 +2,15 @@ import { Namespace, Socket } from 'socket.io';
 import { logger } from '../config/logger';
 import { MessagerieService } from '../services/messagerie.service';
 import { NotificationService } from '../services/notification.service';
+<<<<<<< HEAD
 import { TypeNotification } from '../models/Notification.entity';
 import { AppDataSource } from '../config/database';
 import { Conversation } from '../models/Conversation.entity';
+=======
+import { TypeNotification } from '../entities/Notification.entity';
+import { AppDataSource } from '../config/database';
+import { Conversation } from '../entities/Conversation.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
 /**
  * Utilisateurs en train d'écrire : Map<conversationId, Map<userId, timeout>>
@@ -392,4 +398,8 @@ async function notifierAutresMembres(
 }
 
 // Import manquant
+<<<<<<< HEAD
 import { Message } from '../models/Message.entity';
+=======
+import { Message } from '../entities/Message.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { ID, Timestamp, PaginationParams } from './common.types';
 import { User } from './user.types';
 
@@ -64,4 +65,35 @@ export interface MessageFilters extends PaginationParams {
 
 export interface NonLusCount {
   count: number;
+=======
+import type { User } from './user.types';
+
+export type TypeMessage = 'TEXTE' | 'IMAGE' | 'FICHIER' | 'SYSTEME';
+
+export interface Conversation {
+  id: string;
+  titre?: string;
+  estGroupe: boolean;
+  photoUrl?: string;
+  dernierMessageAt?: string;
+  membres: User[];
+  messages?: Message[];
+  createdAt: string;
+}
+
+export interface Message {
+  id: string;
+  contenu?: string;
+  type: TypeMessage;
+  lu: boolean;
+  dateLecture?: string;
+  fichierUrl?: string;
+  fichierNom?: string;
+  fichierTaille?: number;
+  conversation: Conversation;
+  conversationId: string;
+  expediteur: User;
+  expediteurId: string;
+  createdAt: string;
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 }

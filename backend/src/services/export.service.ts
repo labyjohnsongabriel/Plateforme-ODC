@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { AppDataSource } from '../config/database';
 import { User } from '../models/User.entity';
 import { Formation } from '../models/Formation.entity';
@@ -24,11 +25,57 @@ export class ExportService {
     const header = cols.map((c) => `"${c.label}"`).join(';');
 
     // Lignes
+=======
+// src/services/export.service.ts
+import { userRepository }        from '../repositories/user.repository';
+import { formationRepository }   from '../repositories/formation.repository';
+import { sessionRepository }     from '../repositories/session.repository';
+import { inscriptionRepository } from '../repositories/inscription.repository';
+import { attestationRepository } from '../repositories/attestation.repository';
+import { PdfService }            from './pdf.service';
+import { logger }                from '../config/logger';
+import { NotFoundError }         from '../errors/AppError';
+import { Formation }             from '../entities/Formation.entity';
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export interface CsvColumn {
+  key: string;
+  label: string;
+}
+
+export interface PdfListeParams {
+  titre: string;
+  colonnes: string[];
+  lignes: Array<Array<string | number | null | undefined>>;
+  metadata?: Record<string, any>;
+}
+
+export class ExportService {
+  // ==========================================================================
+  // 📄 CSV
+  // ==========================================================================
+  /**
+   * Convertit un tableau d'objets en CSV (séparateur ';' + BOM pour Excel FR).
+   */
+  static toCSV(data: any[], columns?: CsvColumn[]): string {
+    if (!data || data.length === 0) return '';
+
+    const cols: CsvColumn[] =
+      columns ??
+      Object.keys(data[0]).map((k) => ({ key: k, label: k }));
+
+    const header = cols.map((c) => this.escapeCsv(c.label)).join(';');
+
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     const rows = data.map((row) =>
       cols
         .map((c) => {
           const value = this.getNestedValue(row, c.key);
           if (value === null || value === undefined) return '""';
+<<<<<<< HEAD
           if (typeof value === 'object') return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
           return `"${String(value).replace(/"/g, '""')}"`;
         })
@@ -41,20 +88,45 @@ export class ExportService {
   /**
    * Récupère une valeur imbriquée (a.b.c)
    */
+=======
+          if (typeof value === 'object') return this.escapeCsv(JSON.stringify(value));
+          if (value instanceof Date) return this.escapeCsv(value.toLocaleString('fr-FR'));
+          return this.escapeCsv(String(value));
+        })
+        .join(';'),
+    );
+
+    return '\uFEFF' + [header, ...rows].join('\r\n');
+  }
+
+  private static escapeCsv(value: string): string {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   private static getNestedValue(obj: any, path: string): any {
     return path.split('.').reduce((o, k) => o?.[k], obj);
   }
 
+<<<<<<< HEAD
   /**
    * Export utilisateurs en CSV
    */
   static async utilisateursCSV(): Promise<string> {
     const users = await AppDataSource.getRepository(User).find({
+=======
+  // ==========================================================================
+  // 👥 UTILISATEURS
+  // ==========================================================================
+  static async utilisateursCSV(): Promise<string> {
+    const users = await userRepository.findMany({
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       relations: ['role'],
       order: { createdAt: 'DESC' },
     });
 
     const data = users.map((u) => ({
+<<<<<<< HEAD
       id: u.id,
       nom: u.nom,
       prenom: u.prenom,
@@ -63,12 +135,25 @@ export class ExportService {
       role: u.role?.nom || '',
       actif: u.actif ? 'Oui' : 'Non',
       ville: u.ville || '',
+=======
+      nom: u.nom,
+      prenom: u.prenom,
+      email: u.email,
+      telephone: u.telephone ?? '',
+      role: u.role?.libelle ?? u.role?.nom ?? '',
+      ville: u.ville ?? '',
+      actif: u.actif ? 'Oui' : 'Non',
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       derniereConnexion: u.derniereConnexion
         ? new Date(u.derniereConnexion).toLocaleString('fr-FR')
         : 'Jamais',
       createdAt: new Date(u.createdAt).toLocaleString('fr-FR'),
     }));
 
+<<<<<<< HEAD
+=======
+    logger.info(`📤 Export CSV utilisateurs : ${data.length}`);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     return this.toCSV(data, [
       { key: 'nom', label: 'Nom' },
       { key: 'prenom', label: 'Prénom' },
@@ -82,17 +167,47 @@ export class ExportService {
     ]);
   }
 
+<<<<<<< HEAD
   /**
    * Export formations en CSV
    */
   static async formationsCSV(): Promise<string> {
     const formations = await AppDataSource.getRepository(Formation).find({
       relations: ['sessions'],
+=======
+  static async utilisateursPDF(): Promise<Buffer> {
+    const users = await userRepository.findMany({
+      relations: ['role'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return this.listePDF({
+      titre: 'Liste des utilisateurs',
+      colonnes: ['Nom', 'Prénom', 'Email', 'Rôle', 'Ville', 'Statut'],
+      lignes: users.map((u) => [
+        u.nom,
+        u.prenom,
+        u.email,
+        u.role?.libelle ?? u.role?.nom ?? '',
+        u.ville ?? '-',
+        u.actif ? 'Actif' : 'Inactif',
+      ]),
+    });
+  }
+
+  // ==========================================================================
+  // 📚 FORMATIONS
+  // ==========================================================================
+  static async formationsCSV(): Promise<string> {
+    const formations = await formationRepository.findMany({
+      relations: ['sessions', 'domaineRelation'],
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       order: { createdAt: 'DESC' },
     });
 
     const data = formations.map((f) => ({
       titre: f.titre,
+<<<<<<< HEAD
       domaine: f.domaine,
       niveau: f.niveau,
       dureeHeures: f.dureeHeures,
@@ -102,12 +217,27 @@ export class ExportService {
       createdAt: new Date(f.createdAt).toLocaleString('fr-FR'),
     }));
 
+=======
+      domaine: f.domaineRelation?.nom ?? f.domaine,
+      niveau: f.niveau,
+      dureeHeures: f.dureeHeures,
+      sessionsCount: f.sessions?.length ?? 0,
+      prix: f.prix != null ? Number(f.prix).toFixed(2) : '-',
+      estPubliee: f.estPubliee ? 'Oui' : 'Non',
+      actif: f.actif ? 'Oui' : 'Non',
+      nbVues: f.nbVues ?? 0,
+      createdAt: new Date(f.createdAt).toLocaleString('fr-FR'),
+    }));
+
+    logger.info(`📤 Export CSV formations : ${data.length}`);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     return this.toCSV(data, [
       { key: 'titre', label: 'Titre' },
       { key: 'domaine', label: 'Domaine' },
       { key: 'niveau', label: 'Niveau' },
       { key: 'dureeHeures', label: 'Durée (h)' },
       { key: 'sessionsCount', label: 'Sessions' },
+<<<<<<< HEAD
       { key: 'actif', label: 'Actif' },
       { key: 'description', label: 'Description' },
       { key: 'createdAt', label: 'Créé le' },
@@ -119,12 +249,28 @@ export class ExportService {
    */
   static async inscriptionsCSV(sessionId?: string): Promise<string> {
     const qb = AppDataSource.getRepository(Inscription)
+=======
+      { key: 'prix', label: 'Prix' },
+      { key: 'estPubliee', label: 'Publiée' },
+      { key: 'actif', label: 'Active' },
+      { key: 'nbVues', label: 'Vues' },
+      { key: 'createdAt', label: 'Créée le' },
+    ]);
+  }
+
+  // ==========================================================================
+  // 📝 INSCRIPTIONS
+  // ==========================================================================
+  static async inscriptionsCSV(sessionId?: string): Promise<string> {
+    const qb = inscriptionRepository.raw
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       .createQueryBuilder('i')
       .leftJoinAndSelect('i.participant', 'p')
       .leftJoinAndSelect('p.role', 'r')
       .leftJoinAndSelect('i.session', 's')
       .leftJoinAndSelect('s.formation', 'f');
 
+<<<<<<< HEAD
     if (sessionId) {
       qb.where('i.session_id = :sid', { sid: sessionId });
     }
@@ -139,15 +285,38 @@ export class ExportService {
       telephone: i.participant?.telephone || '',
       ville: i.participant?.ville || '',
       formation: i.session?.formation?.titre || '',
+=======
+    if (sessionId) qb.where('i.session_id = :sid', { sid: sessionId });
+
+    const inscriptions = await qb.orderBy('i.date_inscription', 'DESC').getMany();
+
+    const data = inscriptions.map((i) => ({
+      numero: i.id.substring(0, 8).toUpperCase(),
+      nom: i.participant?.nom ?? '',
+      prenom: i.participant?.prenom ?? '',
+      email: i.participant?.email ?? '',
+      telephone: i.participant?.telephone ?? '',
+      ville: i.participant?.ville ?? '',
+      formation: i.session?.formation?.titre ?? '',
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       dateDebut: i.session?.dateDebut
         ? new Date(i.session.dateDebut).toLocaleDateString('fr-FR')
         : '',
       statut: i.statut,
+<<<<<<< HEAD
       motivation: i.motivation || '',
       motifRefus: i.motifRefus || '',
       dateInscription: new Date(i.dateInscription).toLocaleString('fr-FR'),
     }));
 
+=======
+      motivation: i.motivation ?? '',
+      motifRefus: i.motifRefus ?? '',
+      dateInscription: new Date(i.dateInscription).toLocaleString('fr-FR'),
+    }));
+
+    logger.info(`📤 Export CSV inscriptions : ${data.length}`);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     return this.toCSV(data, [
       { key: 'numero', label: 'N°' },
       { key: 'nom', label: 'Nom' },
@@ -164,6 +333,7 @@ export class ExportService {
     ]);
   }
 
+<<<<<<< HEAD
   /**
    * Export attestations en CSV
    */
@@ -174,11 +344,40 @@ export class ExportService {
         'session',
         'session.formation',
       ],
+=======
+  static async inscriptionsPDF(sessionId: string): Promise<Buffer> {
+    const session = await sessionRepository.findById(sessionId, ['formation']);
+    if (!session) throw new NotFoundError('Session introuvable');
+
+    const inscriptions = await inscriptionRepository.findBySession(sessionId);
+
+    return this.listePDF({
+      titre: `Inscriptions — ${session.formation?.titre ?? 'Session'}`,
+      colonnes: ['Nom', 'Prénom', 'Email', 'Téléphone', 'Statut', 'Date inscription'],
+      lignes: inscriptions.map((i) => [
+        i.participant?.nom ?? '',
+        i.participant?.prenom ?? '',
+        i.participant?.email ?? '',
+        i.participant?.telephone ?? '-',
+        i.statut,
+        new Date(i.dateInscription).toLocaleDateString('fr-FR'),
+      ]),
+    });
+  }
+
+  // ==========================================================================
+  // 🎓 ATTESTATIONS
+  // ==========================================================================
+  static async attestationsCSV(): Promise<string> {
+    const attestations = await attestationRepository.findMany({
+      relations: ['participant', 'session', 'session.formation'],
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       order: { dateEmission: 'DESC' },
     });
 
     const data = attestations.map((a) => ({
       numero: a.numero,
+<<<<<<< HEAD
       nom: a.participant?.nom || '',
       prenom: a.participant?.prenom || '',
       email: a.participant?.email || '',
@@ -190,20 +389,42 @@ export class ExportService {
       hash: a.hash.substring(0, 16) + '...',
     }));
 
+=======
+      nom: a.participant?.nom ?? '',
+      prenom: a.participant?.prenom ?? '',
+      email: a.participant?.email ?? '',
+      formation: a.session?.formation?.titre ?? '',
+      noteFinale: a.noteFinale != null ? Number(a.noteFinale).toFixed(2) : '-',
+      tauxPresence: a.tauxPresence != null ? `${Number(a.tauxPresence).toFixed(2)}%` : '-',
+      dateEmission: new Date(a.dateEmission).toLocaleDateString('fr-FR'),
+      valide: a.valide ? 'Oui' : 'Non',
+      hash: `${a.hash.substring(0, 16)}...`,
+    }));
+
+    logger.info(`📤 Export CSV attestations : ${data.length}`);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     return this.toCSV(data, [
       { key: 'numero', label: 'N° Attestation' },
       { key: 'nom', label: 'Nom' },
       { key: 'prenom', label: 'Prénom' },
       { key: 'email', label: 'Email' },
       { key: 'formation', label: 'Formation' },
+<<<<<<< HEAD
       { key: 'domaine', label: 'Domaine' },
       { key: 'noteFinale', label: 'Note finale' },
       { key: 'tauxPresence', label: 'Présence' },
       { key: 'dateEmission', label: 'Émis le' },
+=======
+      { key: 'noteFinale', label: 'Note finale' },
+      { key: 'tauxPresence', label: 'Présence' },
+      { key: 'dateEmission', label: 'Émise le' },
+      { key: 'valide', label: 'Valide' },
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       { key: 'hash', label: 'Hash' },
     ]);
   }
 
+<<<<<<< HEAD
   /**
    * Export JSON (pour API)
    */
@@ -236,6 +457,34 @@ export class ExportService {
           .logo { font-family: 'Poppins', sans-serif; font-weight: 700; color: #FF7900; font-size: 20px; }
           .titre { font-size: 24px; font-weight: 700; color: #1A1A1A; }
           .meta { font-size: 11px; color: #6B6B6B; text-align: right; }
+=======
+  // ==========================================================================
+  // 📊 JSON
+  // ==========================================================================
+  static toJSON(data: any): string {
+    return JSON.stringify(data, null, 2);
+  }
+
+  // ==========================================================================
+  // 📕 PDF GÉNÉRIQUE
+  // ==========================================================================
+  static async listePDF(params: PdfListeParams): Promise<Buffer> {
+    const html = `
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Inter', Arial, sans-serif; color: #1A1A1A; padding: 20px; }
+          .header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 3px solid #FF7900; padding-bottom: 15px; margin-bottom: 20px;
+          }
+          .logo { font-weight: 700; color: #FF7900; font-size: 20px; }
+          .titre { font-size: 22px; font-weight: 700; margin-top: 4px; }
+          .meta { font-size: 11px; color: #6B6B6B; text-align: right; line-height: 1.5; }
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
           table { width: 100%; border-collapse: collapse; margin-top: 15px; }
           th {
             background: #FF7900; color: #FFF; padding: 10px; text-align: left;
@@ -253,30 +502,49 @@ export class ExportService {
         <div class="header">
           <div>
             <div class="logo">ODC</div>
+<<<<<<< HEAD
             <div class="titre">${params.titre}</div>
+=======
+            <div class="titre">${this.escapeHtml(params.titre)}</div>
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
           </div>
           <div class="meta">
             Généré le : ${new Date().toLocaleString('fr-FR')}<br>
             Total : ${params.lignes.length} entrée(s)
           </div>
         </div>
+<<<<<<< HEAD
 
         <table>
           <thead>
             <tr>
               ${params.colonnes.map((c) => `<th>${c}</th>`).join('')}
             </tr>
+=======
+        <table>
+          <thead>
+            <tr>${params.colonnes.map((c) => `<th>${this.escapeHtml(c)}</th>`).join('')}</tr>
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
           </thead>
           <tbody>
             ${params.lignes
               .map(
                 (row) =>
+<<<<<<< HEAD
                   `<tr>${row.map((cell) => `<td>${cell ?? ''}</td>`).join('')}</tr>`
+=======
+                  `<tr>${row
+                    .map((cell) => `<td>${this.escapeHtml(String(cell ?? ''))}</td>`)
+                    .join('')}</tr>`,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
               )
               .join('')}
           </tbody>
         </table>
+<<<<<<< HEAD
 
+=======
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         <div class="footer">
           Orange Digital Center • contact@odc.mg • odc.orange.mg
         </div>
@@ -287,6 +555,7 @@ export class ExportService {
     return PdfService.genererBufferDepuisHtml(html);
   }
 
+<<<<<<< HEAD
   /**
    * Export utilisateurs en PDF
    */
@@ -344,10 +613,27 @@ export class ExportService {
   static async sauvegarderExport(
     contenu: string | Buffer,
     filename: string
+=======
+  private static escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ==========================================================================
+  // 💾 SAUVEGARDE DISQUE
+  // ==========================================================================
+  static async sauvegarderExport(
+    contenu: string | Buffer,
+    filename: string,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   ): Promise<string> {
     const fs = await import('fs/promises');
     const path = await import('path');
 
+<<<<<<< HEAD
     const dir = path.join(process.cwd(), 'uploads', 'exports');
     await fs.mkdir(dir, { recursive: true });
 
@@ -356,5 +642,18 @@ export class ExportService {
 
     logger.info(`📤 Export sauvegardé : /uploads/exports/${filename}`);
     return `/uploads/exports/${filename}`;
+=======
+    // Sécurité : empêcher path traversal
+    const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const dir = path.join(process.cwd(), 'uploads', 'exports');
+    await fs.mkdir(dir, { recursive: true });
+
+    const fullPath = path.join(dir, safeName);
+    await fs.writeFile(fullPath, contenu);
+
+    logger.info(`📤 Export sauvegardé : /uploads/exports/${safeName}`);
+    return `/uploads/exports/${safeName}`;
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

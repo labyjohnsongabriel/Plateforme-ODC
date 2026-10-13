@@ -1,11 +1,19 @@
 import { eventEmitter, EVENTS } from './index';
 import { logger } from '../config/logger';
 import { NotificationService } from '../services/notification.service';
+<<<<<<< HEAD
 import { TypeNotification } from '../models/Notification.entity';
 import { MailService } from '../services/mail.service';
 import { PdfService } from '../services/pdf.service';
 import { AppDataSource } from '../config/database';
 import { Attestation } from '../models/Attestation.entity';
+=======
+import { TypeNotification } from '../entities/Notification.entity';
+import { MailService } from '../services/mail.service';
+import { PdfService } from '../services/pdf.service';
+import { AppDataSource } from '../config/database';
+import { Attestation } from '../entities/Attestation.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
 /**
  * Enregistre les écouteurs d'événements liés aux attestations

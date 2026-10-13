@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { AppDataSource } from '../config/database';
+<<<<<<< HEAD
 import { AuditLog } from '../models/AuditLog.entity';
+=======
+import { AuditLog } from '../entities/AuditLog.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { roleMiddleware } from '../middlewares/role.middleware';
 import { successResponse, paginatedResponse } from '../utils/response.util';

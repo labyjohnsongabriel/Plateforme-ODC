@@ -1,9 +1,17 @@
 import { AppDataSource } from '../config/database';
+<<<<<<< HEAD
 import { User } from '../models/User.entity';
 import { Formation } from '../models/Formation.entity';
 import { Session } from '../models/Session.entity';
 import { Inscription } from '../models/Inscription.entity';
 import { Attestation } from '../models/Attestation.entity';
+=======
+import { User } from '../entities/User.entity';
+import { Formation } from '../entities/Formation.entity';
+import { Session } from '../entities/Session.entity';
+import { Inscription } from '../entities/Inscription.entity';
+import { Attestation } from '../entities/Attestation.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import { logger } from '../config/logger';
 import fs from 'fs/promises';
 import path from 'path';
