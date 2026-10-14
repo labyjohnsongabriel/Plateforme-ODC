@@ -1,171 +1,532 @@
 // src/services/attestation.service.ts
-import crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import { attestationRepository } from '../repositories/attestation.repository';
-import { sessionRepository } from '../repositories/session.repository';
-import { presenceRepository } from '../repositories/presence.repository';
-import { noteRepository } from '../repositories/note.repository';
-import { inscriptionRepository } from '../repositories/inscription.repository';
-import { StatutInscription } from '../entities/enums';
-import { BadRequestError, ConflictError, NotFoundError } from '../errors/AppError';
-import { notificationService } from './notification.service';
-import { logger } from '../config/logger';
+import { Attestation } from '../entities/Attestation.entity';
+import { AppDataSource } from '../config/database';
+import { Inscription } from '../entities/Inscription.entity';
+import { Presence } from '../entities/Presence.entity';
+import { Note } from '../entities/Note.entity';
+import { Session } from '../entities/Session.entity';
+import { User } from '../entities/User.entity';
+import {
+  NotFoundError,
+  BadRequestError,
+  ConflictError,
+} from '../errors/AppError';
 
-export interface Eligibilite {
-  eligible: boolean;
-  raison?: string;
-  tauxPresence: number;
-  moyenne: number;
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
+export interface EligibilityCriteria {
+  presenceMin: number;
+  noteMin: number;
+  selectionValidee: boolean;
+  inscriptionValidee: boolean;
 }
 
+const DEFAULT_CRITERIA: EligibilityCriteria = {
+  presenceMin: 75,
+  noteMin: 10,
+  selectionValidee: true,
+  inscriptionValidee: true,
+};
+
+/* ============================================================================
+   SERVICE
+   ============================================================================ */
+
 export class AttestationService {
-  /** Numéro unique : ODC-ATT-YYYY-NNNNNN */
-  private static async generateNumero(): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await attestationRepository.count();
-    return `ODC-ATT-${year}-${(count + 1).toString().padStart(6, '0')}`;
+  /* ==========================================================================
+     FIND ALL
+     ========================================================================== */
+  static async findAll(query: any) {
+    return attestationRepository.search({
+      page: query.page,
+      limit: query.limit,
+      sessionId: query.sessionId,
+      participantId: query.participantId,
+      formationId: query.formationId,
+      valide: query.valide,
+      search: query.search,
+      dateDebut: query.dateDebut,
+      dateFin: query.dateFin,
+    });
   }
 
-  /** Hash de vérification */
-  private static generateHash(sessionId: string, participantId: string): string {
-    return crypto
-      .createHash('sha256')
-      .update(`${sessionId}:${participantId}:${Date.now()}`)
-      .digest('hex');
+  /* ==========================================================================
+     FIND ONE
+     ========================================================================== */
+  static async findOne(id: string): Promise<Attestation> {
+    const attestation = await attestationRepository.findByIdWithRelations(id);
+    if (!attestation) {
+      throw new NotFoundError('Attestation introuvable');
+    }
+    return attestation;
   }
 
-  /** Vérifie l'éligibilité d'un participant à une attestation */
-  static async verifierEligibilite(sessionId: string, participantId: string): Promise<Eligibilite> {
-    const inscription = await inscriptionRepository.findBySessionAndParticipant(sessionId, participantId);
-    if (!inscription || inscription.statut !== StatutInscription.ACCEPTEE) {
-      return { eligible: false, raison: 'Participant non accepté dans la session', tauxPresence: 0, moyenne: 0 };
-    }
+  /* ==========================================================================
+     STATS
+     ========================================================================== */
+  static async getStats() {
+    const [total, valides, invalides, ceMois] = await Promise.all([
+      attestationRepository.count(),
+      attestationRepository.countValid(),
+      attestationRepository.countInvalid(),
+      attestationRepository.countThisMonth(),
+    ]);
 
-    const tauxPresence = await presenceRepository.tauxPresence(sessionId, participantId);
-    const notes = await noteRepository.findBySessionAndParticipant(sessionId, participantId);
-    const moyenne = notes.length
-      ? Math.round((notes.reduce((s, n) => s + Number(n.note), 0) / notes.length) * 100) / 100
-      : 0;
-
-    const SEUIL_PRESENCE = 75;
-    const SEUIL_NOTE = 10;
-
-    if (tauxPresence < SEUIL_PRESENCE) {
-      return { eligible: false, raison: `Taux de présence insuffisant (${tauxPresence}% < ${SEUIL_PRESENCE}%)`, tauxPresence, moyenne };
-    }
-    if (notes.length > 0 && moyenne < SEUIL_NOTE) {
-      return { eligible: false, raison: `Moyenne insuffisante (${moyenne} < ${SEUIL_NOTE})`, tauxPresence, moyenne };
-    }
-    return { eligible: true, tauxPresence, moyenne };
+    return { total, valides, invalides, ceMois };
   }
 
-  /** Génère une attestation individuelle */
-  static async generer(sessionId: string, participantId: string) {
-    const existing = await attestationRepository.findBySessionAndParticipant(sessionId, participantId);
-    if (existing) throw new ConflictError('Une attestation existe déjà pour ce participant');
+  /* ==========================================================================
+     VÉRIFICATION PUBLIQUE (QR CODE)
+     ========================================================================== */
+  static async verifierAuthenticite(numero: string) {
+    const attestation = await attestationRepository.findByNumero(numero);
 
-    const elig = await this.verifierEligibilite(sessionId, participantId);
-    if (!elig.eligible) throw new BadRequestError(elig.raison ?? 'Participant non éligible');
+    if (!attestation) {
+      return { valide: false, attestation: null };
+    }
 
+    return {
+      valide: attestation.valide,
+      attestation: this.serialize(attestation),
+    };
+  }
+
+  /* ==========================================================================
+     MES ATTESTATIONS (participant connecté)
+     ========================================================================== */
+  static async mesAttestations(userId: string): Promise<Attestation[]> {
+    return attestationRepository.findByParticipant(userId);
+  }
+
+  /* ==========================================================================
+     ⭐ VÉRIFIER ÉLIGIBILITÉ
+     ========================================================================== */
+  static async verifierEligibilite(
+    sessionId: string,
+    participantId: string,
+    criteria: EligibilityCriteria = DEFAULT_CRITERIA,
+  ) {
+    const raisons: string[] = [];
+
+    /* -------------------- Session -------------------- */
+    const session = await AppDataSource.getRepository(Session).findOne({
+      where: { id: sessionId },
+      relations: ['formation'],
+    });
+    if (!session) throw new NotFoundError('Session introuvable');
+
+    /* -------------------- Inscription -------------------- */
+    const inscription = await AppDataSource.getRepository(Inscription).findOne({
+      where: { sessionId, participantId },
+    });
+
+    if (!inscription) {
+      raisons.push('Aucune inscription trouvée');
+    } else if (
+      criteria.inscriptionValidee &&
+      inscription.statut !== 'VALIDEE'
+    ) {
+      raisons.push(
+        `Inscription non validée (statut : ${inscription.statut})`,
+      );
+    }
+
+    /* -------------------- Sélection -------------------- */
+    if (criteria.selectionValidee && inscription) {
+      if (!(inscription as any).estSelectionne) {
+        raisons.push('Participant non sélectionné');
+      }
+    }
+
+    /* -------------------- Présences -------------------- */
+    const presences = await AppDataSource.getRepository(Presence).find({
+      where: { sessionId, participantId },
+    });
+
+    const totalPresences = presences.length;
+    const presencesPresentes = presences.filter((p) => p.estPresent).length;
+    const tauxPresence =
+      totalPresences > 0
+        ? Math.round((presencesPresentes / totalPresences) * 100)
+        : 0;
+
+    if (tauxPresence < criteria.presenceMin) {
+      raisons.push(
+        `Taux de présence insuffisant (${tauxPresence}% < ${criteria.presenceMin}%)`,
+      );
+    }
+
+    /* -------------------- Notes -------------------- */
+    const notes = await AppDataSource.getRepository(Note).find({
+      where: { sessionId, participantId },
+    });
+
+    const noteFinale =
+      notes.length > 0
+        ? notes.reduce((sum, n) => sum + Number(n.note ?? 0), 0) / notes.length
+        : 0;
+
+    if (noteFinale < criteria.noteMin) {
+      raisons.push(
+        `Note insuffisante (${noteFinale.toFixed(1)}/20 < ${criteria.noteMin}/20)`,
+      );
+    }
+
+    /* -------------------- Attestation existante -------------------- */
+    const existing = await attestationRepository.findBySessionAndParticipant(
+      sessionId,
+      participantId,
+    );
+
+    /* -------------------- Résultat -------------------- */
+    return {
+      eligible: raisons.length === 0,
+      raisons,
+      tauxPresence,
+      noteFinale: Number(noteFinale.toFixed(2)),
+      dejaGeneree: !!existing,
+      attestationId: existing?.id,
+      session: this.serializeSession(session),
+    };
+  }
+
+  /* ==========================================================================
+     ⭐ APERÇU D'UNE SESSION (avant génération)
+     ========================================================================== */
+  static async previewSession(
+    sessionId: string,
+    criteria: EligibilityCriteria = DEFAULT_CRITERIA,
+  ) {
+    const session = await AppDataSource.getRepository(Session).findOne({
+      where: { id: sessionId },
+      relations: ['formation'],
+    });
+
+    if (!session) throw new NotFoundError('Session introuvable');
+
+    /* -------------------- Inscriptions -------------------- */
+    const inscriptions = await AppDataSource.getRepository(Inscription).find({
+      where: { sessionId },
+      relations: ['participant'],
+    });
+
+    /* -------------------- Vérifier chaque participant -------------------- */
+    const participants = await Promise.all(
+      inscriptions.map(async (inscription) => {
+        const result = await this.verifierEligibilite(
+          sessionId,
+          inscription.participantId,
+          criteria,
+        );
+
+        return {
+          participantId: inscription.participantId,
+          participant: {
+            id: inscription.participant.id,
+            nom: inscription.participant.nom,
+            prenom: inscription.participant.prenom,
+            email: inscription.participant.email,
+            photoUrl: inscription.participant.photoUrl,
+          },
+          tauxPresence: result.tauxPresence,
+          noteFinale: result.noteFinale,
+          eligible: result.eligible,
+          raisons: result.raisons,
+          dejaGeneree: result.dejaGeneree,
+          attestationId: result.attestationId,
+        };
+      }),
+    );
+
+    /* -------------------- Statistiques -------------------- */
+    const stats = {
+      total: participants.length,
+      eligibles: participants.filter((p) => p.eligible).length,
+      ineligibles: participants.filter((p) => !p.eligible).length,
+      dejaGenerees: participants.filter((p) => p.dejaGeneree).length,
+    };
+
+    return {
+      session: this.serializeSession(session),
+      criteres: criteria,
+      participants,
+      stats,
+    };
+  }
+
+  /* ==========================================================================
+     ⭐ GÉNÉRER UNE ATTESTATION
+     ========================================================================== */
+  static async generer(
+    sessionId: string,
+    participantId: string,
+  ): Promise<Attestation> {
+    /* -------------------- Vérifier éligibilité -------------------- */
+    const eligibility = await this.verifierEligibilite(
+      sessionId,
+      participantId,
+    );
+
+    if (!eligibility.eligible) {
+      throw new BadRequestError(
+        `Participant non éligible : ${eligibility.raisons.join(', ')}`,
+      );
+    }
+
+    if (eligibility.dejaGeneree) {
+      throw new ConflictError('Une attestation existe déjà pour ce participant');
+    }
+
+    /* -------------------- Créer l'attestation -------------------- */
     const numero = await this.generateNumero();
-    const hash = this.generateHash(sessionId, participantId);
+    const hash = this.generateHash(numero, participantId, sessionId);
 
     const attestation = await attestationRepository.create({
       numero,
       hash,
       sessionId,
       participantId,
-      noteFinale: elig.moyenne,
-      tauxPresence: elig.tauxPresence,
+      noteFinale: eligibility.noteFinale,
+      tauxPresence: eligibility.tauxPresence,
       dateEmission: new Date(),
       valide: true,
+      telechargee: false,
     });
 
-    // TODO: générer PDF + QR + signature numérique
-    // const fileUrl = await pdfService.generateAttestation(attestation);
-    // attestation.fichierUrl = fileUrl;
-    // await attestationRepository.save(attestation);
+    /* -------------------- Générer le PDF -------------------- */
+    try {
+      const pdfUrl = await this.generatePdf(attestation);
+      await attestationRepository.update(attestation.id, {
+        fichierUrl: pdfUrl,
+      } as any);
+      attestation.fichierUrl = pdfUrl;
+    } catch (pdfError) {
+      console.error('[AttestationService.generer] Erreur PDF:', pdfError);
+      // On ne bloque pas la création si le PDF échoue
+    }
 
-    await notificationService.create({
-      userId: participantId,
-      titre: '🎓 Attestation disponible',
-      message: `Votre attestation ${numero} est disponible au téléchargement`,
-      metadata: { attestationId: attestation.id },
-    });
-
-    logger.info(`🎓 Attestation générée : ${numero}`);
     return attestation;
   }
 
-  /** Génération pour toute une session */
-  static async genererParSession(sessionId: string) {
-    const session = await sessionRepository.findByIdOrFail(sessionId, ['formation']);
-    const inscriptions = await inscriptionRepository.findBySession(sessionId);
-    const acceptes = inscriptions.filter((i) => i.statut === StatutInscription.ACCEPTEE);
+  /* ==========================================================================
+     ⭐ GÉNÉRER PAR SESSION (batch)
+     ========================================================================== */
+  static async genererParSession(
+    sessionId: string,
+    criteria: EligibilityCriteria = DEFAULT_CRITERIA,
+  ) {
+    const preview = await this.previewSession(sessionId, criteria);
 
-    const result = { total: acceptes.length, generes: 0, ignores: 0, erreurs: [] as Array<{ participantId: string; raison: string }> };
+    let generes = 0;
+    let ignores = 0;
+    let erreurs = 0;
+    const attestations: Array<{
+      id: string;
+      numero: string;
+      participantId: string;
+      participantNom: string;
+    }> = [];
 
-    for (const insc of acceptes) {
+    for (const p of preview.participants) {
+      if (!p.eligible || p.dejaGeneree) {
+        ignores++;
+        continue;
+      }
+
       try {
-        await this.generer(sessionId, insc.participantId);
-        result.generes++;
-      } catch (e: any) {
-        result.ignores++;
-        result.erreurs.push({ participantId: insc.participantId, raison: e.message });
+        const attestation = await this.generer(
+          sessionId,
+          p.participantId,
+        );
+        generes++;
+        attestations.push({
+          id: attestation.id,
+          numero: attestation.numero,
+          participantId: p.participantId,
+          participantNom: `${p.participant.prenom} ${p.participant.nom}`,
+        });
+      } catch (error) {
+        erreurs++;
+        console.error(
+          `[genererParSession] Erreur pour ${p.participantId}:`,
+          error,
+        );
       }
     }
 
-    logger.info(`🎓 Génération session=${session.codeSession} : ${result.generes}/${result.total}`);
-    return result;
+    return { generes, ignores, erreurs, attestations };
   }
 
-  /** Vérification publique */
-  static async verifierAuthenticite(numero: string) {
-    const att = await attestationRepository.findByNumero(numero);
-    if (!att) return { valide: false };
+  /* ==========================================================================
+     INVALIDER
+     ========================================================================== */
+  static async invalider(
+    id: string,
+    motif: string,
+  ): Promise<Attestation> {
+    const attestation = await attestationRepository.findByIdWithRelations(id);
+    if (!attestation) throw new NotFoundError('Attestation introuvable');
+
+    const updated = await attestationRepository.updateValidity(id, false, motif);
+    return updated!;
+  }
+
+  /* ==========================================================================
+     RÉACTIVER
+     ========================================================================== */
+  static async reactiver(id: string): Promise<Attestation> {
+    const attestation = await attestationRepository.findByIdWithRelations(id);
+    if (!attestation) throw new NotFoundError('Attestation introuvable');
+
+    const updated = await attestationRepository.updateValidity(id, true);
+    return updated!;
+  }
+
+  /* ==========================================================================
+     TÉLÉCHARGER PDF
+     ========================================================================== */
+  static async telecharger(id: string, userId: string) {
+    const attestation = await attestationRepository.findByIdWithRelations(id);
+    if (!attestation) throw new NotFoundError('Attestation introuvable');
+
+    // ⭐ Sécurité : participant ne peut télécharger que SES attestations
+    // (sauf admin/staff)
+    if (
+      attestation.participantId !== userId &&
+      !(await this.isAdminOrStaff(userId))
+    ) {
+      throw new BadRequestError('Non autorisé à télécharger cette attestation');
+    }
+
+    if (!attestation.fichierUrl) {
+      throw new NotFoundError('PDF non encore généré');
+    }
+
+    const filePath = path.join(
+      process.cwd(),
+      'uploads',
+      'attestations',
+      path.basename(attestation.fichierUrl),
+    );
+
+    // Marquer comme téléchargée
+    await attestationRepository.markAsDownloaded(id);
+
     return {
-      valide: true,
-      attestation: {
-        numero: att.numero,
-        dateEmission: att.dateEmission,
-        participant: `${att.participant.prenom} ${att.participant.nom}`,
-        formation: att.session.formation.titre,
-        noteFinale: att.noteFinale,
-        tauxPresence: att.tauxPresence,
-      },
+      path: filePath,
+      nom: `attestation-${attestation.numero}.pdf`,
     };
   }
 
-  /** Mes attestations (participant) */
-  static async mesAttestations(participantId: string) {
-    return attestationRepository.findByParticipant(participantId);
+  /* ==========================================================================
+     HELPERS PRIVÉS
+     ========================================================================== */
+
+  private static async generateNumero(): Promise<string> {
+    const year = new Date().getFullYear();
+    const count = await attestationRepository.count();
+    const sequence = String(count + 1).padStart(6, '0');
+    return `ATT-${year}-${sequence}`;
   }
 
-  /** Liste admin/staff */
-  static async findAll(filters: any) {
-    return attestationRepository.search({
-      sessionId: filters.sessionId,
-      participantId: filters.participantId,
-      valide: filters.valide === 'true' ? true : filters.valide === 'false' ? false : undefined,
-      page: Number(filters.page) || 1,
-      limit: Number(filters.limit) || 10,
-    });
+  private static generateHash(
+    numero: string,
+    participantId: string,
+    sessionId: string,
+  ): string {
+    return crypto
+      .createHash('sha256')
+      .update(`${numero}:${participantId}:${sessionId}:${Date.now()}`)
+      .digest('hex')
+      .slice(0, 64);
   }
 
-  /** Téléchargement (participant) */
-  static async telecharger(id: string, userId: string) {
-    const att = await attestationRepository.findByIdOrFail(id);
-    if (att.participantId !== userId) {
-      throw new NotFoundError('Attestation introuvable');
+  private static async generatePdf(attestation: Attestation): Promise<string> {
+    // ⚠️ À implémenter avec Puppeteer ou PDFKit
+    // Pour l'instant, retourne un chemin fictif
+    const fileName = `attestation-${attestation.numero}.pdf`;
+    const dir = path.join(process.cwd(), 'uploads', 'attestations');
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-    if (!att.fichierUrl) throw new NotFoundError('Fichier non disponible');
 
-    att.telechargee = true;
-    att.dateTelechargement = new Date();
-    await attestationRepository.save(att);
+    // TODO : générer le vrai PDF ici
+    return fileName;
+  }
 
+  private static async isAdminOrStaff(userId: string): Promise<boolean> {
+    const user = await AppDataSource.getRepository(User).findOne({
+      where: { id: userId },
+      relations: ['role'],
+    });
+
+    return (
+      user?.role?.nom === 'ADMINISTRATEUR' ||
+      user?.role?.nom === 'STAFF_ODC'
+    );
+  }
+
+  /* ==========================================================================
+     SERIALIZE
+     ========================================================================== */
+  private static serialize(attestation: Attestation): any {
     return {
-      path: att.fichierUrl,
-      nom: `attestation-${att.numero}.pdf`,
+      id: attestation.id,
+      numero: attestation.numero,
+      hash: attestation.hash,
+      participantId: attestation.participantId,
+      participant: attestation.participant
+        ? {
+            id: attestation.participant.id,
+            nom: attestation.participant.nom,
+            prenom: attestation.participant.prenom,
+            email: attestation.participant.email,
+            photoUrl: attestation.participant.photoUrl,
+          }
+        : undefined,
+      sessionId: attestation.sessionId,
+      session: attestation.session
+        ? this.serializeSession(attestation.session)
+        : undefined,
+      noteFinale:
+        attestation.noteFinale !== null
+          ? Number(attestation.noteFinale)
+          : undefined,
+      tauxPresence:
+        attestation.tauxPresence !== null
+          ? Number(attestation.tauxPresence)
+          : undefined,
+      dateEmission: attestation.dateEmission,
+      fichierUrl: attestation.fichierUrl,
+      qrCodeUrl: attestation.qrCodeUrl,
+      valide: attestation.valide,
+      motifInvalidation: attestation.motifInvalidation,
+      telechargee: attestation.telechargee,
+      dateTelechargement: attestation.dateTelechargement,
+    };
+  }
+
+  private static serializeSession(session: Session): any {
+    return {
+      id: session.id,
+      codeSession: session.codeSession,
+      dateDebut: session.dateDebut,
+      dateFin: session.dateFin,
+      statut: session.statut,
+      formation: session.formation
+        ? {
+            id: session.formation.id,
+            titre: session.formation.titre,
+            dureeHeures: session.formation.dureeHeures,
+          }
+        : undefined,
     };
   }
 }

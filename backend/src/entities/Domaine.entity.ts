@@ -1,11 +1,24 @@
 // src/entities/Domaine.entity.ts
-import { Entity, Column, OneToMany, Index } from 'typeorm';
-import { BaseEntity } from './BaseEntity';
+import {
+  Entity,
+  Column,
+  OneToMany,
+  Index,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+} from 'typeorm';
 import { Formation } from './Formation.entity';
 
 @Entity('domaines')
 @Index(['slug'], { unique: true })
-export class Domaine extends BaseEntity {
+@Index(['actif'])
+@Index(['estPubliee'])
+export class Domaine {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
   @Column({ type: 'varchar', length: 100, unique: true })
   nom: string;
 
@@ -24,7 +37,7 @@ export class Domaine extends BaseEntity {
   @Column({ type: 'text', nullable: true, name: 'image_url' })
   imageUrl: string;
 
-  // ============ PUBLICATION ============
+  /* -------------------- PUBLICATION -------------------- */
   @Column({ type: 'boolean', default: true })
   actif: boolean;
 
@@ -34,6 +47,20 @@ export class Domaine extends BaseEntity {
   @Column({ type: 'int', default: 0, name: 'ordre_affichage' })
   ordreAffichage: number;
 
+  /* -------------------- RELATIONS -------------------- */
   @OneToMany(() => Formation, (f) => f.domaineRelation)
   formations: Formation[];
+
+  /* -------------------- ⭐ COMPTEURS (non persistés) -------------------- */
+  formationsCount?: number;
+
+  /* -------------------- AUDIT -------------------- */
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt: Date;
 }

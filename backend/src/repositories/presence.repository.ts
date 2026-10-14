@@ -1,74 +1,409 @@
 // src/repositories/PresenceRepository.ts
+import { Brackets } from 'typeorm';
 import { Presence } from '../entities/Presence.entity';
 import { BaseRepository } from './base.repository';
+import { StatutPresence } from '../entities/enums';
+
+/* ============================================================================
+   PRESENCE REPOSITORY
+   ============================================================================ */
 
 export class PresenceRepository extends BaseRepository<Presence> {
   constructor() {
     super(Presence);
   }
 
+  /* ==========================================================================
+     ⭐ RECHERCHE PAR SESSION & PARTICIPANT
+     ========================================================================== */
+  /**
+   * Trouve une présence spécifique par session + participant.
+   */
   async findBySessionAndParticipant(
     sessionId: string,
     participantId: string,
     datePresence?: string,
   ): Promise<Presence | null> {
     const qb = this.qb('p')
-      .where('p.session_id = :sid', { sid: sessionId })
-      .andWhere('p.participant_id = :pid', { pid: participantId });
+      .where('p.sessionId = :sid', { sid: sessionId })
+      .andWhere('p.participantId = :pid', { pid: participantId });
 
-    if (datePresence) qb.andWhere('p.date_presence = :d', { d: datePresence });
+    if (datePresence) {
+      qb.andWhere('p.datePresence = :d', { d: datePresence });
+    }
 
     return qb.getOne();
   }
 
-  async findBySession(sessionId: string) {
-    const qb = this.qb('p')
+  /* ==========================================================================
+     ⭐ PRÉSENCES D'UNE SESSION
+     ========================================================================== */
+  /**
+   * Récupère toutes les présences d'une session avec les participants.
+   */
+  async findBySession(sessionId: string): Promise<Presence[]> {
+    return this.qb('p')
       .leftJoinAndSelect('p.participant', 'u')
       .leftJoinAndSelect('u.role', 'r')
-      .where('p.session_id = :sid', { sid: sessionId })
-      .orderBy('p.scanne_le', 'ASC');
-    return qb.getMany();
+      .where('p.sessionId = :sid', { sid: sessionId })
+      .orderBy('p.createdAt', 'ASC') // ⭐ Corrigé : createdAt
+      .getMany();
   }
 
+  /* ==========================================================================
+     ⭐ PRÉSENCES D'UN PARTICIPANT
+     ========================================================================== */
+  /**
+   * Récupère toutes les présences d'un participant.
+   */
   async findByParticipant(participantId: string): Promise<Presence[]> {
     return this.qb('p')
       .leftJoinAndSelect('p.session', 's')
       .leftJoinAndSelect('s.formation', 'f')
-      .where('p.participant_id = :pid', { pid: participantId })
-      .orderBy('p.date_presence', 'DESC')
+      .where('p.participantId = :pid', { pid: participantId })
+      .orderBy('p.datePresence', 'DESC')
       .getMany();
   }
 
+  /* ==========================================================================
+     ⭐ COMPTAGE
+     ========================================================================== */
+  /**
+   * Compte les présences marquées "PRESENT" pour une session.
+   */
   async countPresent(sessionId: string): Promise<number> {
     return this.qb('p')
-      .where('p.session_id = :sid', { sid: sessionId })
-      .andWhere('p.present = true')
+      .where('p.sessionId = :sid', { sid: sessionId })
+      .andWhere('p.statut = :statut', {
+        statut: StatutPresence.PRESENT,
+      })
       .getCount();
   }
 
+  /**
+   * Compte les présences d'une session (toutes).
+   */
+  async countBySession(sessionId: string): Promise<number> {
+    return this.qb('p')
+      .where('p.sessionId = :sid', { sid: sessionId })
+      .getCount();
+  }
+
+  /**
+   * Vérifie si une présence existe.
+   */
+  async exists(id: string): Promise<boolean> {
+    try {
+      const count = await this.qb('p')
+        .where('p.id = :id', { id })
+        .getCount();
+      return count > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ STATISTIQUES PAR SESSION
+     ========================================================================== */
+  /**
+   * Statistiques complètes d'une session :
+   * total, présents, absents, retards, excusés.
+   */
   async statsBySession(sessionId: string) {
-    const [total, presents, absents, retards, excuses] = await Promise.all([
-      this.count({ sessionId } as any),
-      this.count({ sessionId, present: true } as any),
-      this.count({ sessionId, present: false } as any),
-      this.qb('p').where('p.session_id = :sid', { sid: sessionId })
-        .andWhere('p.statut = :st', { st: 'RETARD' }).getCount(),
-      this.qb('p').where('p.session_id = :sid', { sid: sessionId })
-        .andWhere('p.statut = :st', { st: 'EXCUSE' }).getCount(),
-    ]);
-    return { total, presents, absents, retards, excuses };
+    try {
+      const [total, presents, absents, retards, excuses] =
+        await Promise.all([
+          this.qb('p')
+            .where('p.sessionId = :sid', { sid: sessionId })
+            .getCount(),
+          this.qb('p')
+            .where('p.sessionId = :sid', { sid: sessionId })
+            .andWhere('p.statut = :statut', {
+              statut: StatutPresence.PRESENT,
+            })
+            .getCount(),
+          this.qb('p')
+            .where('p.sessionId = :sid', { sid: sessionId })
+            .andWhere('p.statut = :statut', {
+              statut: StatutPresence.ABSENT,
+            })
+            .getCount(),
+          this.qb('p')
+            .where('p.sessionId = :sid', { sid: sessionId })
+            .andWhere('p.statut = :statut', {
+              statut: StatutPresence.RETARD,
+            })
+            .getCount(),
+          this.qb('p')
+            .where('p.sessionId = :sid', { sid: sessionId })
+            .andWhere('p.statut = :statut', {
+              statut: StatutPresence.EXCUSE,
+            })
+            .getCount(),
+        ]);
+
+      return {
+        total,
+        presents,
+        absents,
+        retards,
+        excuses,
+        tauxPresence:
+          total === 0
+            ? 0
+            : Math.round((presents / total) * 100 * 100) / 100,
+      };
+    } catch (error) {
+      console.error('[PresenceRepository.statsBySession] Erreur:', error);
+      return {
+        total: 0,
+        presents: 0,
+        absents: 0,
+        retards: 0,
+        excuses: 0,
+        tauxPresence: 0,
+      };
+    }
   }
 
-  async tauxPresence(sessionId: string, participantId: string): Promise<number> {
-    const total = await this.count({ sessionId } as any);
-    if (total === 0) return 0;
-    const present = await this.qb('p')
-      .where('p.session_id = :sid', { sid: sessionId })
-      .andWhere('p.participant_id = :pid', { pid: participantId })
-      .andWhere('p.present = true')
-      .getCount();
-    return Math.round((present / total) * 100 * 100) / 100;
+  /* ==========================================================================
+     ⭐ TAUX DE PRÉSENCE
+     ========================================================================== */
+  /**
+   * Taux de présence d'un participant à une session.
+   */
+  async tauxPresence(
+    sessionId: string,
+    participantId: string,
+  ): Promise<number> {
+    try {
+      const total = await this.qb('p')
+        .where('p.sessionId = :sid', { sid: sessionId })
+        .getCount();
+
+      if (total === 0) return 0;
+
+      const present = await this.qb('p')
+        .where('p.sessionId = :sid', { sid: sessionId })
+        .andWhere('p.participantId = :pid', { pid: participantId })
+        .andWhere('p.statut = :statut', {
+          statut: StatutPresence.PRESENT,
+        })
+        .getCount();
+
+      return Math.round((present / total) * 100 * 100) / 100;
+    } catch (error) {
+      console.error('[PresenceRepository.tauxPresence] Erreur:', error);
+      return 0;
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ MARQUER UNE PRÉSENCE
+     ========================================================================== */
+  /**
+   * Marque ou met à jour une présence.
+   */
+  async marquerPresence(
+    sessionId: string,
+    participantId: string,
+    statut: StatutPresence,
+  ): Promise<Presence> {
+    let presence = await this.findBySessionAndParticipant(
+      sessionId,
+      participantId,
+    );
+
+    if (presence) {
+      // Mise à jour
+      presence.statut = statut;
+      presence.datePresence = new Date();
+      return this.save(presence);
+    }
+
+    // Création
+    return this.create({
+      sessionId,
+      participantId,
+      statut,
+      datePresence: new Date(),
+    } as any);
+  }
+
+  /* ==========================================================================
+     ⭐ STATS PAR FORMATEUR
+     ========================================================================== */
+  /**
+   * Taux de présence pour les sessions d'un formateur.
+   */
+  async tauxPresenceParFormateur(
+    formateurId: string,
+  ): Promise<number> {
+    try {
+      const raw = await this.qb('p')
+        .leftJoin('p.session', 's')
+        .select('COUNT(p.id)', 'total')
+        .addSelect(
+          `SUM(CASE WHEN p.statut = :present THEN 1 ELSE 0 END)`,
+          'presents',
+        )
+        .where('s.formateurId = :fid', { fid: formateurId })
+        .setParameter('present', StatutPresence.PRESENT)
+        .getRawOne();
+
+      const total = Number(raw?.total ?? 0);
+      const presents = Number(raw?.presents ?? 0);
+
+      return total === 0
+        ? 0
+        : Math.round((presents / total) * 100 * 100) / 100;
+    } catch (error) {
+      console.error(
+        '[PresenceRepository.tauxPresenceParFormateur] Erreur:',
+        error,
+      );
+      return 0;
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ STATS PAR PARTICIPANT
+     ========================================================================== */
+  /**
+   * Taux de présence global d'un participant.
+   */
+  async tauxPresenceParParticipant(
+    participantId: string,
+  ): Promise<number> {
+    try {
+      const raw = await this.qb('p')
+        .select('COUNT(p.id)', 'total')
+        .addSelect(
+          `SUM(CASE WHEN p.statut = :present THEN 1 ELSE 0 END)`,
+          'presents',
+        )
+        .where('p.participantId = :pid', { pid: participantId })
+        .setParameter('present', StatutPresence.PRESENT)
+        .getRawOne();
+
+      const total = Number(raw?.total ?? 0);
+      const presents = Number(raw?.presents ?? 0);
+
+      return total === 0
+        ? 0
+        : Math.round((presents / total) * 100 * 100) / 100;
+    } catch (error) {
+      console.error(
+        '[PresenceRepository.tauxPresenceParParticipant] Erreur:',
+        error,
+      );
+      return 0;
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ RECHERCHE AVANCÉE
+     ========================================================================== */
+  /**
+   * Récupère les présences avec filtres avancés.
+   */
+  async search(filters: {
+    sessionId?: string;
+    participantId?: string;
+    statut?: StatutPresence;
+    dateDebut?: string;
+    dateFin?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    try {
+      const page = Math.max(1, Number(filters.page) || 1);
+      const limit = Math.min(
+        100,
+        Math.max(1, Number(filters.limit) || 20),
+      );
+      const skip = (page - 1) * limit;
+
+      const qb = this.qb('p')
+        .leftJoinAndSelect('p.participant', 'u')
+        .leftJoinAndSelect('p.session', 's');
+
+      if (filters.sessionId) {
+        qb.andWhere('p.sessionId = :sid', { sid: filters.sessionId });
+      }
+
+      if (filters.participantId) {
+        qb.andWhere('p.participantId = :pid', {
+          pid: filters.participantId,
+        });
+      }
+
+      if (filters.statut) {
+        qb.andWhere('p.statut = :statut', { statut: filters.statut });
+      }
+
+      if (filters.dateDebut) {
+        qb.andWhere('p.datePresence >= :dateDebut', {
+          dateDebut: filters.dateDebut,
+        });
+      }
+
+      if (filters.dateFin) {
+        qb.andWhere('p.datePresence <= :dateFin', {
+          dateFin: filters.dateFin,
+        });
+      }
+
+      qb.orderBy('p.datePresence', 'DESC');
+
+      const total = await qb.getCount();
+      const data = await qb.offset(skip).limit(limit).getMany();
+
+      return {
+        data,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 1,
+        },
+      };
+    } catch (error) {
+      console.error('[PresenceRepository.search] Erreur:', error);
+      return {
+        data: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 1 },
+      };
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ SUPPRESSION
+     ========================================================================== */
+  /**
+   * Supprime toutes les présences d'une session.
+   */
+  async deleteBySession(sessionId: string): Promise<number> {
+    try {
+      const result = await this.qb('p')
+        .softDelete()
+        .where('p.sessionId = :sid', { sid: sessionId })
+        .execute();
+
+      return result.affected ?? 0;
+    } catch (error) {
+      console.error(
+        '[PresenceRepository.deleteBySession] Erreur:',
+        error,
+      );
+      return 0;
+    }
   }
 }
+
+/* ============================================================================
+   INSTANCE SINGLETON
+   ============================================================================ */
 
 export const presenceRepository = new PresenceRepository();

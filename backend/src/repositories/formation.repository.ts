@@ -1,16 +1,13 @@
 // src/repositories/FormationRepository.ts
+import { Brackets } from 'typeorm';
 import { Formation } from '../entities/Formation.entity';
 import { BaseRepository } from './base.repository';
 import { NiveauFormation } from '../entities/enums';
 
-/* ============================================================================
-   TYPES
-   ============================================================================ */
-
 export interface FormationFilters {
   q?: string;
   domaineId?: string;
-  niveau?: NiveauFormation;
+  niveau?: NiveauFormation | 'all';
   estPubliee?: boolean;
   actif?: boolean;
   miseEnAvant?: boolean;
@@ -19,23 +16,9 @@ export interface FormationFilters {
   limit?: number;
 }
 
-/* ============================================================================
-   REPOSITORY
-   ============================================================================ */
-
 export class FormationRepository extends BaseRepository<Formation> {
   constructor() {
     super(Formation);
-  }
-
-  /* ==========================================================================
-     Trouver par slug
-     ========================================================================== */
-  async findBySlug(
-    slug: string,
-    relations: string[] = ['domaineRelation'],
-  ): Promise<Formation | null> {
-    return this.findOne({ slug } as any, relations);
   }
 
   /* ==========================================================================
@@ -43,45 +26,55 @@ export class FormationRepository extends BaseRepository<Formation> {
      ========================================================================== */
   async findPublic(filters: FormationFilters = {}) {
     const page = Math.max(1, Number(filters.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(filters.limit) || 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, Number(filters.limit) || 10),
+    );
 
     const qb = this.qb('f')
       .leftJoinAndSelect('f.domaineRelation', 'd')
-      // ⭐ CORRECTION : f.estPubliee (propriété TS), pas f.est_publiee
+      // ⭐ Compter les sessions uniquement
+      .loadRelationCountAndMap('f.sessionsCount', 'f.sessions')
       .where('f.estPubliee = :publiee', { publiee: true })
-      // ⭐ f.actif n'existe pas sur Formation → on l'enlève
+      .andWhere('f.actif = :actif', { actif: true })
       .andWhere('f.deletedAt IS NULL');
 
-    /* -------------------- Recherche full-text -------------------- */
-    if (filters.q) {
+    if (filters.q && filters.q.trim()) {
       qb.andWhere(
-        '(f.titre ILIKE :q OR f.description ILIKE :q OR f.resume ILIKE :q)',
-        { q: `%${filters.q}%` },
+        new Brackets((sub) => {
+          sub
+            .where('f.titre ILIKE :q', { q: `%${filters.q}%` })
+            .orWhere('f.description ILIKE :q', {
+              q: `%${filters.q}%`,
+            });
+        }),
       );
     }
 
-    /* -------------------- Filtre domaine -------------------- */
     if (filters.domaineId) {
-      // ⭐ f.domaineId (propriété TS), pas f.domaine_id
       qb.andWhere('f.domaineId = :did', { did: filters.domaineId });
     }
 
-    /* -------------------- Filtre niveau -------------------- */
-    if (filters.niveau) {
+    if (filters.niveau && filters.niveau !== 'all') {
       qb.andWhere('f.niveau = :n', { n: filters.niveau });
     }
 
-    /* -------------------- Tri + Pagination -------------------- */
-    // ⭐ f.miseEnAvant, f.createdAt (propriétés TS)
-    qb.orderBy('f.miseEnAvant', 'DESC')
-      .addOrderBy('f.createdAt', 'DESC')   // ⭐ pas date_publication
-      .skip((page - 1) * limit)
-      .take(limit);
+    qb.orderBy('f.miseEnAvant', 'DESC').addOrderBy(
+      'f.createdAt',
+      'DESC',
+    );
 
-    const [data, total] = await qb.getManyAndCount();
+    const total = await qb.getCount();
+    const data = await qb
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getMany();
+
+    // ⭐ Enrichir avec inscriptionsCount via requête séparée
+    const enriched = await this.enrichWithInscriptionsCount(data);
 
     return {
-      data,
+      data: enriched.map(this.normalize),
       total,
       page,
       limit,
@@ -90,61 +83,77 @@ export class FormationRepository extends BaseRepository<Formation> {
   }
 
   /* ==========================================================================
-     🔒 ADMIN / STAFF — Recherche
+     🔒 ADMIN — Recherche
      ========================================================================== */
   async search(filters: FormationFilters = {}) {
     const page = Math.max(1, Number(filters.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(filters.limit) || 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, Number(filters.limit) || 20),
+    );
 
     const qb = this.qb('f')
       .leftJoinAndSelect('f.domaineRelation', 'd')
-      .where('f.deletedAt IS NULL');   // ⭐ exclure soft-deleted
+      // ⭐ Compter les sessions uniquement
+      .loadRelationCountAndMap('f.sessionsCount', 'f.sessions')
+      .where('f.deletedAt IS NULL');
 
-    /* -------------------- Recherche -------------------- */
-    if (filters.q) {
+    if (filters.q && filters.q.trim()) {
       qb.andWhere(
-        '(f.titre ILIKE :q OR f.slug ILIKE :q)',
-        { q: `%${filters.q}%` },
+        new Brackets((sub) => {
+          sub
+            .where('f.titre ILIKE :q', { q: `%${filters.q}%` })
+            .orWhere('f.slug ILIKE :q', { q: `%${filters.q}%` })
+            .orWhere('f.description ILIKE :q', {
+              q: `%${filters.q}%`,
+            });
+        }),
       );
     }
 
-    /* -------------------- Domaine -------------------- */
     if (filters.domaineId) {
       qb.andWhere('f.domaineId = :did', { did: filters.domaineId });
     }
 
-    /* -------------------- Niveau -------------------- */
-    if (filters.niveau) {
+    if (filters.niveau && filters.niveau !== 'all') {
       qb.andWhere('f.niveau = :n', { n: filters.niveau });
     }
 
-    /* -------------------- Publication -------------------- */
-    // ⭐ f.estPubliee (propriété TS)
     if (filters.estPubliee !== undefined) {
       qb.andWhere('f.estPubliee = :p', { p: filters.estPubliee });
     }
 
-    /* -------------------- Mise en avant -------------------- */
+    if (filters.actif !== undefined) {
+      qb.andWhere('f.actif = :a', { a: filters.actif });
+    }
+
     if (filters.miseEnAvant !== undefined) {
       qb.andWhere('f.miseEnAvant = :m', { m: filters.miseEnAvant });
     }
 
-    /* -------------------- Formateur -------------------- */
     if (filters.formateurId) {
-      qb.andWhere('f.formateurId = :fid', { fid: filters.formateurId });
+      qb.leftJoin('f.sessions', 'fs').andWhere(
+        'fs.formateurId = :fid',
+        { fid: filters.formateurId },
+      );
     }
 
-    /* -------------------- ⭐ TRI (le FIX principal) -------------------- */
-    // ⭐ f.createdAt (propriété TS), PAS f.created_at (colonne DB)
-    qb.orderBy('f.createdAt', 'DESC')
-      .addOrderBy('f.miseEnAvant', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+    qb.orderBy('f.createdAt', 'DESC').addOrderBy(
+      'f.miseEnAvant',
+      'DESC',
+    );
 
-    const [data, total] = await qb.getManyAndCount();
+    const total = await qb.getCount();
+    const data = await qb
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getMany();
+
+    // ⭐ Enrichir avec inscriptionsCount via requête séparée
+    const enriched = await this.enrichWithInscriptionsCount(data);
 
     return {
-      data,
+      data: enriched.map(this.normalize),
       total,
       page,
       limit,
@@ -156,42 +165,145 @@ export class FormationRepository extends BaseRepository<Formation> {
      🌐 TOP PUBLIC
      ========================================================================== */
   async findTopPublic(limit = 6): Promise<Formation[]> {
-    return this.qb('f')
+    const data = await this.qb('f')
       .leftJoinAndSelect('f.domaineRelation', 'd')
-      // ⭐ f.estPubliee (propriété TS)
+      .loadRelationCountAndMap('f.sessionsCount', 'f.sessions')
       .where('f.estPubliee = :publiee', { publiee: true })
+      .andWhere('f.actif = :actif', { actif: true })
       .andWhere('f.deletedAt IS NULL')
-      // ⭐ f.miseEnAvant, f.nbVues (propriétés TS)
       .orderBy('f.miseEnAvant', 'DESC')
       .addOrderBy('f.nbVues', 'DESC')
       .limit(limit)
       .getMany();
+
+    const enriched = await this.enrichWithInscriptionsCount(data);
+    return enriched.map(this.normalize);
   }
 
   /* ==========================================================================
-     📈 Incrémenter les vues
+     🔍 PAR SLUG
+     ========================================================================== */
+  async findBySlug(slug: string): Promise<Formation | null> {
+    const formation = await this.qb('f')
+      .leftJoinAndSelect('f.domaineRelation', 'd')
+      .loadRelationCountAndMap('f.sessionsCount', 'f.sessions')
+      .where('f.slug = :slug', { slug })
+      .andWhere('f.deletedAt IS NULL')
+      .getOne();
+
+    if (!formation) return null;
+
+    const [enriched] = await this.enrichWithInscriptionsCount([
+      formation,
+    ]);
+    return this.normalize(enriched);
+  }
+
+  /* ==========================================================================
+     ⭐⭐ PAR ID AVEC RELATIONS
+     ========================================================================== */
+  async findByIdWithRelations(
+    id: string,
+    relations: string[] = [],
+  ): Promise<Formation | null> {
+    const formation = await this.qb('f')
+      .leftJoinAndSelect('f.domaineRelation', 'd')
+      .loadRelationCountAndMap('f.sessionsCount', 'f.sessions')
+      .where('f.id = :id', { id })
+      .andWhere('f.deletedAt IS NULL')
+      .getOne();
+
+    if (!formation) return null;
+
+    const [enriched] = await this.enrichWithInscriptionsCount([
+      formation,
+    ]);
+    return this.normalize(enriched);
+  }
+
+  /* ==========================================================================
+     ⭐⭐ PAR ID OU ÉCHOUER
+     ========================================================================== */
+  async findByIdOrFail(
+    id: string,
+    relations: string[] = [],
+  ): Promise<Formation> {
+    const formation = await this.findByIdWithRelations(id, relations);
+
+    if (!formation) {
+      throw new Error('Formation introuvable');
+    }
+
+    return formation;
+  }
+
+  /* ==========================================================================
+     ⭐⭐⭐ ENRICHISSEMENT — Compte les inscriptions via les sessions
+     ========================================================================== */
+  private async enrichWithInscriptionsCount(
+    formations: Formation[],
+  ): Promise<Formation[]> {
+    if (!formations.length) return formations;
+
+    const ids = formations.map((f) => f.id);
+
+    /* -------------------- Requête COUNT -------------------- */
+    const counts = await this.repo.manager
+      .createQueryBuilder()
+      .select('s.formationId', 'formationId')
+      .addSelect('COUNT(DISTINCT i.id)', 'count')
+      .from('inscriptions', 'i')
+      .leftJoin('sessions', 's', 's.id = i.session_id')
+      .where('s.formation_id IN (:...ids)', { ids })
+      .andWhere('i.deleted_at IS NULL')
+      .groupBy('s.formationId')
+      .getRawMany();
+
+    /* -------------------- Map des compteurs -------------------- */
+    const countMap = new Map<string, number>();
+    counts.forEach((c: any) => {
+      countMap.set(c.formationId, Number(c.count));
+    });
+
+    /* -------------------- Enrichir -------------------- */
+    return formations.map((f) => ({
+      ...f,
+      inscriptionsCount: countMap.get(f.id) ?? 0,
+    }));
+  }
+
+  /* ==========================================================================
+     📈 INCRÉMENTER LES VUES
      ========================================================================== */
   async incrementVues(id: string): Promise<void> {
-    await this.repo.increment({ id } as any, 'nbVues', 1);
+    try {
+      await this.repo.increment({ id } as any, 'nbVues', 1);
+    } catch {
+      // Silencieux
+    }
   }
 
   /* ==========================================================================
-     📢 Publication / Dépublication
+     📢 PUBLICATION
      ========================================================================== */
-  async setPublication(id: string, estPubliee: boolean): Promise<Formation> {
+  async setPublication(
+    id: string,
+    estPubliee: boolean,
+  ): Promise<Formation> {
     const formation = await this.findByIdOrFail(id);
     formation.estPubliee = estPubliee;
-    // ⭐ On ne touche pas à datePublication (peut ne pas exister sur l'entité)
+    if (estPubliee && !formation.datePublication) {
+      formation.datePublication = new Date();
+    }
     return this.save(formation);
   }
 
   /* ==========================================================================
-     📊 Statistiques par domaine
+     📊 STATS PAR DOMAINE
      ========================================================================== */
   async countByDomaine() {
-    return this.qb('f')
+    const results = await this.qb('f')
       .leftJoin('f.domaineRelation', 'd')
-      // ⭐ Retirer f.actif (propriété inexistante)
       .where('f.deletedAt IS NULL')
       .select('d.id', 'domaineId')
       .addSelect('d.nom', 'domaine')
@@ -201,6 +313,25 @@ export class FormationRepository extends BaseRepository<Formation> {
       .addGroupBy('d.nom')
       .addGroupBy('d.couleur')
       .getRawMany();
+
+    return results.map((r: any) => ({
+      domaineId: r.domaineId,
+      domaine: r.domaine ?? 'Sans domaine',
+      couleur: r.couleur ?? '#6B7280',
+      count: Number(r.count),
+    }));
+  }
+
+  /* ==========================================================================
+     ⭐ NORMALISATION
+     ========================================================================== */
+  private normalize(formation: any): Formation {
+    return {
+      ...formation,
+      domaine: formation.domaineRelation,
+      sessionsCount: Number(formation.sessionsCount ?? 0),
+      inscriptionsCount: Number(formation.inscriptionsCount ?? 0),
+    } as Formation;
   }
 }
 

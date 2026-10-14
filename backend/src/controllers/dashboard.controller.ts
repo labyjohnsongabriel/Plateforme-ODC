@@ -5,6 +5,7 @@ import { successResponse } from '../utils/response.util';
 import { BadRequestError } from '../errors/AppError';
 import { RoleName } from '../entities/enums';
 import { AppDataSource } from '../config/database';
+import { logger } from '../config/logger';
 
 /* ============================================================================
    HELPERS
@@ -29,6 +30,7 @@ function getUserRole(req: Request): RoleName {
 export class DashboardController {
   /* ==========================================================================
      GET /api/dashboard/me
+     Tableau de bord générique selon le rôle de l'utilisateur
      ========================================================================== */
   static async myStats(
     req: Request,
@@ -38,6 +40,8 @@ export class DashboardController {
     try {
       const userId = getUserId(req);
       const role = getUserRole(req);
+
+      logger.info(`📊 myStats — user=${userId} role=${role}`);
 
       const stats = await DashboardService.getStats(role, userId);
 
@@ -49,6 +53,7 @@ export class DashboardController {
 
   /* ==========================================================================
      ⭐ GET /api/admin/dashboard
+     Dashboard administrateur
      ========================================================================== */
   static async adminDashboard(
     _req: Request,
@@ -56,8 +61,11 @@ export class DashboardController {
     next: NextFunction,
   ): Promise<void> {
     try {
+      logger.info('📊 adminDashboard');
+
       const stats = await DashboardService.getAdminStats();
-      return successResponse(res, stats);
+
+      return successResponse(res, stats, 'Statistiques administrateur');
     } catch (e) {
       next(e);
     }
@@ -72,7 +80,7 @@ export class DashboardController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const limit = Math.min(10, Number(req.query.limit) || 5);
+      const limit = Math.min(10, Math.max(1, Number(req.query.limit) || 5));
 
       const stats = await DashboardService.getAdminStats();
       const top = stats.topFormations.slice(0, limit);
@@ -85,6 +93,7 @@ export class DashboardController {
 
   /* ==========================================================================
      GET /api/admin/dashboard/status
+     Vérifier l'état du système
      ========================================================================== */
   static async systemStatus(
     _req: Request,
@@ -107,6 +116,7 @@ export class DashboardController {
         storage: 45,
         uptime: process.uptime(),
         version: process.env.APP_VERSION ?? '1.0.0',
+        timestamp: new Date().toISOString(),
       });
     } catch (e) {
       next(e);
@@ -114,34 +124,63 @@ export class DashboardController {
   }
 
   /* ==========================================================================
-     🔒 Routes par rôle (utilise le service)
+     🔒 Routes par rôle — Utilise byRole()
      ========================================================================== */
 
-  static adminStats(req: Request, res: Response, next: NextFunction) {
+  /* -------------------- ADMIN -------------------- */
+  static adminStats(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     return DashboardController.byRole(RoleName.ADMINISTRATEUR)(req, res, next);
   }
 
-  static staffStats(req: Request, res: Response, next: NextFunction) {
+  /* -------------------- STAFF -------------------- */
+  static staffStats(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     return DashboardController.byRole(RoleName.STAFF_ODC)(req, res, next);
   }
 
-  static formateurStats(req: Request, res: Response, next: NextFunction) {
+  /* -------------------- FORMATEUR -------------------- */
+  static formateurStats(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     return DashboardController.byRole(RoleName.FORMATEUR)(req, res, next);
   }
 
-  static participantStats(req: Request, res: Response, next: NextFunction) {
+  /* -------------------- PARTICIPANT -------------------- */
+  static participantStats(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     return DashboardController.byRole(RoleName.PARTICIPANT)(req, res, next);
   }
 
-  static partenaireStats(req: Request, res: Response, next: NextFunction) {
+  /* -------------------- PARTENAIRE -------------------- */
+  static partenaireStats(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     return DashboardController.byRole(RoleName.PARTENAIRE)(req, res, next);
   }
 
   /* ==========================================================================
-     Helper — Route par rôle forcé
+     🔧 Helper privé — Route par rôle forcé
      ========================================================================== */
   private static byRole(forcedRole: RoleName) {
-    return async (req: Request, res: Response, next: NextFunction) => {
+    return async (
+      req: Request,
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
       try {
         const userId = getUserId(req);
         const stats = await DashboardService.getStats(forcedRole, userId);
@@ -150,5 +189,16 @@ export class DashboardController {
         next(e);
       }
     };
+  }
+
+  /* ==========================================================================
+     📊 GET /api/admin/dashboard/stats (alias)
+     ========================================================================== */
+  static async getStats(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    return DashboardController.adminDashboard(req, res, next);
   }
 }

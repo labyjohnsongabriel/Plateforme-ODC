@@ -1,120 +1,174 @@
+// src/app/(public)/formations/[slug]/components/SessionList.tsx
 'use client';
 
 import Link from 'next/link';
-import { Calendar, MapPin, Users, ArrowRight } from 'lucide-react';
+import {
+  Calendar,
+  MapPin,
+  Users,
+  Clock,
+  ArrowRight,
+  Video,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { formatDate, formatDateTime } from '@/lib/formatters';
 import { useSessionsByFormation } from '@/hooks/queries/useSessions';
-import { formatDate } from '@/lib/formatters';
 
-const STATUT_LABELS: Record<string, string> = {
-  PLANIFIEE: 'Planifiée',
-  OUVERTE: 'Inscriptions ouvertes',
-  EN_COURS: 'En cours',
-  TERMINEE: 'Terminée',
-  ANNULEE: 'Annulée',
-};
-
-const STATUT_COLORS: Record<string, string> = {
-  PLANIFIEE: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
-  OUVERTE: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
-  EN_COURS: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400',
-  TERMINEE: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
-  ANNULEE: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
-};
-
-interface Props {
+interface SessionListProps {
   formationId: string;
 }
 
-export function SessionList({ formationId }: Props) {
+const STATUT_CONFIG = {
+  OUVERTE: {
+    label: 'Inscriptions ouvertes',
+    className: 'bg-odc-success-soft text-odc-success-dark',
+  },
+  PLANIFIEE: {
+    label: 'Planifiée',
+    className: 'bg-odc-info-soft text-odc-info-dark',
+  },
+  EN_COURS: {
+    label: 'En cours',
+    className: 'bg-odc-warning-soft text-odc-warning-dark',
+  },
+  TERMINEE: {
+    label: 'Terminée',
+    className: 'bg-odc-surface-alt text-odc-text-secondary',
+  },
+} as const;
+
+export function SessionList({ formationId }: SessionListProps) {
   const { data: sessions = [], isLoading } = useSessionsByFormation(formationId);
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-40" />
+      <div className="space-y-3">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-lg" />
         ))}
       </div>
     );
   }
 
-  if (sessions.length === 0) {
+  const visibleSessions = sessions.filter(
+    (s) => s.statut !== 'ANNULEE',
+  );
+
+  if (visibleSessions.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Calendar className="h-12 w-12 text-odc-muted mx-auto mb-4" />
-          <p className="font-medium mb-2">Aucune session programmée</p>
-          <p className="text-sm text-odc-muted">
-            Revenez bientôt pour découvrir les prochaines sessions.
-          </p>
-        </CardContent>
+      <Card className="border-dashed p-6 text-center">
+        <p className="text-sm text-odc-text-muted">
+          Aucune session programmée pour le moment.
+        </p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {sessions.map((session) => (
-        <Card key={session.id} className="hover:shadow-odc-md transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-              <div>
-                <p className="font-mono text-xs text-odc-muted mb-1">
-                  {session.codeSession}
-                </p>
-                <h4 className="font-display font-semibold text-lg">
-                  {session.lieu || 'En ligne'}
-                </h4>
-              </div>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
-                  STATUT_COLORS[session.statut]
-                }`}
-              >
-                {STATUT_LABELS[session.statut]}
-              </span>
-            </div>
+    <div className="space-y-3">
+      {visibleSessions.map((session) => {
+        const config =
+          STATUT_CONFIG[session.statut as keyof typeof STATUT_CONFIG] ??
+          STATUT_CONFIG.PLANIFIEE;
+        const placesRestantes = session.capacite - (session.inscriptionsCount ?? 0);
+        const isFull = placesRestantes <= 0;
+        const canRegister = session.statut === 'OUVERTE' && !isFull;
 
-            <div className="grid sm:grid-cols-3 gap-4 text-sm mb-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-odc-primary shrink-0" />
-                <span>{formatDate(session.dateDebut)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-odc-primary shrink-0" />
-                <span className="truncate">{session.lieu || 'En ligne'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-odc-primary shrink-0" />
-                <span>{session.capacite} places</span>
-              </div>
-            </div>
+        return (
+          <Card
+            key={session.id}
+            className={cn(
+              'transition-all hover:shadow-odc-md',
+              canRegister && 'border-odc-success/30',
+            )}
+          >
+            <CardContent className="p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                {/* Infos session */}
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs font-semibold text-odc-text-primary">
+                      {session.codeSession}
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                        config.className,
+                      )}
+                    >
+                      {config.label}
+                    </span>
+                  </div>
 
-            <div className="flex items-center justify-end">
-              <Button
-                variant="odc"
-                size="sm"
-                disabled={session.statut === 'TERMINEE' || session.statut === 'ANNULEE'}
-                asChild={
-                  session.statut !== 'TERMINEE' && session.statut !== 'ANNULEE'
-                }
-              >
-                {session.statut === 'TERMINEE' || session.statut === 'ANNULEE' ? (
-                  <span>{STATUT_LABELS[session.statut]}</span>
-                ) : (
-                  <Link href={`/inscription-en-ligne?session=${session.id}`}>
-                    S&apos;inscrire
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="flex items-center gap-2 text-sm text-odc-text-secondary">
+                      <Calendar className="h-4 w-4 shrink-0 text-odc-primary" />
+                      {formatDate(session.dateDebut)} →{' '}
+                      {formatDate(session.dateFin)}
+                    </div>
+
+                    {session.lieu && (
+                      <div className="flex items-center gap-2 text-sm text-odc-text-secondary">
+                        <MapPin className="h-4 w-4 shrink-0 text-odc-primary" />
+                        <span className="truncate">{session.lieu}</span>
+                      </div>
+                    )}
+
+                    {session.lienVisio && (
+                      <div className="flex items-center gap-2 text-sm text-odc-text-secondary">
+                        <Video className="h-4 w-4 shrink-0 text-odc-info" />
+                        <span>En ligne</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 text-sm text-odc-text-secondary">
+                      <Users className="h-4 w-4 shrink-0 text-odc-primary" />
+                      <span
+                        className={cn(
+                          isFull && 'font-semibold text-odc-error',
+                        )}
+                      >
+                        {isFull
+                          ? 'Complet'
+                          : `${placesRestantes} place${placesRestantes > 1 ? 's' : ''} disponible${placesRestantes > 1 ? 's' : ''}`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action */}
+                <div className="shrink-0 sm:self-center">
+                  {canRegister ? (
+                    <Button variant="odc" asChild>
+                      <Link
+                        href={`/inscription-en-ligne?session=${session.id}`}
+                      >
+                        S&apos;inscrire
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  ) : isFull ? (
+                    <Badge
+                      variant="outline"
+                      className="border-odc-error/30 text-odc-error"
+                    >
+                      Complet
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-odc-text-muted">
+                      Indisponible
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

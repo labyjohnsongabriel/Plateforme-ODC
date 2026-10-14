@@ -1,19 +1,16 @@
+// src/app/(admin)/admin/sessions/[id]/page.tsx
 import type { Metadata } from 'next';
-import { SessionForm } from '../components/SessionForm';
+import { SessionDetailClient } from './components/SessionDetailClient';
 
-interface Props {
+interface PageProps {
   params: { id: string };
 }
 
-export const metadata: Metadata = { title: 'Modifier session' };
+export const metadata: Metadata = {
+  title: 'Détail session | ODC Admin',
+  description: 'Consultez et gérez les informations de la session.',
+};
 
-export default function EditSessionPage({ params }: Props) {
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <h1 className="font-display text-2xl md:text-3xl font-bold">
-        Modifier la session
-      </h1>
-      <SessionForm mode="edit" id={params.id} />
-    </div>
-  );
+export default function SessionDetailPage({ params }: PageProps) {
+  return <SessionDetailClient sessionId={params.id} />;
 }

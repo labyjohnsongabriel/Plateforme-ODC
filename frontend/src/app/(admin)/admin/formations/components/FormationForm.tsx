@@ -1,7 +1,7 @@
 // src/app/(admin)/admin/formations/components/FormationForm.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import * as React from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -46,7 +46,46 @@ import {
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 import { cn } from '@/lib/utils';
-import { slugify } from '@/lib/slugify'; // ⭐ Import dédié
+import { slugify } from '@/lib/slugify';
+
+/* ============================================================================
+   NORMALISATION — Garantit un tableau de chaînes
+   ============================================================================ */
+
+function toArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((v): v is string => typeof v === 'string')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((v): v is string => typeof v === 'string')
+            .map((s) => s.trim())
+            .filter(Boolean);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return trimmed
+      .split(/[,;\n\r]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
 
 /* ============================================================================
    TYPES
@@ -137,8 +176,9 @@ export function FormationForm({
   const qc = useQueryClient();
   const isEdit = mode === 'edit';
 
-  const [newObjectif, setNewObjectif] = useState('');
-  const [newPrerequis, setNewPrerequis] = useState('');
+  const [newObjectif, setNewObjectif] = React.useState('');
+  const [newPrerequis, setNewPrerequis] = React.useState('');
+  const lastSlugRef = React.useRef('');
 
   /* -------------------- Formulaire -------------------- */
   const {
@@ -172,14 +212,22 @@ export function FormationForm({
 
   const titreValue = watch('titre');
   const slugValue = watch('slug');
-  const objectifsValue = watch('objectifs') ?? [];
-  const prerequisValue = watch('prerequis') ?? [];
+  const objectifsValue = toArray(watch('objectifs'));
+  const prerequisValue = toArray(watch('prerequis'));
 
   /* -------------------- Slug auto -------------------- */
-  useEffect(() => {
-    if (!isEdit && titreValue && !slugValue) {
-      setValue('slug', slugify(titreValue), { shouldValidate: false });
-    }
+  React.useEffect(() => {
+    if (isEdit) return;
+    if (!titreValue) return;
+
+    const newSlug = slugify(titreValue);
+    if (newSlug === lastSlugRef.current) return;
+
+    // Si l'utilisateur a modifié manuellement, ne pas écraser
+    if (slugValue && slugValue !== lastSlugRef.current) return;
+
+    lastSlugRef.current = newSlug;
+    setValue('slug', newSlug, { shouldValidate: false, shouldDirty: false });
   }, [titreValue, slugValue, isEdit, setValue]);
 
   /* -------------------- Domaines -------------------- */
@@ -187,7 +235,8 @@ export function FormationForm({
     queryKey: ['admin', 'domaines'],
     queryFn: async () => {
       const { data } = await api.get('/admin/domaines');
-      return data.data;
+      const list = Array.isArray(data) ? data : (data?.data ?? []);
+      return Array.isArray(list) ? list : [];
     },
     staleTime: 10 * 60_000,
   });
@@ -197,12 +246,12 @@ export function FormationForm({
     queryKey: ['admin', 'formation', id],
     queryFn: async () => {
       const { data } = await api.get(`/admin/formations/${id}`);
-      return data.data;
+      return data?.data ?? data;
     },
     enabled: isEdit && !!id,
   });
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (existing && isEdit) {
       reset({
         titre: existing.titre ?? '',
@@ -213,8 +262,8 @@ export function FormationForm({
         dureeHeures: existing.dureeHeures ?? 10,
         prix: existing.prix ?? 0,
         nbParticipantsMax: existing.nbParticipantsMax ?? 30,
-        objectifs: existing.objectifs ?? [],
-        prerequis: existing.prerequis ?? [],
+        objectifs: toArray(existing.objectifs),
+        prerequis: toArray(existing.prerequis),
         programme: existing.programme ?? '',
         imageUrl: existing.imageUrl ?? '',
         estPubliee: existing.estPubliee ?? false,
@@ -234,6 +283,8 @@ export function FormationForm({
         nbParticipantsMax: data.nbParticipantsMax ?? undefined,
         imageUrl: data.imageUrl || undefined,
         programme: data.programme || undefined,
+        objectifs: toArray(data.objectifs),
+        prerequis: toArray(data.prerequis),
       };
 
       if (isEdit && id) {
@@ -241,10 +292,10 @@ export function FormationForm({
           `/admin/formations/${id}`,
           payload,
         );
-        return res.data;
+        return res?.data ?? res;
       }
       const { data: res } = await api.post('/admin/formations', payload);
-      return res.data;
+      return res?.data ?? res;
     },
     onSuccess: () => {
       toast.success(isEdit ? 'Formation mise à jour' : 'Formation créée');
@@ -758,7 +809,7 @@ export function FormationForm({
       {/* ================================================================
           ACTIONS
           ================================================================ */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-odc-border sticky bottom-0 bg-odc-surface">
+      <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-odc-border bg-odc-surface pt-4">
         <Button
           type="button"
           variant="outline"

@@ -1,12 +1,26 @@
 // src/components/ui/table.tsx
+'use client';
+
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+/* ============================================================================
+   TABLE — Conteneur racine
+   ============================================================================ */
+
 const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto scrollbar-thin">
+  React.HTMLAttributes<HTMLTableElement> & {
+    /** Désactive le défilement horizontal */
+    noScroll?: boolean;
+  }
+>(({ className, noScroll = false, ...props }, ref) => (
+  <div
+    className={cn(
+      'relative w-full',
+      !noScroll && 'overflow-x-auto scrollbar-thin',
+    )}
+  >
     <table
       ref={ref}
       className={cn('w-full caption-bottom text-sm', className)}
@@ -16,17 +30,28 @@ const Table = React.forwardRef<
 ));
 Table.displayName = 'Table';
 
+/* ============================================================================
+   TABLE HEADER
+   ============================================================================ */
+
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn('bg-odc-surface-alt/50 [&_tr]:border-b', className)}
+    className={cn(
+      'bg-odc-surface-alt/60 backdrop-blur-sm [&_tr]:border-b [&_tr]:border-odc-border',
+      className,
+    )}
     {...props}
   />
 ));
 TableHeader.displayName = 'TableHeader';
+
+/* ============================================================================
+   TABLE BODY
+   ============================================================================ */
 
 const TableBody = React.forwardRef<
   HTMLTableSectionElement,
@@ -40,6 +65,10 @@ const TableBody = React.forwardRef<
 ));
 TableBody.displayName = 'TableBody';
 
+/* ============================================================================
+   TABLE FOOTER
+   ============================================================================ */
+
 const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
@@ -47,7 +76,7 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      'border-t border-odc-border bg-odc-surface-alt font-medium',
+      'border-t border-odc-border bg-odc-surface-alt/80 font-medium [&>tr]:last:border-b-0',
       className,
     )}
     {...props}
@@ -55,14 +84,23 @@ const TableFooter = React.forwardRef<
 ));
 TableFooter.displayName = 'TableFooter';
 
+/* ============================================================================
+   TABLE ROW
+   ============================================================================ */
+
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
-  React.HTMLAttributes<HTMLTableRowElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLTableRowElement> & {
+    /** Désactive les effets de survol */
+    noHover?: boolean;
+  }
+>(({ className, noHover = false, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
-      'border-b border-odc-border transition-colors hover:bg-odc-surface-alt/50 data-[state=selected]:bg-odc-primary-soft/30',
+      'border-b border-odc-border transition-colors',
+      !noHover && 'hover:bg-odc-surface-alt/50',
+      'data-[state=selected]:bg-odc-primary-soft/30',
       className,
     )}
     {...props}
@@ -70,20 +108,34 @@ const TableRow = React.forwardRef<
 ));
 TableRow.displayName = 'TableRow';
 
+/* ============================================================================
+   TABLE HEAD (cellule d'en-tête)
+   ============================================================================ */
+
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
+    scope="col"
     className={cn(
-      'h-11 px-4 text-left align-middle text-xs font-semibold text-odc-muted uppercase tracking-wider [&:has([role=checkbox])]:pr-0',
+      // Mise en page
+      'h-11 px-4 text-left align-middle',
+      // Typographie
+      'text-xs font-semibold uppercase tracking-wider text-odc-muted',
+      // Cas particulier : checkbox
+      '[&:has([role=checkbox])]:pr-0 [&:has([role=checkbox])]:w-10',
       className,
     )}
     {...props}
   />
 ));
 TableHead.displayName = 'TableHead';
+
+/* ============================================================================
+   TABLE CELL (cellule de contenu)
+   ============================================================================ */
 
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
@@ -92,13 +144,18 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      'p-4 align-middle [&:has([role=checkbox])]:pr-0',
+      'p-4 align-middle text-odc-text-primary',
+      '[&:has([role=checkbox])]:pr-0 [&:has([role=checkbox])]:w-10',
       className,
     )}
     {...props}
   />
 ));
 TableCell.displayName = 'TableCell';
+
+/* ============================================================================
+   TABLE CAPTION
+   ============================================================================ */
 
 const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
@@ -111,6 +168,10 @@ const TableCaption = React.forwardRef<
   />
 ));
 TableCaption.displayName = 'TableCaption';
+
+/* ============================================================================
+   EXPORTS
+   ============================================================================ */
 
 export {
   Table,

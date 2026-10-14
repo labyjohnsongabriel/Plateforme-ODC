@@ -1,7 +1,7 @@
 // src/app/(admin)/admin/utilisateurs/components/UserForm.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -43,18 +43,17 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RoleSelector } from './RoleSelector';
+
+/* ⭐ CORRECTION : import avec le BON nom */
+import { RoleSelectorInline } from './RoleSelectorInline';
 
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 import { getInitials, cn } from '@/lib/utils';
-import type { User } from '@/types/user.types';
 
 /* ============================================================================
    SCHÉMA DE VALIDATION
    ============================================================================ */
-
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 const baseUserSchema = z.object({
   nom: z
@@ -114,7 +113,7 @@ const baseUserSchema = z.object({
   emailVerifie: z.boolean().default(false),
 });
 
-/* -------------------- Schéma CREATE (avec mot de passe) -------------------- */
+/* -------------------- CREATE (avec mot de passe) -------------------- */
 
 const createSchema = baseUserSchema
   .extend({
@@ -131,7 +130,7 @@ const createSchema = baseUserSchema
     path: ['confirmation'],
   });
 
-/* -------------------- Schéma EDIT (sans mot de passe) -------------------- */
+/* -------------------- EDIT (sans mot de passe) -------------------- */
 
 const editSchema = baseUserSchema;
 
@@ -146,9 +145,7 @@ type FormData = CreateFormData | EditFormData;
 interface UserFormProps {
   mode?: 'create' | 'edit';
   userId?: string;
-  /** Callback après succès */
   onSuccess?: () => void;
-  /** Callback après annulation */
   onCancel?: () => void;
 }
 
@@ -184,9 +181,10 @@ export function UserForm({
   const qc = useQueryClient();
 
   const isEdit = mode === 'edit';
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmation, setShowConfirmation] = React.useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false);
 
   /* -------------------- Récupérer l'utilisateur (edit) -------------------- */
   const { data: user, isLoading } = useQuery<UserResponse>({
@@ -204,8 +202,6 @@ export function UserForm({
     handleSubmit,
     control,
     reset,
-    watch,
-    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(isEdit ? editSchema : createSchema),
@@ -228,7 +224,7 @@ export function UserForm({
   });
 
   /* -------------------- Charger les données en édition -------------------- */
-  useEffect(() => {
+  React.useEffect(() => {
     if (user && isEdit) {
       reset({
         nom: user.nom ?? '',
@@ -252,15 +248,22 @@ export function UserForm({
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       if (isEdit && userId) {
-        const { motDePasse, confirmation, ...updateData } =
+        // ⭐⭐ CORRECTION : séparer le rôle du reste
+        const { motDePasse, confirmation, roleNom, email, ...updateData } =
           data as CreateFormData;
-        const { data: res } = await api.put(
-          `/admin/users/${userId}`,
-          updateData,
-        );
-        return res.data;
+
+        // 1. Mettre à jour les infos générales
+        await api.put(`/admin/users/${userId}`, updateData);
+
+        // 2. Si le rôle a changé, appeler l'endpoint dédié
+        if (user?.role?.nom !== roleNom) {
+          await api.put(`/admin/users/${userId}/role`, { roleNom });
+        }
+
+        return;
       }
 
+      // ⭐ Création : envoyer tout
       const { data: res } = await api.post('/admin/users', data);
       return res.data;
     },
@@ -269,6 +272,8 @@ export function UserForm({
         isEdit ? 'Utilisateur mis à jour' : 'Utilisateur créé avec succès',
       );
       qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'user', userId] });
+
       if (onSuccess) onSuccess();
       else router.push('/admin/utilisateurs');
     },
@@ -288,6 +293,7 @@ export function UserForm({
     onSuccess: () => {
       toast.success('Photo mise à jour');
       qc.invalidateQueries({ queryKey: ['admin', 'user', userId] });
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -302,7 +308,9 @@ export function UserForm({
     else router.back();
   };
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -329,15 +337,11 @@ export function UserForm({
     return <UserFormSkeleton />;
   }
 
-  /* -------------------- Valeurs watch -------------------- */
-  const watchedPrenom = watch('prenom');
-  const watchedNom = watch('nom');
-
   /* -------------------- Rendu -------------------- */
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6 max-w-4xl"
+      className="max-w-4xl space-y-6"
       noValidate
     >
       {/* ================================================================
@@ -346,7 +350,7 @@ export function UserForm({
       <header className="flex items-center gap-4">
         <div
           className={cn(
-            'w-12 h-12 rounded-xl flex items-center justify-center shadow-odc-md',
+            'flex h-12 w-12 items-center justify-center rounded-xl shadow-odc-md',
             isEdit
               ? 'bg-gradient-to-br from-blue-500 to-blue-700'
               : 'bg-gradient-to-br from-odc-500 to-odc-700',
@@ -360,9 +364,9 @@ export function UserForm({
         </div>
         <div>
           <h1 className="font-display text-2xl font-bold">
-            {isEdit ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}
+            {isEdit ? "Modifier l'utilisateur" : 'Nouvel utilisateur'}
           </h1>
-          <p className="text-sm text-odc-muted">
+          <p className="text-sm text-odc-text-muted">
             {isEdit
               ? 'Mettez à jour les informations du compte'
               : 'Créez un nouveau compte utilisateur'}
@@ -383,14 +387,14 @@ export function UserForm({
               <div className="relative">
                 <Avatar className="h-24 w-24 border-2 border-odc-border">
                   <AvatarImage src={user.photoUrl ?? undefined} />
-                  <AvatarFallback className="bg-odc-primary-soft text-odc-primary text-2xl font-bold">
+                  <AvatarFallback className="bg-odc-primary-soft text-2xl font-bold text-odc-primary">
                     {getInitials(user.nom, user.prenom)}
                   </AvatarFallback>
                 </Avatar>
 
                 {uploadingAvatar && (
-                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
                   </div>
                 )}
               </div>
@@ -412,10 +416,10 @@ export function UserForm({
                   }
                   disabled={uploadingAvatar}
                 >
-                  <Camera className="h-4 w-4 mr-2" />
+                  <Camera className="mr-2 h-4 w-4" />
                   Changer la photo
                 </Button>
-                <p className="text-xs text-odc-muted">
+                <p className="text-xs text-odc-text-muted">
                   JPG, PNG ou WEBP · Max 5 Mo
                 </p>
               </div>
@@ -439,8 +443,7 @@ export function UserForm({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Nom + Prénom */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="prenom">
                 Prénom <span className="text-odc-error">*</span>
@@ -454,7 +457,7 @@ export function UserForm({
                 aria-invalid={!!errors.prenom}
               />
               {errors.prenom && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {errors.prenom.message}
                 </p>
               )}
@@ -473,15 +476,14 @@ export function UserForm({
                 aria-invalid={!!errors.nom}
               />
               {errors.nom && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {errors.nom.message}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Email + Téléphone */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="email" className="flex items-center gap-1.5">
                 <Mail className="h-3.5 w-3.5" />
@@ -497,12 +499,12 @@ export function UserForm({
                 aria-invalid={!!errors.email}
               />
               {isEdit && (
-                <p className="text-xs text-odc-muted mt-1.5">
-                  L&apos;email ne peut pas être modifié
+                <p className="mt-1.5 text-xs text-odc-text-muted">
+                  L'email ne peut pas être modifié
                 </p>
               )}
               {errors.email && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {errors.email.message}
                 </p>
               )}
@@ -524,14 +526,13 @@ export function UserForm({
                 aria-invalid={!!errors.telephone}
               />
               {errors.telephone && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {errors.telephone.message}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Ville */}
           <div>
             <Label htmlFor="ville" className="flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5" />
@@ -546,7 +547,6 @@ export function UserForm({
             />
           </div>
 
-          {/* Bio */}
           <div>
             <Label htmlFor="bio">Biographie</Label>
             <Textarea
@@ -558,7 +558,7 @@ export function UserForm({
               className="mt-1.5 resize-none"
             />
             {errors.bio && (
-              <p className="text-odc-error text-xs mt-1.5" role="alert">
+              <p className="mt-1.5 text-xs text-odc-error" role="alert">
                 {errors.bio.message}
               </p>
             )}
@@ -576,7 +576,7 @@ export function UserForm({
             Rôle et permissions
           </CardTitle>
           <CardDescription>
-            Sélectionnez le rôle qui définit les accès de l&apos;utilisateur
+            Sélectionnez le rôle qui définit les accès de l'utilisateur
           </CardDescription>
         </CardHeader>
 
@@ -585,7 +585,8 @@ export function UserForm({
             name="roleNom"
             control={control}
             render={({ field }) => (
-              <RoleSelector
+              /* ⭐ Utilisation du bon composant */
+              <RoleSelectorInline
                 value={field.value}
                 onChange={field.onChange}
                 disabled={isSubmitting}
@@ -594,7 +595,7 @@ export function UserForm({
             )}
           />
           {errors.roleNom && (
-            <p className="text-odc-error text-xs mt-1.5" role="alert">
+            <p className="mt-1.5 text-xs text-odc-error" role="alert">
               {errors.roleNom.message}
             </p>
           )}
@@ -617,7 +618,6 @@ export function UserForm({
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* Mot de passe */}
             <div>
               <Label htmlFor="motDePasse">
                 Mot de passe <span className="text-odc-error">*</span>
@@ -636,7 +636,7 @@ export function UserForm({
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-odc-text-muted transition-colors hover:text-odc-primary"
                   tabIndex={-1}
                   aria-label={showPassword ? 'Masquer' : 'Afficher'}
                 >
@@ -648,13 +648,12 @@ export function UserForm({
                 </button>
               </div>
               {(errors as any).motDePasse && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {(errors as any).motDePasse.message}
                 </p>
               )}
             </div>
 
-            {/* Confirmation */}
             <div>
               <Label htmlFor="confirmation">
                 Confirmer le mot de passe{' '}
@@ -674,7 +673,7 @@ export function UserForm({
                 <button
                   type="button"
                   onClick={() => setShowConfirmation((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-odc-text-muted transition-colors hover:text-odc-primary"
                   tabIndex={-1}
                   aria-label={showConfirmation ? 'Masquer' : 'Afficher'}
                 >
@@ -686,16 +685,17 @@ export function UserForm({
                 </button>
               </div>
               {(errors as any).confirmation && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {(errors as any).confirmation.message}
                 </p>
               )}
             </div>
 
-            {/* Règles */}
-            <div className="p-3 rounded-lg bg-odc-surface-alt text-xs text-odc-muted">
-              <p className="font-medium mb-1">Le mot de passe doit contenir :</p>
-              <ul className="list-disc list-inside space-y-0.5">
+            <div className="rounded-lg bg-odc-surface-alt p-3 text-xs text-odc-text-muted">
+              <p className="mb-1 font-medium">
+                Le mot de passe doit contenir :
+              </p>
+              <ul className="list-inside list-disc space-y-0.5">
                 <li>Au moins 8 caractères</li>
                 <li>Une majuscule et une minuscule</li>
                 <li>Au moins un chiffre</li>
@@ -720,7 +720,7 @@ export function UserForm({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="entreprise" className="flex items-center gap-1.5">
                 <Building2 className="h-3.5 w-3.5" />
@@ -747,7 +747,7 @@ export function UserForm({
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="siteWeb" className="flex items-center gap-1.5">
                 <Globe className="h-3.5 w-3.5" />
@@ -763,7 +763,7 @@ export function UserForm({
                 aria-invalid={!!errors.siteWeb}
               />
               {errors.siteWeb && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {errors.siteWeb.message}
                 </p>
               )}
@@ -784,7 +784,7 @@ export function UserForm({
                 aria-invalid={!!errors.linkedin}
               />
               {errors.linkedin && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className="mt-1.5 text-xs text-odc-error" role="alert">
                   {errors.linkedin.message}
                 </p>
               )}
@@ -802,13 +802,12 @@ export function UserForm({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Actif */}
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Label htmlFor="actif" className="font-medium cursor-pointer">
+              <Label htmlFor="actif" className="cursor-pointer font-medium">
                 Compte actif
               </Label>
-              <p className="text-xs text-odc-muted mt-0.5">
+              <p className="mt-0.5 text-xs text-odc-text-muted">
                 Un compte inactif ne peut pas se connecter
               </p>
             </div>
@@ -828,17 +827,16 @@ export function UserForm({
 
           <Separator />
 
-          {/* Email vérifié */}
           <div className="flex items-center justify-between gap-4">
             <div>
               <Label
                 htmlFor="emailVerifie"
-                className="font-medium cursor-pointer"
+                className="cursor-pointer font-medium"
               >
                 Email vérifié
               </Label>
-              <p className="text-xs text-odc-muted mt-0.5">
-                Marquer l&apos;email comme vérifié manuellement
+              <p className="mt-0.5 text-xs text-odc-text-muted">
+                Marquer l'email comme vérifié manuellement
               </p>
             </div>
             <Controller
@@ -860,7 +858,7 @@ export function UserForm({
       {/* ================================================================
           ACTIONS
           ================================================================ */}
-      <div className="flex items-center justify-end gap-3 sticky bottom-4 bg-odc-surface/95 backdrop-blur-sm p-4 rounded-lg border border-odc-border shadow-odc-md z-10">
+      <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-lg border border-odc-border bg-odc-surface/95 p-4 shadow-odc-md backdrop-blur-sm">
         <Button
           type="button"
           variant="outline"
@@ -878,13 +876,13 @@ export function UserForm({
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {isEdit ? 'Enregistrement…' : 'Création…'}
             </>
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" />
-              {isEdit ? 'Enregistrer' : 'Créer l\'utilisateur'}
+              <Save className="mr-2 h-4 w-4" />
+              {isEdit ? 'Enregistrer' : "Créer l'utilisateur"}
             </>
           )}
         </Button>
@@ -899,9 +897,9 @@ export function UserForm({
 
 function UserFormSkeleton() {
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center gap-4">
-        <Skeleton className="w-12 h-12 rounded-xl" />
+        <Skeleton className="h-12 w-12 rounded-xl" />
         <div className="space-y-2">
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-4 w-60" />
@@ -914,7 +912,7 @@ function UserFormSkeleton() {
             <Skeleton className="h-5 w-40" />
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Skeleton className="h-16" />
               <Skeleton className="h-16" />
             </div>

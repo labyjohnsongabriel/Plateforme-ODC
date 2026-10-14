@@ -9,12 +9,20 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation'; // ✅ Next.js, pas react-router-dom
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/error-handler';
-import { getDashboardRoute, ROUTES } from '@/lib/routes';
+
+/* ⭐ CORRECTION : import de ROUTES_FLAT et ROUTES_ALIAS */
+import {
+  ROUTES,
+  ROUTES_ALIAS,
+  ROUTES_FLAT,
+  getDashboardRoute,
+} from '@/lib/routes';
+
 import type { User } from '@/types/user.types';
 import type { RoleName } from '@/types/role.types';
 
@@ -81,7 +89,7 @@ export function AuthProvider({
   children,
   autoRedirect = false,
 }: AuthProviderProps) {
-  const router = useRouter(); // ✅ Next.js
+  const router = useRouter();
 
   /* -------------------- SÉLECTEURS ZUSTAND -------------------- */
   const user = useAuthStore((s) => s.user);
@@ -147,11 +155,16 @@ export function AuthProvider({
     [setAuth, router, autoRedirect],
   );
 
-  /* -------------------- LOGOUT -------------------- */
+  /* -------------------- LOGOUT ⭐ CORRIGÉ -------------------- */
   const logout = useCallback(() => {
     clearAuth();
     toast.success('Déconnexion réussie');
-    router.push(ROUTES.AUTH.LOGIN);
+
+    // ⭐⭐⭐ CORRECTION : utiliser ROUTES_FLAT.LOGIN
+    router.push(ROUTES_FLAT.LOGIN);
+
+    // Alternative : router.push(ROUTES_ALIAS.AUTH.LOGIN)
+    // Alternative : router.push(ROUTES.auth.connexion)
   }, [clearAuth, router]);
 
   /* -------------------- REFETCH USER -------------------- */
@@ -166,10 +179,11 @@ export function AuthProvider({
     }
   }, [setUser]);
 
-  /* -------------------- GO TO DASHBOARD -------------------- */
+  /* -------------------- GO TO DASHBOARD ⭐ CORRIGÉ -------------------- */
   const goToDashboard = useCallback(() => {
     if (!user) {
-      router.push(ROUTES.AUTH.LOGIN);
+      // ⭐⭐⭐ CORRECTION : utiliser ROUTES_FLAT.LOGIN
+      router.push(ROUTES_FLAT.LOGIN);
       return;
     }
     router.push(getDashboardRoute(user.role?.nom));
@@ -195,7 +209,8 @@ export function AuthProvider({
   const can = useCallback(
     (permission: string): boolean => {
       if (!user?.role) return false;
-      const permissions = user.role.permissions?.map((p: any) => p.code) ?? [];
+      const permissions =
+        (user.role.permissions as any[])?.map((p) => p.code) ?? [];
       if (permissions.includes('*')) return true;
       return permissions.includes(permission);
     },
@@ -265,7 +280,7 @@ export function useAuthContext(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
     throw new Error(
-      'useAuthContext doit être utilisé à l\'intérieur de <AuthProvider>',
+      "useAuthContext doit être utilisé à l'intérieur de <AuthProvider>",
     );
   }
   return ctx;
@@ -296,4 +311,4 @@ export function useHasRole(roles: RoleName | RoleName[]): boolean {
 export function useCan(permission: string): boolean {
   const { can } = useAuthContext();
   return can(permission);
-} 
+}

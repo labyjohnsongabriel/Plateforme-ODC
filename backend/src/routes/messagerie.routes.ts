@@ -1,40 +1,63 @@
 // src/routes/messagerie.routes.ts
 import { Router } from 'express';
+import { MessagerieController } from '../controllers/messagerie.controller';  // ⭐ LIGNE CRITIQUE
 import { authMiddleware } from '../middlewares/auth.middleware';
-import { MessagerieController } from '../controllers/messagerie.controller';
+import { uploadImage } from '../middlewares/upload.middleware';
 
 const router = Router();
 
+/* ============================================================================
+   🔒 SÉCURITÉ GLOBALE
+   ============================================================================ */
+
 router.use(authMiddleware);
 
-/* ============================================================
- *  💬 CONVERSATIONS
- * ============================================================ */
-// GET  /api/messagerie/conversations
-router.get ('/conversations',          MessagerieController.mesConversations);
+/* ============================================================================
+   💬 CONVERSATIONS
+   ============================================================================ */
+
+// GET /api/messagerie/conversations
+router.get('/conversations', MessagerieController.mesConversations);
+
 // POST /api/messagerie/conversations/privee
-router.post('/conversations/privee',   MessagerieController.createPrivate);
+router.post(
+  '/conversations/privee',
+  MessagerieController.createPrivate,
+);
+
 // POST /api/messagerie/conversations/groupe
-router.post('/conversations/groupe',   MessagerieController.createGroupe);
-// GET  /api/messagerie/conversations/:id
-router.get ('/conversations/:id',      MessagerieController.getConversation);
+router.post(
+  '/conversations/groupe',
+  uploadImage.single('photo'),
+  MessagerieController.createGroupe,
+);
 
-/* ============================================================
- *  ✉️ MESSAGES
- * ============================================================ */
-// GET  /api/messagerie/conversations/:id/messages
-router.get ('/conversations/:id/messages', MessagerieController.getMessages);
+// GET /api/messagerie/conversations/:id
+router.get('/conversations/:id', MessagerieController.getConversation);
+
+// GET /api/messagerie/conversations/:id/messages
+router.get(
+  '/conversations/:id/messages',
+  MessagerieController.getMessages,
+);
+
 // POST /api/messagerie/conversations/:id/messages
-router.post('/conversations/:id/messages', MessagerieController.envoyer);
-// PUT  /api/messagerie/conversations/:id/lus
-router.put ('/conversations/:id/lus',      MessagerieController.marquerLus);
-// DELETE /api/messagerie/messages/:id
-router.delete('/messages/:id',             MessagerieController.supprimerMessage);
+router.post(
+  '/conversations/:id/messages',
+  MessagerieController.envoyer,
+);
 
-/* ============================================================
- *  🔔 COMPTEURS
- * ============================================================ */
-// GET /api/messagerie/non-lus/count
-router.get('/non-lus/count', MessagerieController.countNonLus);
+// PUT /api/messagerie/conversations/:id/lu
+router.put(
+  '/conversations/:id/lu',
+  MessagerieController.marquerLus,
+);
+
+/* ============================================================================
+   📩 NOTIFICATIONS
+   ============================================================================ */
+
+// GET /api/messagerie/non-lus
+router.get('/non-lus', MessagerieController.countNonLus);
 
 export default router;

@@ -10,6 +10,7 @@ import {
   NotFoundError,
   ConflictError,
   BadRequestError,
+  ForbiddenError,
 } from '../errors/AppError';
 import bcrypt from 'bcrypt';
 
@@ -42,7 +43,9 @@ function sanitizeUser(user: User | null): any {
  */
 function validatePasswordStrength(password: string): void {
   if (!password || password.length < 8) {
-    throw new BadRequestError('Le mot de passe doit contenir au moins 8 caractères');
+    throw new BadRequestError(
+      'Le mot de passe doit contenir au moins 8 caractères',
+    );
   }
   if (!/[A-Z]/.test(password)) {
     throw new BadRequestError('Le mot de passe doit contenir une majuscule');
@@ -55,13 +58,70 @@ function validatePasswordStrength(password: string): void {
   }
 }
 
+/**
+ * ⭐ NEW : Vérifie qu'il reste au moins un administrateur actif.
+ */
+async function ensureNotLastAdmin(excludeUserId?: string): Promise<void> {
+  const qb = userRepo()
+    .createQueryBuilder('u')
+    .leftJoin('u.role', 'r')
+    .where('r.nom = :nom', { nom: RoleName.ADMINISTRATEUR })
+    .andWhere('u.actif = :actif', { actif: true })
+    .andWhere('u.deletedAt IS NULL');
+
+  if (excludeUserId) {
+    qb.andWhere('u.id != :id', { id: excludeUserId });
+  }
+
+  const count = await qb.getCount();
+
+  if (count === 0) {
+    throw new BadRequestError(
+      'Impossible : il doit rester au moins un administrateur actif',
+    );
+  }
+}
+
+/* ============================================================================
+   CHAMPS AUTORISÉS
+   ============================================================================ */
+
+/** Champs qu'un ADMIN peut modifier sur un autre utilisateur */
+const ADMIN_UPDATABLE_FIELDS = [
+  'nom',
+  'prenom',
+  'telephone',
+  'bio',
+  'ville',
+  'entreprise',
+  'poste',
+  'siteWeb',
+  'linkedin',
+  'photoUrl',
+  'actif',
+  'emailVerifie',
+] as const;
+
+/** Champs qu'un utilisateur peut modifier sur SON PROPRE profil */
+const SELF_UPDATABLE_FIELDS = [
+  'prenom',
+  'nom',
+  'telephone',
+  'bio',
+  'ville',
+  'entreprise',
+  'poste',
+  'siteWeb',
+  'linkedin',
+] as const;
+
 /* ============================================================================
    CONTROLLER
    ============================================================================ */
 
 export class UserController {
   /* ==========================================================================
-     POST /api/users — Admin — Créer un utilisateur
+     POST /api/admin/users — Admin — Créer un utilisateur
      ========================================================================== */
   static async create(
     req: Request,
@@ -127,7 +187,7 @@ export class UserController {
   }
 
   /* ==========================================================================
-     GET /api/users — Admin — Liste paginée
+     GET /api/admin/users — Admin — Liste paginée
      ========================================================================== */
   static async findAll(
     req: Request,
@@ -142,30 +202,24 @@ export class UserController {
 
       const { role, roleId, actif, q } = req.query;
 
-      /* -------------------- QueryBuilder -------------------- */
       const qb = userRepo()
         .createQueryBuilder('u')
         .leftJoinAndSelect('u.role', 'r')
-        .where('u.deletedAt IS NULL'); // ⭐ Exclure les soft-deleted
+        .where('u.deletedAt IS NULL');
 
-      /* -------------------- Filtre par rôle (nom) -------------------- */
       if (role && typeof role === 'string') {
         qb.andWhere('r.nom = :role', { role });
       }
 
-      /* -------------------- Filtre par rôle (id) -------------------- */
-      // ⭐ CORRECTION : u.roleId (propriété TS), pas u.role_id (colonne DB)
       if (roleId && typeof roleId === 'string') {
         qb.andWhere('u.roleId = :rid', { rid: roleId });
       }
 
-      /* -------------------- Filtre actif/inactif -------------------- */
       if (actif !== undefined) {
         const actifBool = actif === 'true' || actif === true;
         qb.andWhere('u.actif = :a', { a: actifBool });
       }
 
-      /* -------------------- Recherche full-text -------------------- */
       if (q && typeof q === 'string') {
         qb.andWhere(
           '(u.nom ILIKE :q OR u.prenom ILIKE :q OR u.email ILIKE :q)',
@@ -173,16 +227,9 @@ export class UserController {
         );
       }
 
-      /* -------------------- Tri + Pagination -------------------- */
-      // ⭐⭐ CORRECTION CRITIQUE : u.createdAt (propriété TS), PAS u.created_at (colonne DB)
-      qb.orderBy('u.createdAt', 'DESC')  // ← LE FIX
-        .skip(skip)
-        .take(limit);
+      qb.orderBy('u.createdAt', 'DESC').skip(skip).take(limit);
 
-      /* -------------------- Exécution -------------------- */
       const [data, total] = await qb.getManyAndCount();
-
-      /* -------------------- Sanitize -------------------- */
       const sanitized = data.map(sanitizeUser);
 
       return paginatedResponse(res, sanitized, total, page, limit);
@@ -192,7 +239,7 @@ export class UserController {
   }
 
   /* ==========================================================================
-     GET /api/users/:id — Admin — Détail
+     GET /api/admin/users/:id — Admin — Détail
      ========================================================================== */
   static async findOne(
     req: Request,
@@ -214,7 +261,7 @@ export class UserController {
   }
 
   /* ==========================================================================
-     PUT /api/users/:id — Admin — Mise à jour
+     PUT /api/admin/users/:id — Admin — Mise à jour
      ========================================================================== */
   static async update(
     req: Request,
@@ -224,25 +271,32 @@ export class UserController {
     try {
       const user = await userRepo().findOne({
         where: { id: req.params.id },
+        relations: ['role'],
       });
 
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- Champs protégés -------------------- */
-      // ⚠️ Ne PAS permettre la modification de :
-      delete req.body.motDePasse;
-      delete req.body.roleId;
-      delete req.body.email; // Optionnel : décommenter si email immuable
-      delete req.body.id;
-      delete req.body.createdAt;
-      delete req.body.updatedAt;
+      /* -------------------- ⭐ Whitelist des champs -------------------- */
+      const updates: Partial<User> = {};
 
-      /* -------------------- Appliquer les modifications -------------------- */
-      Object.assign(user, req.body);
+      for (const field of ADMIN_UPDATABLE_FIELDS) {
+        if (req.body[field] !== undefined) {
+          (updates as any)[field] = req.body[field];
+        }
+      }
 
+      /* -------------------- Protection dernier admin -------------------- */
+      // Si on désactive un admin, vérifier qu'il en reste un autre
+      if (
+        updates.actif === false &&
+        user.role?.nom === RoleName.ADMINISTRATEUR
+      ) {
+        await ensureNotLastAdmin(user.id);
+      }
+
+      Object.assign(user, updates);
       await userRepo().save(user);
 
-      /* -------------------- Recharger avec relations -------------------- */
       const updated = await userRepo().findOne({
         where: { id: user.id },
         relations: ['role'],
@@ -259,7 +313,8 @@ export class UserController {
   }
 
   /* ==========================================================================
-     PUT /api/users/:id/role — Admin — Changer le rôle
+     PUT /api/admin/users/:id/role — Admin — Changer le rôle
+     ⭐ CORRIGÉ : recharge les permissions + protection dernier admin
      ========================================================================== */
   static async changeRole(
     req: Request,
@@ -267,29 +322,59 @@ export class UserController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { roleNom } = req.body;
+      const { roleNom, roleId } = req.body;
 
-      if (!roleNom) {
-        throw new BadRequestError('roleNom est requis');
+      /* -------------------- Validation -------------------- */
+      if (!roleNom && !roleId) {
+        throw new BadRequestError('roleNom ou roleId est requis');
       }
 
       const user = await userRepo().findOne({
         where: { id: req.params.id },
+        relations: ['role'],
       });
+
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      const role = await roleRepo().findOne({
-        where: { nom: roleNom as RoleName },
-      });
-      if (!role) throw new NotFoundError(`Rôle "${roleNom}" introuvable`);
+      /* -------------------- Trouver le rôle -------------------- */
+      let role: Role | null = null;
 
+      if (roleId) {
+        role = await roleRepo().findOne({ where: { id: roleId } });
+      } else {
+        if (!Object.values(RoleName).includes(roleNom as RoleName)) {
+          throw new BadRequestError(
+            `Rôle invalide : "${roleNom}". Valeurs autorisées : ${Object.values(RoleName).join(', ')}`,
+          );
+        }
+        role = await roleRepo().findOne({
+          where: { nom: roleNom as RoleName },
+        });
+      }
+
+      if (!role) {
+        throw new NotFoundError(
+          `Rôle "${roleNom ?? roleId}" introuvable`,
+        );
+      }
+
+      /* -------------------- Protection dernier admin -------------------- */
+      const isRemovingAdmin =
+        user.role?.nom === RoleName.ADMINISTRATEUR &&
+        role.nom !== RoleName.ADMINISTRATEUR;
+
+      if (isRemovingAdmin) {
+        await ensureNotLastAdmin(user.id);
+      }
+
+      /* -------------------- Appliquer -------------------- */
       user.roleId = role.id;
       await userRepo().save(user);
 
-      /* -------------------- Recharger -------------------- */
+      /* -------------------- ⭐ Recharger avec permissions -------------------- */
       const updated = await userRepo().findOne({
         where: { id: user.id },
-        relations: ['role'],
+        relations: ['role', 'role.permissions'],
       });
 
       return successResponse(
@@ -303,7 +388,8 @@ export class UserController {
   }
 
   /* ==========================================================================
-     PUT /api/users/:id/actif — Admin — Activer/Désactiver
+     PUT /api/admin/users/:id/actif — Admin — Activer/Désactiver
+     ⭐ CORRIGÉ : protection dernier admin
      ========================================================================== */
   static async toggleActif(
     req: Request,
@@ -319,8 +405,23 @@ export class UserController {
 
       const user = await userRepo().findOne({
         where: { id: req.params.id },
+        relations: ['role'],
       });
+
       if (!user) throw new NotFoundError('Utilisateur introuvable');
+
+      /* -------------------- Protection dernier admin -------------------- */
+      if (actif === false && user.role?.nom === RoleName.ADMINISTRATEUR) {
+        await ensureNotLastAdmin(user.id);
+      }
+
+      /* -------------------- ⭐ Protection auto-désactivation -------------------- */
+      const currentUserId = (req as any).user?.sub;
+      if (currentUserId === user.id && actif === false) {
+        throw new BadRequestError(
+          'Vous ne pouvez pas désactiver votre propre compte',
+        );
+      }
 
       user.actif = actif;
       await userRepo().save(user);
@@ -336,7 +437,8 @@ export class UserController {
   }
 
   /* ==========================================================================
-     DELETE /api/users/:id — Admin — Supprimer (soft delete)
+     DELETE /api/admin/users/:id — Admin — Supprimer (soft delete)
+     ⭐ CORRIGÉ : protection dernier admin
      ========================================================================== */
   static async delete(
     req: Request,
@@ -346,14 +448,22 @@ export class UserController {
     try {
       const user = await userRepo().findOne({
         where: { id: req.params.id },
+        relations: ['role'],
       });
 
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      // Empêcher l'auto-suppression
+      /* -------------------- Auto-suppression interdite -------------------- */
       const currentUserId = (req as any).user?.sub;
       if (currentUserId === user.id) {
-        throw new BadRequestError('Vous ne pouvez pas supprimer votre propre compte');
+        throw new BadRequestError(
+          'Vous ne pouvez pas supprimer votre propre compte',
+        );
+      }
+
+      /* -------------------- Protection dernier admin -------------------- */
+      if (user.role?.nom === RoleName.ADMINISTRATEUR) {
+        await ensureNotLastAdmin(user.id);
       }
 
       await userRepo().softRemove(user);
@@ -365,7 +475,8 @@ export class UserController {
   }
 
   /* ==========================================================================
-     GET /api/users/stats/roles — Admin — Statistiques par rôle
+     GET /api/admin/users/stats/roles — Admin — Statistiques par rôle
+     ⭐ CORRIGÉ : inclut les inactifs
      ========================================================================== */
   static async stats(
     _req: Request,
@@ -373,32 +484,49 @@ export class UserController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const roles = await userRepo()
+      /* -------------------- Total & actifs -------------------- */
+      const total = await userRepo()
+        .createQueryBuilder('u')
+        .where('u.deletedAt IS NULL')
+        .getCount();
+
+      const actifs = await userRepo()
+        .createQueryBuilder('u')
+        .where('u.actif = :actif', { actif: true })
+        .andWhere('u.deletedAt IS NULL')
+        .getCount();
+
+      const inactifs = total - actifs;
+
+      /* -------------------- Répartition par rôle -------------------- */
+      const parRole = await userRepo()
         .createQueryBuilder('u')
         .leftJoin('u.role', 'r')
         .select('r.nom', 'role')
         .addSelect('r.libelle', 'libelle')
         .addSelect('COUNT(u.id)', 'count')
-        .where('u.actif = :actif', { actif: true })
-        .andWhere('u.deletedAt IS NULL')
+        .where('u.deletedAt IS NULL')
         .groupBy('r.nom')
         .addGroupBy('r.libelle')
         .getRawMany();
 
-      // ⭐ Convertir count en nombre
-      const formatted = roles.map((r) => ({
-        ...r,
-        count: Number(r.count),
-      }));
-
-      return successResponse(res, formatted);
+      return successResponse(res, {
+        total,
+        actifs,
+        inactifs,
+        parRole: parRole.map((r) => ({
+          role: r.role ?? 'PARTICIPANT',
+          libelle: r.libelle ?? 'Participant',
+          count: Number(r.count),
+        })),
+      });
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     POST /api/users/:id/reset-password — Admin — Reset mot de passe
+     POST /api/admin/users/:id/reset-password — Admin
      ========================================================================== */
   static async resetPassword(
     req: Request,
@@ -458,6 +586,7 @@ export class UserController {
 
   /* ==========================================================================
      PUT /api/users/me — Mettre à jour son propre profil
+     ⭐ CORRIGÉ : whitelist stricte
      ========================================================================== */
   static async updateMe(
     req: Request,
@@ -471,20 +600,8 @@ export class UserController {
       const user = await userRepo().findOne({ where: { id: userId } });
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- Champs modifiables uniquement -------------------- */
-      const ALLOWED_FIELDS = [
-        'prenom',
-        'nom',
-        'telephone',
-        'bio',
-        'ville',
-        'entreprise',
-        'poste',
-        'siteWeb',
-        'linkedin',
-      ];
-
-      for (const field of ALLOWED_FIELDS) {
+      /* -------------------- ⭐ Whitelist stricte -------------------- */
+      for (const field of SELF_UPDATABLE_FIELDS) {
         if (req.body[field] !== undefined) {
           (user as any)[field] = req.body[field];
         }
@@ -492,7 +609,6 @@ export class UserController {
 
       await userRepo().save(user);
 
-      /* -------------------- Recharger -------------------- */
       const updated = await userRepo().findOne({
         where: { id: user.id },
         relations: ['role'],
@@ -524,11 +640,7 @@ export class UserController {
 
       await userRepo().update(userId, { photoUrl });
 
-      return successResponse(
-        res,
-        { photoUrl },
-        'Photo mise à jour',
-      );
+      return successResponse(res, { photoUrl }, 'Photo mise à jour');
     } catch (e) {
       next(e);
     }
@@ -549,14 +661,11 @@ export class UserController {
       const { ancienMotDePasse, nouveauMotDePasse } = req.body;
 
       if (!ancienMotDePasse || !nouveauMotDePasse) {
-        throw new BadRequestError(
-          'Ancien et nouveau mot de passe requis',
-        );
+        throw new BadRequestError('Ancien et nouveau mot de passe requis');
       }
 
       validatePasswordStrength(nouveauMotDePasse);
 
-      /* -------------------- Récupérer le user avec mot de passe -------------------- */
       const user = await userRepo()
         .createQueryBuilder('u')
         .addSelect('u.motDePasse')
@@ -565,13 +674,11 @@ export class UserController {
 
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- Vérifier l'ancien mot de passe -------------------- */
       const isValid = await bcrypt.compare(ancienMotDePasse, user.motDePasse);
       if (!isValid) {
         throw new BadRequestError('Ancien mot de passe incorrect');
       }
 
-      /* -------------------- Mettre à jour -------------------- */
       user.motDePasse = await bcrypt.hash(nouveauMotDePasse, 12);
       await userRepo().save(user);
 

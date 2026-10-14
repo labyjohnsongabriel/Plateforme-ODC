@@ -2,14 +2,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { SessionService } from '../services/session.service';
 import { StatutSession, ModaliteSession } from '../entities/enums';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-import { BadRequestError, NotFoundError } from '../errors/AppError';
+import {
+  successResponse,
+  paginatedResponse,
+} from '../utils/response.util';
+import {
+  BadRequestError,
+  NotFoundError,
+  ForbiddenError,
+} from '../errors/AppError';
+import { logger } from '../config/logger';
 
 /* ============================================================================
-   HELPERS
+   CONSTANTES & HELPERS
    ============================================================================ */
 
 const VALID_STATUTS = Object.values(StatutSession);
+const VALID_MODALITES = Object.values(ModaliteSession);
 
 function validateStatut(statut: unknown): asserts statut is StatutSession {
   if (!statut || !VALID_STATUTS.includes(statut as StatutSession)) {
@@ -19,14 +28,50 @@ function validateStatut(statut: unknown): asserts statut is StatutSession {
   }
 }
 
-function validateModalite(modalite: unknown): asserts modalite is ModaliteSession {
+function validateModalite(
+  modalite: unknown,
+): asserts modalite is ModaliteSession {
   if (
     modalite !== undefined &&
-    !Object.values(ModaliteSession).includes(modalite as ModaliteSession)
+    modalite !== '' &&
+    !VALID_MODALITES.includes(modalite as ModaliteSession)
   ) {
-    throw new BadRequestError('Modalité invalide');
+    throw new BadRequestError(
+      `Modalité invalide. Valeurs acceptées : ${VALID_MODALITES.join(', ')}`,
+    );
   }
 }
+
+function validateDates(dateDebut: unknown, dateFin: unknown): void {
+  if (!dateDebut || !dateFin) {
+    throw new BadRequestError('dateDebut et dateFin sont requis');
+  }
+
+  const debut = new Date(dateDebut as string);
+  const fin = new Date(dateFin as string);
+
+  if (isNaN(debut.getTime())) {
+    throw new BadRequestError('dateDebut invalide');
+  }
+  if (isNaN(fin.getTime())) {
+    throw new BadRequestError('dateFin invalide');
+  }
+  if (fin <= debut) {
+    throw new BadRequestError(
+      'dateFin doit être postérieure à dateDebut',
+    );
+  }
+}
+
+function getUserId(req: Request): string {
+  const userId = (req as any).user?.sub ?? (req as any).userId;
+  if (!userId) throw new BadRequestError('Utilisateur non authentifié');
+  return userId;
+}
+
+/* ============================================================================
+   TYPES
+   ============================================================================ */
 
 interface SessionQuery {
   page?: string;
@@ -46,13 +91,8 @@ interface SessionQuery {
 
 export class SessionController {
   /* ==========================================================================
-     🌐 PUBLIC
+     🌐 PUBLIC — Liste des sessions
      ========================================================================== */
-
-  /**
-   * GET /api/public/sessions
-   * Liste publique des sessions ouvertes.
-   */
   static async listPublic(
     req: Request,
     res: Response,
@@ -83,10 +123,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * GET /api/public/sessions/:codeSession
-   * Détail public par code session.
-   */
+  /* ==========================================================================
+     🌐 PUBLIC — Détail par code
+     ========================================================================== */
   static async detailPublic(
     req: Request,
     res: Response,
@@ -110,46 +149,22 @@ export class SessionController {
   }
 
   /* ==========================================================================
-     🔒 STAFF / ADMIN
+     🔒 STAFF / ADMIN — Création
      ========================================================================== */
-
-  /**
-   * POST /api/sessions
-   * Créer une session.
-   */
   static async create(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { formationId, dateDebut, dateFin } = req.body;
+      const { formationId, dateDebut, dateFin, modalite } = req.body;
 
       if (!formationId) {
         throw new BadRequestError('formationId est requis');
       }
-      if (!dateDebut || !dateFin) {
-        throw new BadRequestError('dateDebut et dateFin sont requis');
-      }
 
-      // Validation des dates
-      const debut = new Date(dateDebut);
-      const fin = new Date(dateFin);
-
-      if (isNaN(debut.getTime())) {
-        throw new BadRequestError('dateDebut invalide');
-      }
-      if (isNaN(fin.getTime())) {
-        throw new BadRequestError('dateFin invalide');
-      }
-      if (fin <= debut) {
-        throw new BadRequestError(
-          'dateFin doit être postérieure à dateDebut',
-        );
-      }
-
-      // Validation modalité si présente
-      validateModalite(req.body.modalite);
+      validateDates(dateDebut, dateFin);
+      validateModalite(modalite);
 
       const session = await SessionService.create(req.body);
 
@@ -159,10 +174,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * GET /api/sessions
-   * Liste paginée (admin/staff).
-   */
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Liste paginée
+     ========================================================================== */
   static async findAll(
     req: Request,
     res: Response,
@@ -177,6 +191,8 @@ export class SessionController {
         modalite: req.query.modalite as ModaliteSession,
         formationId: req.query.formationId as string,
         formateurId: req.query.formateurId as string,
+        dateDebut: req.query.dateDebut as string,
+        dateFin: req.query.dateFin as string,
       };
 
       const result = await SessionService.findAll(query);
@@ -193,10 +209,27 @@ export class SessionController {
     }
   }
 
-  /**
-   * GET /api/sessions/:id
-   * Détail admin/staff par ID.
-   */
+  /* ==========================================================================
+     ⭐⭐⭐ STAFF / ADMIN — Statistiques globales
+     ⚠️ Route : GET /api/admin/sessions/stats
+     ⚠️ DOIT ÊTRE DÉCLARÉE AVANT /:id dans les routes
+     ========================================================================== */
+  static async getStats(
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const stats = await SessionService.getStats();
+      return successResponse(res, stats, 'Statistiques des sessions');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Détail par ID
+     ========================================================================== */
   static async findOne(
     req: Request,
     res: Response,
@@ -215,10 +248,67 @@ export class SessionController {
     }
   }
 
-  /**
-   * PUT /api/sessions/:id
-   * Mise à jour d'une session.
-   */
+  /* ==========================================================================
+     ⭐⭐⭐ STAFF / ADMIN — Inscriptions d'une session
+     ⚠️ Route : GET /api/admin/sessions/:id/inscriptions
+     ⚠️ DOIT ÊTRE DÉCLARÉE AVANT /:id dans les routes
+     ========================================================================== */
+  static async getInscriptions(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const sessionId = req.params.id;
+
+      // ⭐ Vérifier que la session existe
+      const exists = await SessionService.exists(sessionId);
+      if (!exists) {
+        throw new NotFoundError('Session introuvable');
+      }
+
+      const inscriptions = await SessionService.getInscriptions(sessionId);
+
+      return successResponse(
+        res,
+        inscriptions,
+        'Inscriptions de la session',
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     ⭐⭐⭐ STAFF / ADMIN — Présences d'une session
+     ⚠️ Route : GET /api/admin/sessions/:id/presences
+     ⚠️ DOIT ÊTRE DÉCLARÉE AVANT /:id dans les routes
+     ========================================================================== */
+  static async getPresences(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const sessionId = req.params.id;
+
+      // ⭐ Vérifier que la session existe
+      const exists = await SessionService.exists(sessionId);
+      if (!exists) {
+        throw new NotFoundError('Session introuvable');
+      }
+
+      const presences = await SessionService.getPresences(sessionId);
+
+      return successResponse(res, presences, 'Présences de la session');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Mise à jour
+     ========================================================================== */
   static async update(
     req: Request,
     res: Response,
@@ -226,24 +316,19 @@ export class SessionController {
   ): Promise<void> {
     try {
       // Validation modalité si présente
-      validateModalite(req.body.modalite);
+      if (req.body.modalite !== undefined) {
+        validateModalite(req.body.modalite);
+      }
 
       // Validation dates si présentes
       if (req.body.dateDebut && req.body.dateFin) {
-        const debut = new Date(req.body.dateDebut);
-        const fin = new Date(req.body.dateFin);
-
-        if (isNaN(debut.getTime()) || isNaN(fin.getTime())) {
-          throw new BadRequestError('Dates invalides');
-        }
-        if (fin <= debut) {
-          throw new BadRequestError(
-            'dateFin doit être postérieure à dateDebut',
-          );
-        }
+        validateDates(req.body.dateDebut, req.body.dateFin);
       }
 
-      const session = await SessionService.update(req.params.id, req.body);
+      const session = await SessionService.update(
+        req.params.id,
+        req.body,
+      );
 
       return successResponse(res, session, 'Session mise à jour');
     } catch (e) {
@@ -251,10 +336,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * PUT /api/sessions/:id/statut
-   * Changer le statut d'une session.
-   */
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Changer le statut
+     ========================================================================== */
   static async changerStatut(
     req: Request,
     res: Response,
@@ -276,10 +360,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * PUT /api/sessions/:id/publier
-   * Toggle publication.
-   */
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Publier / Dépublier
+     ========================================================================== */
   static async publier(
     req: Request,
     res: Response,
@@ -306,10 +389,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * PUT /api/sessions/:id/ouvrir-presence
-   * Active/désactive le QR code de présence.
-   */
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Ouvrir / Fermer présence
+     ========================================================================== */
   static async ouvrirPresence(
     req: Request,
     res: Response,
@@ -333,10 +415,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * DELETE /api/sessions/:id
-   * Suppression (soft delete) d'une session.
-   */
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Suppression
+     ========================================================================== */
   static async delete(
     req: Request,
     res: Response,
@@ -350,10 +431,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * POST /api/sessions/:id/dupliquer
-   * Dupliquer une session.
-   */
+  /* ==========================================================================
+     🔒 STAFF / ADMIN — Dupliquer une session
+     ========================================================================== */
   static async dupliquer(
     req: Request,
     res: Response,
@@ -368,38 +448,25 @@ export class SessionController {
   }
 
   /* ==========================================================================
-     🔒 FORMATEUR
+     🔒 FORMATEUR — Mes sessions
      ========================================================================== */
-
-  /**
-   * GET /api/formateur/sessions
-   * Sessions animées par le formateur connecté.
-   */
   static async mesSessions(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      // ⭐ CORRECTION : utiliser (req as any).user.sub (défini par authMiddleware)
-      const userId = (req as any).user?.sub;
-
-      if (!userId) {
-        throw new BadRequestError('Utilisateur non authentifié');
-      }
-
+      const userId = getUserId(req);
       const data = await SessionService.findMesSessions(userId);
-
       return successResponse(res, data, 'Mes sessions');
     } catch (e) {
       next(e);
     }
   }
 
-  /**
-   * GET /api/formateur/sessions/:id/participants
-   * Participants d'une session.
-   */
+  /* ==========================================================================
+     🔒 FORMATEUR / STAFF — Participants d'une session
+     ========================================================================== */
   static async participants(
     req: Request,
     res: Response,
@@ -413,10 +480,9 @@ export class SessionController {
     }
   }
 
-  /**
-   * GET /api/sessions/:id/statistiques
-   * Statistiques d'une session (présences, taux, etc.).
-   */
+  /* ==========================================================================
+     🔒 STATISTIQUES — Détail d'une session
+     ========================================================================== */
   static async statistiques(
     req: Request,
     res: Response,

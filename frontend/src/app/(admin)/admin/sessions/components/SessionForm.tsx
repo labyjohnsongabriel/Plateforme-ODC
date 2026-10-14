@@ -1,35 +1,71 @@
+// src/app/(admin)/admin/sessions/components/SessionForm.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Loader2, Save, ArrowLeft } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import * as React from 'react';
+import { Loader2, Save, Info, Calendar, Users, FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import { getErrorMessage } from '@/lib/error-handler';
+import {
+  useCreateSession,
+  useUpdateSession,
+  type Session,
+  type SessionFormValues,
+  type StatutSession,
+} from '@/hooks/useSessions';
 
-interface Props {
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
+interface SessionFormProps {
   mode: 'create' | 'edit';
   id?: string;
+  existing?: Session | null;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-const STATUTS = ['PLANIFIEE', 'OUVERTE', 'EN_COURS', 'TERMINEE', 'ANNULEE'];
+const STATUTS: { value: StatutSession; label: string }[] = [
+  { value: 'PLANIFIEE', label: 'Planifiée' },
+  { value: 'OUVERTE', label: 'Ouverte' },
+  { value: 'EN_COURS', label: 'En cours' },
+  { value: 'TERMINEE', label: 'Terminée' },
+  { value: 'ANNULEE', label: 'Annulée' },
+];
 
-export function SessionForm({ mode, id }: Props) {
-  const router = useRouter();
-  const qc = useQueryClient();
+/* ============================================================================
+   COMPOSANT
+   ============================================================================ */
+
+export function SessionForm({
+  mode,
+  id,
+  existing,
+  onSuccess,
+  onCancel,
+}: SessionFormProps) {
   const isEdit = mode === 'edit';
 
-  const [form, setForm] = useState({
+  const [form, setForm] = React.useState<SessionFormValues>({
     formationId: '',
     formateurId: '',
     codeSession: '',
@@ -46,35 +82,9 @@ export function SessionForm({ mode, id }: Props) {
     dateFermetureInscriptions: '',
   });
 
-  const { data: formations } = useQuery({
-    queryKey: ['admin', 'formations', 'all'],
-    queryFn: async () => {
-      const { data } = await api.get('/admin/formations', { params: { limit: 100 } });
-      return data.data;
-    },
-  });
-
-  const { data: formateurs } = useQuery({
-    queryKey: ['admin', 'users', 'formateurs'],
-    queryFn: async () => {
-      const { data } = await api.get('/admin/users', {
-        params: { role: 'FORMATEUR', limit: 100 },
-      });
-      return data.data;
-    },
-  });
-
-  const { data: existing } = useQuery({
-    queryKey: ['admin', 'session', id],
-    queryFn: async () => {
-      const { data } = await api.get(`/admin/sessions/${id}`);
-      return data.data;
-    },
-    enabled: isEdit && !!id,
-  });
-
-  useEffect(() => {
-    if (existing) {
+  /* -------------------- Chargement en édition -------------------- */
+  React.useEffect(() => {
+    if (existing && isEdit) {
       setForm({
         formationId: existing.formationId ?? '',
         formateurId: existing.formateurId ?? '',
@@ -88,65 +98,102 @@ export function SessionForm({ mode, id }: Props) {
         notes: existing.notes ?? '',
         imageUrl: existing.imageUrl ?? '',
         estPubliee: existing.estPubliee ?? true,
-        dateOuvertureInscriptions: existing.dateOuvertureInscriptions?.slice(0, 16) ?? '',
-        dateFermetureInscriptions: existing.dateFermetureInscriptions?.slice(0, 16) ?? '',
+        dateOuvertureInscriptions:
+          existing.dateOuvertureInscriptions?.slice(0, 16) ?? '',
+        dateFermetureInscriptions:
+          existing.dateFermetureInscriptions?.slice(0, 16) ?? '',
       });
     }
-  }, [existing]);
+  }, [existing, isEdit]);
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        ...form,
-        formateurId: form.formateurId || undefined,
-        codeSession: form.codeSession || undefined,
-        dateOuvertureInscriptions: form.dateOuvertureInscriptions || undefined,
-        dateFermetureInscriptions: form.dateFermetureInscriptions || undefined,
-      };
-      if (isEdit) {
-        await api.put(`/admin/sessions/${id}`, payload);
-      } else {
-        await api.post('/admin/sessions', payload);
-      }
+  /* -------------------- Formations -------------------- */
+  const { data: formations = [] } = useQuery({
+    queryKey: ['admin', 'formations', 'all'],
+    queryFn: async () => {
+      const { data } = await api.get('/admin/formations', {
+        params: { limit: 200 },
+      });
+      return data?.data ?? [];
     },
-    onSuccess: () => {
-      toast.success(isEdit ? 'Session mise à jour' : 'Session créée');
-      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] });
-      router.push('/admin/sessions');
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
+    staleTime: 10 * 60_000,
   });
 
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        mutation.mutate();
-      }}
-      className="space-y-6"
-    >
-      <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Retour
-      </Button>
+  /* -------------------- Formateurs -------------------- */
+  const { data: formateurs = [] } = useQuery({
+    queryKey: ['admin', 'users', 'formateurs'],
+    queryFn: async () => {
+      const { data } = await api.get('/admin/users', {
+        params: { role: 'FORMATEUR', limit: 200 },
+      });
+      return data?.data ?? [];
+    },
+    staleTime: 10 * 60_000,
+  });
 
+  /* -------------------- Mutations -------------------- */
+  const createMutation = useCreateSession();
+  const updateMutation = useUpdateSession(id ?? '');
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  /* -------------------- Submit -------------------- */
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload: SessionFormValues = {
+      ...form,
+      formateurId: form.formateurId || undefined,
+      codeSession: form.codeSession || undefined,
+      lieu: form.lieu || undefined,
+      lienVisio: form.lienVisio || undefined,
+      notes: form.notes || undefined,
+      imageUrl: form.imageUrl || undefined,
+      dateOuvertureInscriptions:
+        form.dateOuvertureInscriptions || undefined,
+      dateFermetureInscriptions:
+        form.dateFermetureInscriptions || undefined,
+    };
+
+    try {
+      if (isEdit && id) {
+        await updateMutation.mutateAsync(payload);
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
+      onSuccess?.();
+    } catch {
+      /* Erreur déjà gérée */
+    }
+  };
+
+  /* -------------------- Rendu -------------------- */
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {/* CARTE 1 — Informations générales */}
       <Card>
         <CardHeader>
-          <CardTitle>Informations générales</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Info className="h-5 w-5 text-odc-primary" />
+            Informations générales
+          </CardTitle>
+          <CardDescription>Formation, formateur et code</CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="formationId">Formation *</Label>
+              <Label htmlFor="formationId">
+                Formation <span className="text-odc-error">*</span>
+              </Label>
               <Select
                 value={form.formationId}
                 onValueChange={(v) => setForm({ ...form, formationId: v })}
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="mt-1.5">
                   <SelectValue placeholder="Sélectionnez une formation" />
                 </SelectTrigger>
                 <SelectContent>
-                  {formations?.map((f: any) => (
+                  {formations.map((f: any) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.titre}
                     </SelectItem>
@@ -158,14 +205,15 @@ export function SessionForm({ mode, id }: Props) {
             <div>
               <Label htmlFor="formateurId">Formateur</Label>
               <Select
-                value={form.formateurId}
+                value={form.formateurId ?? ''}
                 onValueChange={(v) => setForm({ ...form, formateurId: v })}
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="mt-1.5">
                   <SelectValue placeholder="Optionnel" />
                 </SelectTrigger>
                 <SelectContent>
-                  {formateurs?.map((u: any) => (
+                  {formateurs.map((u: any) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.prenom} {u.nom}
                     </SelectItem>
@@ -182,43 +230,63 @@ export function SessionForm({ mode, id }: Props) {
               value={form.codeSession}
               onChange={(e) => setForm({ ...form, codeSession: e.target.value })}
               placeholder="Auto-généré si vide"
+              disabled={isSubmitting}
               className="mt-1.5 font-mono"
             />
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+      {/* CARTE 2 — Planning */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-odc-primary" />
+            Planning
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="dateDebut">Date de début *</Label>
+              <Label htmlFor="dateDebut">
+                Date de début <span className="text-odc-error">*</span>
+              </Label>
               <Input
                 id="dateDebut"
                 type="date"
                 value={form.dateDebut}
                 onChange={(e) => setForm({ ...form, dateDebut: e.target.value })}
+                disabled={isSubmitting}
                 required
                 className="mt-1.5"
               />
             </div>
             <div>
-              <Label htmlFor="dateFin">Date de fin *</Label>
+              <Label htmlFor="dateFin">
+                Date de fin <span className="text-odc-error">*</span>
+              </Label>
               <Input
                 id="dateFin"
                 type="date"
                 value={form.dateFin}
                 onChange={(e) => setForm({ ...form, dateFin: e.target.value })}
+                disabled={isSubmitting}
                 required
                 className="mt-1.5"
               />
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="lieu">Lieu</Label>
               <Input
                 id="lieu"
                 value={form.lieu}
                 onChange={(e) => setForm({ ...form, lieu: e.target.value })}
-                placeholder="Ex: ODC Antananarivo"
+                placeholder="Ex : ODC Antananarivo"
+                disabled={isSubmitting}
                 className="mt-1.5"
               />
             </div>
@@ -229,22 +297,39 @@ export function SessionForm({ mode, id }: Props) {
                 value={form.lienVisio}
                 onChange={(e) => setForm({ ...form, lienVisio: e.target.value })}
                 placeholder="https://meet..."
+                disabled={isSubmitting}
                 className="mt-1.5"
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+      {/* CARTE 3 — Capacité & statut */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-odc-primary" />
+            Capacité & statut
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="capacite">Capacité *</Label>
+              <Label htmlFor="capacite">
+                Capacité <span className="text-odc-error">*</span>
+              </Label>
               <Input
                 id="capacite"
                 type="number"
+                min={1}
+                max={1000}
                 value={form.capacite}
                 onChange={(e) =>
                   setForm({ ...form, capacite: Number(e.target.value) })
                 }
-                min={1}
+                disabled={isSubmitting}
                 className="mt-1.5"
               />
             </div>
@@ -252,41 +337,38 @@ export function SessionForm({ mode, id }: Props) {
               <Label htmlFor="statut">Statut</Label>
               <Select
                 value={form.statut}
-                onValueChange={(v) => setForm({ ...form, statut: v })}
+                onValueChange={(v) =>
+                  setForm({ ...form, statut: v as StatutSession })
+                }
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="mt-1.5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {STATUTS.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-
-          <div>
-            <Label htmlFor="notes">Notes internes</Label>
-            <Textarea
-              id="notes"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              rows={3}
-              className="mt-1.5"
-            />
-          </div>
         </CardContent>
       </Card>
 
+      {/* CARTE 4 — Inscriptions */}
       <Card>
         <CardHeader>
-          <CardTitle>Inscriptions</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-odc-primary" />
+            Inscriptions
+          </CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="dateOuverture">Ouverture des inscriptions</Label>
               <Input
@@ -294,8 +376,12 @@ export function SessionForm({ mode, id }: Props) {
                 type="datetime-local"
                 value={form.dateOuvertureInscriptions}
                 onChange={(e) =>
-                  setForm({ ...form, dateOuvertureInscriptions: e.target.value })
+                  setForm({
+                    ...form,
+                    dateOuvertureInscriptions: e.target.value,
+                  })
                 }
+                disabled={isSubmitting}
                 className="mt-1.5"
               />
             </div>
@@ -306,37 +392,74 @@ export function SessionForm({ mode, id }: Props) {
                 type="datetime-local"
                 value={form.dateFermetureInscriptions}
                 onChange={(e) =>
-                  setForm({ ...form, dateFermetureInscriptions: e.target.value })
+                  setForm({
+                    ...form,
+                    dateFermetureInscriptions: e.target.value,
+                  })
                 }
+                disabled={isSubmitting}
                 className="mt-1.5"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-lg border border-odc-border p-4">
             <div>
-              <Label htmlFor="publiee">Publier la session</Label>
+              <Label htmlFor="estPubliee" className="cursor-pointer">
+                Publier la session
+              </Label>
               <p className="text-xs text-odc-muted mt-0.5">
                 Visible sur le planning public
               </p>
             </div>
             <Switch
-              id="publiee"
+              id="estPubliee"
               checked={form.estPubliee}
               onCheckedChange={(v) => setForm({ ...form, estPubliee: v })}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="notes">Notes internes</Label>
+            <Textarea
+              id="notes"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={3}
+              disabled={isSubmitting}
+              className="mt-1.5 resize-none"
             />
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
+      {/* ACTIONS */}
+      <div className="sticky bottom-0 flex flex-col-reverse gap-3 border-t border-odc-border bg-odc-surface pt-4 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
           Annuler
         </Button>
-        <Button type="submit" variant="odc" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <Save className="h-4 w-4 mr-2" />
-          {isEdit ? 'Mettre à jour' : 'Créer la session'}
+        <Button
+          type="submit"
+          variant="odc"
+          disabled={isSubmitting || !form.formationId || !form.dateDebut || !form.dateFin}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {isEdit ? 'Enregistrement…' : 'Création…'}
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              {isEdit ? 'Enregistrer' : 'Créer la session'}
+            </>
+          )}
         </Button>
       </div>
     </form>

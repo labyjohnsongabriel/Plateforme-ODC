@@ -1,111 +1,609 @@
+/* ============================================================================
+   ODC FORMATIONS — Design Tokens (Root)
+   Version : 2.0.0
+   Description : Variables CSS globales, palette ODC, typographie, thèmes
+   ============================================================================ */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  /* ==========================================================================
+     1. PALETTE ODC — Couleur signature #FF7900
+     Échelle complète 50 → 950 pour une flexibilité maximale
+     ========================================================================== */
+  --odc-50:  #FFF7ED;
+  --odc-100: #FFEDD5;
+  --odc-200: #FED7AA;
+  --odc-300: #FDBA74;
+  --odc-400: #FB923C;
+  --odc-500: #FF7900;   /* ← Couleur signature ODC */
+  --odc-600: #EA6A00;
+  --odc-700: #C25400;
+  --odc-800: #9A4300;
+  --odc-900: #7C3600;
+  --odc-950: #431A00;
+
+  /* Alias sémantiques */
+  --odc-primary:        var(--odc-500);
+  --odc-primary-hover:  var(--odc-600);
+  --odc-primary-active: var(--odc-700);
+  --odc-primary-light:  var(--odc-300);
+  --odc-primary-soft:   var(--odc-100);
+  --odc-primary-softer: var(--odc-50);
+  --odc-primary-soft-rgb: 255, 237, 213;
+
+  /* ==========================================================================
+     2. COULEURS SECONDAIRES — Accents professionnels
+     ========================================================================== */
+  /* Bleu nuit (confiance, institutionnel) */
+  --odc-blue-50:  #EFF6FF;
+  --odc-blue-100: #DBEAFE;
+  --odc-blue-500: #3B82F6;
+  --odc-blue-600: #2563EB;
+  --odc-blue-700: #1D4ED8;
+  --odc-blue-900: #1E3A8A;
+
+  /* Violet (créativité, éducation) */
+  --odc-purple-50:  #F5F3FF;
+  --odc-purple-100: #EDE9FE;
+  --odc-purple-500: #8B5CF6;
+  --odc-purple-600: #7C3AED;
+  --odc-purple-700: #6D28D9;
+
+  /* Rose (accent, notifications) */
+  --odc-pink-50:  #FDF2F8;
+  --odc-pink-500: #EC4899;
+  --odc-pink-600: #DB2777;
+
+  /* ==========================================================================
+     3. NEUTRES — Échelle de gris harmonisée
+     ========================================================================== */
+  --odc-gray-0:   #FFFFFF;
+  --odc-gray-25:  #FCFCFD;
+  --odc-gray-50:  #F9FAFB;
+  --odc-gray-100: #F3F4F6;
+  --odc-gray-200: #E5E7EB;
+  --odc-gray-300: #D1D5DB;
+  --odc-gray-400: #9CA3AF;
+  --odc-gray-500: #6B7280;
+  --odc-gray-600: #4B5563;
+  --odc-gray-700: #374151;
+  --odc-gray-800: #1F2937;
+  --odc-gray-900: #111827;
+  --odc-gray-950: #030712;
+
+  /* ==========================================================================
+     4. COULEURS SÉMANTIQUES — États & feedbacks
+     ========================================================================== */
+  /* Succès */
+  --odc-success:      #16A34A;
+  --odc-success-dark: #15803D;
+  --odc-success-soft: #DCFCE7;
+  --odc-success-bg:   #F0FDF4;
+
+  /* Avertissement */
+  --odc-warning:      #F59E0B;
+  --odc-warning-dark: #D97706;
+  --odc-warning-soft: #FEF3C7;
+  --odc-warning-bg:   #FFFBEB;
+
+  /* Erreur */
+  --odc-error:        #DC2626;
+  --odc-error-dark:   #B91C1C;
+  --odc-error-soft:   #FEE2E2;
+  --odc-error-bg:     #FEF2F2;
+
+  /* Information */
+  --odc-info:         #0284C7;
+  --odc-info-dark:    #0369A1;
+  --odc-info-soft:    #E0F2FE;
+  --odc-info-bg:      #F0F9FF;
+
+  /* ==========================================================================
+     5. ALIAS DE COMPATIBILITÉ (mapping ancien → nouveau)
+     ========================================================================== */
+  --text:        var(--odc-text-secondary);
+  --text-h:      var(--odc-text-primary);
+  --bg:          var(--odc-background);
+  --border:      var(--odc-border);
+  --code-bg:     var(--odc-surface-alt);
+  --accent:      var(--odc-primary);
+  --accent-bg:   var(--odc-primary-soft);
+  --accent-border: var(--odc-primary-light);
+  --social-bg:   var(--odc-surface-alt);
+
+  /* ==========================================================================
+     6. SURFACES — Hiérarchie de profondeur
+     ========================================================================== */
+  --odc-background:      #FAFAFA;
+  --odc-background-alt:  #F5F5F5;
+  --odc-surface:         #FFFFFF;
+  --odc-surface-hover:   #FAFAFA;
+  --odc-surface-active:  #F5F5F5;
+  --odc-surface-alt:     #F5F5F5;
+  --odc-surface-sunken:  #EFEFEF;
+  --odc-elevated:        #FFFFFF;
+  --odc-overlay:         rgba(17, 24, 39, 0.55);
+  --odc-overlay-strong:  rgba(17, 24, 39, 0.75);
+
+  /* ==========================================================================
+     7. TEXTES — Hiérarchie typographique
+     ========================================================================== */
+  --odc-text-primary:    #111827;
+  --odc-text-secondary:  #4B5563;
+  --odc-text-tertiary:   #6B7280;
+  --odc-text-muted:      #9CA3AF;
+  --odc-text-disabled:   #D1D5DB;
+  --odc-text-inverse:    #FFFFFF;
+  --odc-text-link:       var(--odc-primary);
+  --odc-text-link-hover: var(--odc-primary-hover);
+
+  /* ==========================================================================
+     8. BORDURES
+     ========================================================================== */
+  --odc-border:          #E5E7EB;
+  --odc-border-light:    #F3F4F6;
+  --odc-border-strong:   #D1D5DB;
+  --odc-border-emphasis: #9CA3AF;
+  --odc-border-focus:    var(--odc-primary);
+
+  /* ==========================================================================
+     9. OMBRES — Élévation multicouche réaliste
+     ========================================================================== */
+  --odc-shadow-xs: 0 1px 2px 0 rgba(17, 24, 39, 0.04);
+  --odc-shadow-sm:
+    0 1px 3px 0 rgba(17, 24, 39, 0.06),
+    0 1px 2px -1px rgba(17, 24, 39, 0.04);
+  --odc-shadow-md:
+    0 4px 6px -1px rgba(17, 24, 39, 0.07),
+    0 2px 4px -2px rgba(17, 24, 39, 0.05);
+  --odc-shadow-lg:
+    0 10px 15px -3px rgba(17, 24, 39, 0.08),
+    0 4px 6px -4px rgba(17, 24, 39, 0.05);
+  --odc-shadow-xl:
+    0 20px 25px -5px rgba(17, 24, 39, 0.10),
+    0 8px 10px -6px rgba(17, 24, 39, 0.05);
+  --odc-shadow-2xl: 0 25px 50px -12px rgba(17, 24, 39, 0.20);
+
+  /* Ombres colorées ODC */
+  --odc-shadow-primary-sm: 0 1px 3px 0 rgba(255, 121, 0, 0.15);
+  --odc-shadow-primary-md: 0 4px 12px -2px rgba(255, 121, 0, 0.22);
+  --odc-shadow-primary-lg: 0 10px 24px -4px rgba(255, 121, 0, 0.28);
+
+  /* Focus ring */
+  --odc-shadow-focus:       0 0 0 3px rgba(255, 121, 0, 0.20);
+  --odc-shadow-focus-error: 0 0 0 3px rgba(220, 38, 38, 0.20);
+
+  /* Alias rétrocompatible */
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px,
+    rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* ==========================================================================
+     10. GRADIENTS — Effets premium
+     ========================================================================== */
+  --odc-gradient-primary:
+    linear-gradient(135deg, #FF7900 0%, #EA6A00 50%, #C25400 100%);
+  --odc-gradient-primary-soft:
+    linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+  --odc-gradient-rainbow:
+    linear-gradient(135deg, #FF7900 0%, #F59E0B 50%, #DB2777 100%);
+  --odc-gradient-glass:
+    linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%);
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
+  /* ==========================================================================
+     11. RAYONS — Cohérence des arrondis
+     ========================================================================== */
+  --odc-radius-xs:   0.25rem;   /*  4px */
+  --odc-radius-sm:   0.375rem;  /*  6px */
+  --odc-radius-md:   0.5rem;    /*  8px */
+  --odc-radius-lg:   0.75rem;   /* 12px */
+  --odc-radius-xl:   1rem;      /* 16px */
+  --odc-radius-2xl:  1.5rem;    /* 24px */
+  --odc-radius-full: 9999px;
+
+  /* ==========================================================================
+     12. ESPACEMENTS — Grille 4px
+     ========================================================================== */
+  --odc-space-0:  0;
+  --odc-space-1:  0.25rem;
+  --odc-space-2:  0.5rem;
+  --odc-space-3:  0.75rem;
+  --odc-space-4:  1rem;
+  --odc-space-5:  1.25rem;
+  --odc-space-6:  1.5rem;
+  --odc-space-8:  2rem;
+  --odc-space-10: 2.5rem;
+  --odc-space-12: 3rem;
+  --odc-space-16: 4rem;
+
+  /* ==========================================================================
+     13. TYPOGRAPHIE — Échelle modulaire
+     ========================================================================== */
+  --odc-font-sans:    'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --odc-font-display: 'Poppins', 'Inter', system-ui, sans-serif;
+  --odc-font-mono:    'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, monospace;
+
+  /* Alias rétrocompatible */
+  --sans:    var(--odc-font-sans);
+  --heading: var(--odc-font-display);
+  --mono:    var(--odc-font-mono);
+
+  --odc-text-xs:   0.75rem;   /* 12px */
+  --odc-text-sm:   0.875rem;  /* 14px */
+  --odc-text-base: 1rem;      /* 16px */
+  --odc-text-lg:   1.125rem;  /* 18px */
+  --odc-text-xl:   1.25rem;   /* 20px */
+  --odc-text-2xl:  1.5rem;    /* 24px */
+  --odc-text-3xl:  1.875rem;  /* 30px */
+  --odc-text-4xl:  2.25rem;   /* 36px */
+  --odc-text-5xl:  3rem;      /* 48px */
+
+  /* Poids */
+  --odc-font-normal:   400;
+  --odc-font-medium:   500;
+  --odc-font-semibold: 600;
+  --odc-font-bold:     700;
+
+  /* Interlignes */
+  --odc-leading-tight:   1.25;
+  --odc-leading-snug:    1.375;
+  --odc-leading-normal:  1.5;
+  --odc-leading-relaxed: 1.625;
+  --odc-leading-loose:   2;
+
+  /* Espacement des lettres */
+  --odc-tracking-tight:  -0.025em;
+  --odc-tracking-normal: 0;
+  --odc-tracking-wide:   0.025em;
+  --odc-tracking-wider:  0.05em;
+
+  /* ==========================================================================
+     14. TRANSITIONS — Courbes naturelles
+     ========================================================================== */
+  --odc-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --odc-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --odc-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --odc-transition-fast: 150ms var(--odc-ease-in-out);
+  --odc-transition-base: 200ms var(--odc-ease-in-out);
+  --odc-transition-slow: 300ms var(--odc-ease-out);
+
+  /* ==========================================================================
+     15. Z-INDEX — Pile cohérente
+     ========================================================================== */
+  --odc-z-base:           0;
+  --odc-z-dropdown:       1000;
+  --odc-z-sticky:         1020;
+  --odc-z-fixed:          1030;
+  --odc-z-modal-backdrop: 1040;
+  --odc-z-modal:          1050;
+  --odc-z-popover:        1060;
+  --odc-z-tooltip:        1070;
+  --odc-z-toast:          1080;
+  --odc-z-max:            9999;
+
+  /* ==========================================================================
+     16. MISE EN PAGE
+     ========================================================================== */
+  --odc-container-sm:  640px;
+  --odc-container-md:  768px;
+  --odc-container-lg:  1024px;
+  --odc-container-xl:  1280px;
+  --odc-container-2xl: 1440px;
+
+  --odc-header-height: 4rem;
+  --odc-sidebar-width: 16rem;
+  --odc-sidebar-collapsed: 4rem;
+
+  /* ==========================================================================
+     17. STYLES DE BASE
+     ========================================================================== */
+  font: 16px/1.5 var(--odc-font-sans);
+  letter-spacing: 0.01em;
+  color-scheme: light;
+  color: var(--odc-text-secondary);
+  background: var(--odc-background);
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+/* ============================================================================
+   RESPONSIVE — Ajustements typographiques
+   ============================================================================ */
+@media (max-width: 1024px) {
+  :root {
+    font-size: 15px;
   }
 }
 
+@media (max-width: 768px) {
+  :root {
+    font-size: 14px;
+  }
+}
+
+/* ============================================================================
+   MODE SOMBRE
+   ============================================================================ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
+    /* Primaire (accentué pour rester visible) */
+    --odc-primary:        #FF8F1F;
+    --odc-primary-hover:  #FFA040;
+    --odc-primary-active: #E67000;
+    --odc-primary-light:  #FDBA74;
+    --odc-primary-soft:   #3D2A1A;
+    --odc-primary-softer: #2A1D10;
+    --odc-primary-soft-rgb: 61, 42, 26;
+
+    /* Surfaces */
+    --odc-background:      #0A0A0A;
+    --odc-background-alt:  #111111;
+    --odc-surface:         #161616;
+    --odc-surface-hover:   #1C1C1C;
+    --odc-surface-active:  #222222;
+    --odc-surface-alt:     #1C1C1C;
+    --odc-surface-sunken:  #0F0F0F;
+    --odc-elevated:        #1F1F1F;
+    --odc-overlay:         rgba(0, 0, 0, 0.65);
+    --odc-overlay-strong:  rgba(0, 0, 0, 0.85);
+
+    /* Textes */
+    --odc-text-primary:    #F9FAFB;
+    --odc-text-secondary:  #D1D5DB;
+    --odc-text-tertiary:   #9CA3AF;
+    --odc-text-muted:      #6B7280;
+    --odc-text-disabled:   #4B5563;
+    --odc-text-inverse:    #111827;
+
+    /* Bordures */
+    --odc-border:          #2A2A2A;
+    --odc-border-light:    #1F1F1F;
+    --odc-border-strong:   #3F3F3F;
+    --odc-border-emphasis: #525252;
+
+    /* États */
+    --odc-success:      #22C55E;
+    --odc-success-soft: #14331F;
+    --odc-success-bg:   #0F2417;
+    --odc-warning:      #FBBF24;
+    --odc-warning-soft: #3D2E0A;
+    --odc-warning-bg:   #2A1F05;
+    --odc-error:        #F87171;
+    --odc-error-soft:   #3D1616;
+    --odc-error-bg:     #2A0F0F;
+    --odc-info:         #38BDF8;
+    --odc-info-soft:    #0C2A3D;
+    --odc-info-bg:      #081F2A;
+
+    /* Ombres */
+    --odc-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+    --odc-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.6);
+    --odc-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.65);
+    --odc-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+    --odc-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.75);
+    --odc-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
+
+    --odc-shadow-primary-sm: 0 1px 3px 0 rgba(255, 143, 31, 0.25);
+    --odc-shadow-primary-md: 0 4px 12px -2px rgba(255, 143, 31, 0.32);
+    --odc-shadow-primary-lg: 0 10px 24px -4px rgba(255, 143, 31, 0.38);
+
+    --odc-shadow-focus: 0 0 0 3px rgba(255, 143, 31, 0.30);
+
+    --odc-gradient-primary:
+      linear-gradient(135deg, #FF8F1F 0%, #FF7900 50%, #E67000 100%);
+    --odc-gradient-primary-soft:
+      linear-gradient(135deg, #2A1D10 0%, #3D2A1A 100%);
+
+    /* Alias rétrocompatibles */
+    --text:      var(--odc-text-secondary);
+    --text-h:    var(--odc-text-primary);
+    --bg:        var(--odc-background);
+    --border:    var(--odc-border);
+    --code-bg:   var(--odc-surface-alt);
+    --accent:    var(--odc-primary);
+    --accent-bg: var(--odc-primary-soft);
+    --accent-border: var(--odc-primary-light);
+    --social-bg: var(--odc-surface-alt);
     --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+      rgba(0, 0, 0, 0.4) 0 10px 15px -3px,
+      rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+    color-scheme: dark;
+    color: var(--odc-text-secondary);
+    background: var(--odc-background);
   }
 
+  /* Inversion d'icônes claires en mode sombre */
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
+/* ============================================================================
+   LAYOUT RACINE (#root / #__next)
+   ============================================================================ */
+#root,
+#__next {
+  width: 100%;
+  max-width: 1440px;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  text-align: left;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  background: var(--odc-background);
+  color: var(--odc-text-primary);
 }
 
+/* Fallback : conteneur principal avec bordure latérale (optionnel) */
+#root.bordered {
+  border-inline: 1px solid var(--odc-border);
+}
+
+/* ============================================================================
+   STYLES GLOBAUX — Reset & typographie
+   ============================================================================ */
 body {
   margin: 0;
+  padding: 0;
+  font-family: var(--odc-font-sans);
+  font-size: var(--odc-text-base);
+  line-height: var(--odc-leading-normal);
+  color: var(--odc-text-secondary);
+  background: var(--odc-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+/* Titres */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--odc-font-display);
+  font-weight: var(--odc-font-semibold);
+  color: var(--odc-text-primary);
+  letter-spacing: var(--odc-tracking-tight);
+  line-height: var(--odc-leading-tight);
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+  font-size: var(--odc-text-5xl);
+  font-weight: var(--odc-font-bold);
+  letter-spacing: -0.03em;
+  margin: var(--odc-space-8) 0;
 }
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+  font-size: var(--odc-text-3xl);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--odc-space-2);
 }
-p {
-  margin: 0;
+h3 {
+  font-size: var(--odc-text-2xl);
+  margin: 0 0 var(--odc-space-2);
+}
+h4 {
+  font-size: var(--odc-text-xl);
+  margin: 0 0 var(--odc-space-2);
 }
 
+/* Paragraphes */
+p {
+  margin: 0 0 var(--odc-space-4);
+  color: var(--odc-text-secondary);
+  line-height: var(--odc-leading-relaxed);
+}
+
+/* Liens */
+a {
+  color: var(--odc-text-link);
+  text-decoration: none;
+  transition: color var(--odc-transition-fast);
+}
+a:hover {
+  color: var(--odc-text-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* Code */
 code,
 .counter {
-  font-family: var(--mono);
+  font-family: var(--odc-font-mono);
   display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+  align-items: center;
+  border-radius: var(--odc-radius-xs);
+  color: var(--odc-text-primary);
+  background: var(--odc-surface-alt);
+  font-size: 0.875em;
+  line-height: 1.35;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--odc-border);
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+pre {
+  font-family: var(--odc-font-mono);
+  background: var(--odc-surface-alt);
+  color: var(--odc-text-primary);
+  padding: var(--odc-space-4);
+  border-radius: var(--odc-radius-md);
+  border: 1px solid var(--odc-border);
+  overflow-x: auto;
+  font-size: var(--odc-text-sm);
+  line-height: var(--odc-leading-relaxed);
+}
+pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+/* ============================================================================
+   RESPONSIVE — Ajustements titres
+   ============================================================================ */
+@media (max-width: 1024px) {
+  h1 {
+    font-size: var(--odc-text-4xl);
+    margin: var(--odc-space-6) 0;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: var(--odc-text-2xl);
+  }
+  h3 {
+    font-size: var(--odc-text-xl);
+  }
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: var(--odc-text-3xl);
+    margin: var(--odc-space-4) 0;
+  }
+  h2 {
+    font-size: var(--odc-text-xl);
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITÉ — Réduction des animations
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   IMPRESSION
+   ============================================================================ */
+@media print {
+  :root {
+    --odc-background: #FFFFFF;
+    --odc-text-primary: #000000;
+    --odc-text-secondary: #333333;
+    --odc-border: #CCCCCC;
+  }
+
+  body {
+    background: #FFFFFF;
+    color: #000000;
+  }
+
+  a {
+    color: #000000;
+    text-decoration: underline;
+  }
+
+  .no-print {
+    display: none !important;
+  }
 }

@@ -1,24 +1,29 @@
+// src/app/(admin)/admin/utilisateurs/components/UserFilters.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useRoles } from '@/hooks/queries/useRoles';
+import { useRoles } from '@/hooks/useRoles';
 
 export function UserFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: roles = [] } = useRoles();
-  const [search, setSearch] = useState(searchParams.get('q') ?? '');
+  const [search, setSearch] = React.useState(searchParams.get('q') ?? '');
   const debouncedSearch = useDebounce(search, 400);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     if (debouncedSearch) params.set('q', debouncedSearch);
     else params.delete('q');
@@ -46,19 +51,17 @@ export function UserFilters() {
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Recherche */}
-      <div className="relative flex-1 min-w-[220px] max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-odc-muted pointer-events-none" />
+      <div className="relative min-w-[220px] max-w-md flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-odc-text-muted" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher par nom, email…"
-          className="pl-9 input-odc"
+          className="pl-9"
           aria-label="Rechercher un utilisateur"
         />
       </div>
 
-      {/* Rôle */}
       <Select
         value={searchParams.get('roleId') ?? 'all'}
         onValueChange={(v) => updateParam('roleId', v)}
@@ -76,7 +79,6 @@ export function UserFilters() {
         </SelectContent>
       </Select>
 
-      {/* Statut */}
       <Select
         value={searchParams.get('actif') ?? 'all'}
         onValueChange={(v) => updateParam('actif', v)}
@@ -93,7 +95,7 @@ export function UserFilters() {
 
       {hasFilters && (
         <Button variant="ghost" size="sm" onClick={clearAll}>
-          <X className="h-4 w-4 mr-1.5" />
+          <X className="mr-1.5 h-4 w-4" />
           Réinitialiser
         </Button>
       )}

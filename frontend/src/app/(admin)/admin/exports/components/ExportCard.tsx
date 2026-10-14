@@ -1,15 +1,48 @@
+// src/app/(admin)/admin/exports/components/ExportCard.tsx
 'use client';
 
-import { Download, FileSpreadsheet, FileText } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Users,
+  BookOpen,
+  Calendar,
+  Award,
+  FileSpreadsheet,
+  FileText,
+  Download,
+  type LucideIcon,
+} from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useExport } from '@/hooks/useExport';
 
-interface Props {
+/* ============================================================================
+   MAPPING — Nom d'icône → Composant
+   ============================================================================ */
+
+const ICON_MAP = {
+  Users,
+  BookOpen,
+  Calendar,
+  Award,
+  Download,
+} as const;
+
+export type IconName = keyof typeof ICON_MAP;
+
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
+interface ExportCardProps {
   title: string;
   description: string;
-  icon: LucideIcon;
+  /** ⭐ Nom de l'icône (string), PAS le composant */
+  iconName: IconName;
   endpoints: {
     csv?: string;
     pdf?: string;
@@ -17,23 +50,36 @@ interface Props {
   filename: string;
 }
 
-export function ExportCard({ title, description, icon: Icon, endpoints, filename }: Props) {
+/* ============================================================================
+   COMPOSANT
+   ============================================================================ */
+
+export function ExportCard({
+  title,
+  description,
+  iconName,
+  endpoints,
+  filename,
+}: ExportCardProps) {
   const { exportToCSV, exportToPDF } = useExport();
   const date = new Date().toISOString().slice(0, 10);
 
+  // ⭐ Résoudre l'icône dans le Client Component
+  const Icon = ICON_MAP[iconName] ?? Download;
+
   return (
-    <Card className="hover:shadow-odc-md transition-shadow">
+    <Card className="transition-shadow hover:shadow-odc-md">
       <CardHeader>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-11 h-11 rounded-lg bg-odc-primary-soft flex items-center justify-center">
-            <Icon className="h-5 w-5 text-odc-primary" />
+        <div className="mb-2 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-odc-primary-soft">
+            <Icon className="h-5 w-5 text-odc-primary" aria-hidden="true" />
           </div>
           <CardTitle className="text-base">{title}</CardTitle>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <p className="text-sm text-odc-muted">{description}</p>
+        <p className="text-sm text-odc-text-muted">{description}</p>
 
         <div className="flex gap-2">
           {endpoints.csv && (
@@ -44,8 +90,8 @@ export function ExportCard({ title, description, icon: Icon, endpoints, filename
               onClick={() =>
                 exportToCSV(endpoints.csv!, `${filename}-${date}.csv`)
               }
+              leftIcon={<FileSpreadsheet className="h-4 w-4" />}
             >
-              <FileSpreadsheet className="h-4 w-4 mr-1.5" />
               CSV
             </Button>
           )}
@@ -58,8 +104,8 @@ export function ExportCard({ title, description, icon: Icon, endpoints, filename
               onClick={() =>
                 exportToPDF(endpoints.pdf!, `${filename}-${date}.pdf`)
               }
+              leftIcon={<FileText className="h-4 w-4" />}
             >
-              <FileText className="h-4 w-4 mr-1.5" />
               PDF
             </Button>
           )}

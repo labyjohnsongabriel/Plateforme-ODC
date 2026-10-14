@@ -1,18 +1,8 @@
-// src/controllers/MessagerieController.ts
+// src/controllers/messagerie.controller.ts
 import { Request, Response, NextFunction } from 'express';
-import { In } from 'typeorm';
-import { AppDataSource } from '../config/database';
-import { Conversation } from '../entities/Conversation.entity';
-import { Message } from '../entities/Message.entity';
-import { User } from '../entities/User.entity';
-import { TypeMessage } from '../entities/enums';
-import { successResponse } from '../utils/response.util';
-import {
-  NotFoundError,
-  ForbiddenError,
-  BadRequestError,
-} from '../errors/AppError';
-import { logger } from '../config/logger';
+import { MessagerieService } from '../services/messagerie.service';
+import { successResponse, paginatedResponse } from '../utils/response.util';
+import { BadRequestError, NotFoundError } from '../errors/AppError';
 
 /* ============================================================================
    HELPERS
@@ -30,9 +20,9 @@ function getUserId(req: Request): string {
 
 export class MessagerieController {
   /* ==========================================================================
-     💬 CONVERSATIONS
+     GET /api/messagerie/conversations
+     ⭐ Liste des conversations de l'utilisateur connecté
      ========================================================================== */
-
   static async mesConversations(
     req: Request,
     res: Response,
@@ -40,46 +30,17 @@ export class MessagerieController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-
-      // ⭐ Utilise les PROPRIÉTÉS TypeScript (pas les colonnes DB)
-      const conversations = await AppDataSource.getRepository(Conversation)
-        .createQueryBuilder('c')
-        .leftJoinAndSelect('c.membres', 'm')
-        .leftJoinAndSelect('m.role', 'r')
-        .innerJoin('c.membres', 'me', 'me.id = :uid', { uid: userId })
-        .orderBy('c.dernierMessageAt', 'DESC', 'NULLS LAST') // ⭐ Camelcase
-        .getMany();
-
-      return successResponse(res, conversations, 'Mes conversations');
+      const conversations = await MessagerieService.mesConversations(userId);
+      return successResponse(res, conversations);
     } catch (e) {
       next(e);
     }
   }
 
-  static async getConversation(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const userId = getUserId(req);
-
-      const conv = await AppDataSource.getRepository(Conversation).findOne({
-        where: { id: req.params.id },
-        relations: ['membres', 'membres.role'],
-      });
-
-      if (!conv) throw new NotFoundError('Conversation introuvable');
-      if (!conv.membres.some((m) => m.id === userId)) {
-        throw new ForbiddenError('Accès refusé');
-      }
-
-      return successResponse(res, conv, 'Conversation récupérée');
-    } catch (e) {
-      next(e);
-    }
-  }
-
+  /* ==========================================================================
+     POST /api/messagerie/conversations/privee
+     Créer une conversation privée
+     ========================================================================== */
   static async createPrivate(
     req: Request,
     res: Response,
@@ -90,61 +51,24 @@ export class MessagerieController {
       const { destinataireId } = req.body;
 
       if (!destinataireId) {
-        throw new BadRequestError('destinataireId requis');
-      }
-      if (destinataireId === userId) {
-        throw new BadRequestError(
-          'Impossible de créer une conversation avec soi-même',
-        );
+        throw new BadRequestError('destinataireId est requis');
       }
 
-      const userRepo = AppDataSource.getRepository(User);
-
-      const destinataire = await userRepo.findOne({
-        where: { id: destinataireId },
-      });
-      if (!destinataire) {
-        throw new NotFoundError('Destinataire introuvable');
-      }
-
-      const repo = AppDataSource.getRepository(Conversation);
-
-      // ⭐ Vérifier si conversation privée existante
-      // Utilise estGroupe (propriété TS)
-      const existing = await repo
-        .createQueryBuilder('c')
-        .leftJoin('c.membres', 'm')
-        .where('c.estGroupe = :isGroup', { isGroup: false })
-        .andWhere('m.id IN (:...ids)', { ids: [userId, destinataireId] })
-        .groupBy('c.id')
-        .having('COUNT(m.id) = 2')
-        .getOne();
-
-      if (existing) {
-        return successResponse(res, existing, 'Conversation existante');
-      }
-
-      const moi = await userRepo.findOne({ where: { id: userId } });
-      if (!moi) throw new NotFoundError('Utilisateur introuvable');
-
-      const conv = repo.create({
-        estGroupe: false,
-        membres: [moi, destinataire],
-        dernierMessageAt: new Date(),
-      });
-
-      await repo.save(conv);
-
-      logger.info(
-        `💬 Conversation privée créée : ${moi.id} ↔ ${destinataire.id}`,
+      const conversation = await MessagerieService.createPrivate(
+        userId,
+        destinataireId,
       );
 
-      return successResponse(res, conv, 'Conversation créée', 201);
+      return successResponse(res, conversation, 'Conversation créée', 201);
     } catch (e) {
       next(e);
     }
   }
 
+  /* ==========================================================================
+     POST /api/messagerie/conversations/groupe
+     Créer une conversation de groupe
+     ========================================================================== */
   static async createGroupe(
     req: Request,
     res: Response,
@@ -154,47 +78,53 @@ export class MessagerieController {
       const userId = getUserId(req);
       const { titre, membreIds, photoUrl } = req.body;
 
-      if (!titre || typeof titre !== 'string') {
-        throw new BadRequestError('Titre requis');
-      }
-      if (!Array.isArray(membreIds) || membreIds.length === 0) {
-        throw new BadRequestError('membreIds requis (tableau non vide)');
+      if (!titre || !Array.isArray(membreIds) || membreIds.length === 0) {
+        throw new BadRequestError('titre et membreIds sont requis');
       }
 
-      const ids = [...new Set([...membreIds, userId])];
-
-      const membres = await AppDataSource.getRepository(User).find({
-        where: { id: In(ids) },
-      });
-
-      if (membres.length !== ids.length) {
-        throw new BadRequestError('Certains membres sont introuvables');
-      }
-
-      const repo = AppDataSource.getRepository(Conversation);
-
-      const conv = repo.create({
-        titre: titre.trim(),
-        estGroupe: true,
-        membres,
+      const conversation = await MessagerieService.createGroupe(
+        userId,
+        titre,
+        membreIds,
         photoUrl,
-        dernierMessageAt: new Date(),
-      });
+      );
 
-      await repo.save(conv);
-
-      logger.info(`👥 Groupe créé : ${titre} (${membres.length} membres)`);
-
-      return successResponse(res, conv, 'Groupe créé', 201);
+      return successResponse(res, conversation, 'Groupe créé', 201);
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     ✉️ MESSAGES
+     GET /api/messagerie/conversations/:id
+     Détail d'une conversation
      ========================================================================== */
+  static async getConversation(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const userId = getUserId(req);
+      const conversation = await MessagerieService.getConversation(
+        req.params.id,
+        userId,
+      );
 
+      if (!conversation) {
+        throw new NotFoundError('Conversation introuvable');
+      }
+
+      return successResponse(res, conversation);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     GET /api/messagerie/conversations/:id/messages
+     Liste des messages
+     ========================================================================== */
   static async getMessages(
     req: Request,
     res: Response,
@@ -202,36 +132,24 @@ export class MessagerieController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
+      const limit = Number(req.query.limit) || 100;
 
-      const conv = await AppDataSource.getRepository(Conversation).findOne({
-        where: { id: req.params.id },
-        relations: ['membres', 'membres.role'],
-      });
-
-      if (!conv) throw new NotFoundError('Conversation introuvable');
-      if (!conv.membres.some((m) => m.id === userId)) {
-        throw new ForbiddenError('Accès refusé');
-      }
-
-      const limit = Math.min(200, Number(req.query.limit) || 100);
-
-      const messages = await AppDataSource.getRepository(Message).find({
-        where: { conversationId: conv.id }, // ⭐ Propriété TS
-        relations: ['expediteur', 'expediteur.role'],
-        order: { createdAt: 'ASC' }, // ⭐ Propriété TS
-        take: limit,
-      });
-
-      return successResponse(
-        res,
-        { conversation: conv, messages },
-        'Messages récupérés',
+      const messages = await MessagerieService.getMessages(
+        req.params.id,
+        userId,
+        limit,
       );
+
+      return successResponse(res, messages);
     } catch (e) {
       next(e);
     }
   }
 
+  /* ==========================================================================
+     POST /api/messagerie/conversations/:id/messages
+     Envoyer un message
+     ========================================================================== */
   static async envoyer(
     req: Request,
     res: Response,
@@ -239,47 +157,37 @@ export class MessagerieController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-
-      const conv = await AppDataSource.getRepository(Conversation).findOne({
-        where: { id: req.params.id },
-        relations: ['membres'],
-      });
-
-      if (!conv) throw new NotFoundError('Conversation introuvable');
-      if (!conv.membres.some((m) => m.id === userId)) {
-        throw new ForbiddenError('Accès refusé');
-      }
-
-      const { contenu, type, fichierUrl, fichierNom, fichierTaille } = req.body;
+      const { contenu, type, fichierUrl, fichierNom, fichierTaille } =
+        req.body;
 
       if (!contenu && !fichierUrl) {
-        throw new BadRequestError('Message vide (contenu ou fichier requis)');
+        throw new BadRequestError(
+          'Le message doit contenir du texte ou un fichier',
+        );
       }
 
-      const msgRepo = AppDataSource.getRepository(Message);
+      const message = await MessagerieService.envoyer(
+        req.params.id,
+        userId,
+        {
+          contenu,
+          type,
+          fichierUrl,
+          fichierNom,
+          fichierTaille,
+        },
+      );
 
-      const msg = msgRepo.create({
-        conversationId: conv.id,
-        expediteurId: userId,
-        contenu: contenu?.trim() ?? null,
-        type: (type as TypeMessage) || TypeMessage.TEXTE,
-        fichierUrl,
-        fichierNom,
-        fichierTaille,
-      });
-
-      await msgRepo.save(msg);
-
-      // Mettre à jour la date du dernier message
-      conv.dernierMessageAt = new Date();
-      await AppDataSource.getRepository(Conversation).save(conv);
-
-      return successResponse(res, msg, 'Message envoyé', 201);
+      return successResponse(res, message, 'Message envoyé', 201);
     } catch (e) {
       next(e);
     }
   }
 
+  /* ==========================================================================
+     PUT /api/messagerie/conversations/:id/lu
+     Marquer tous les messages comme lus
+     ========================================================================== */
   static async marquerLus(
     req: Request,
     res: Response,
@@ -287,70 +195,20 @@ export class MessagerieController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-
-      const conv = await AppDataSource.getRepository(Conversation).findOne({
-        where: { id: req.params.id },
-        relations: ['membres'],
-      });
-
-      if (!conv) throw new NotFoundError('Conversation introuvable');
-      if (!conv.membres.some((m) => m.id === userId)) {
-        throw new ForbiddenError('Accès refusé');
-      }
-
-      // ⭐ Utilise les propriétés TS : conversationId, expediteurId, lu, dateLecture
-      await AppDataSource.getRepository(Message)
-        .createQueryBuilder()
-        .update(Message)
-        .set({ lu: true, dateLecture: new Date() })
-        .where('conversationId = :cid', { cid: req.params.id }) // ⭐ conversationId
-        .andWhere('expediteurId != :uid', { uid: userId }) // ⭐ expediteurId
-        .andWhere('lu = :isLue', { isLue: false }) // ⭐ lu = :isLue
-        .execute();
-
-      return successResponse(res, null, 'Messages marqués comme lus');
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  static async supprimerMessage(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const userId = getUserId(req);
-
-      const repo = AppDataSource.getRepository(Message);
-
-      const msg = await repo.findOne({
-        where: { id: req.params.id },
-        relations: ['conversation', 'conversation.membres'],
-      });
-
-      if (!msg) throw new NotFoundError('Message introuvable');
-
-      if (msg.expediteurId !== userId) {
-        throw new ForbiddenError(
-          'Vous ne pouvez supprimer que vos propres messages',
-        );
-      }
-
-      await repo.softDelete(req.params.id);
-
-      logger.info(`🗑️ Message supprimé : ${req.params.id}`);
-
-      return successResponse(res, null, 'Message supprimé');
+      const result = await MessagerieService.marquerLus(
+        req.params.id,
+        userId,
+      );
+      return successResponse(res, result, 'Messages marqués comme lus');
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔔 COMPTEURS
+     GET /api/messagerie/non-lus
+     Compter les messages non lus
      ========================================================================== */
-
   static async countNonLus(
     req: Request,
     res: Response,
@@ -358,18 +216,8 @@ export class MessagerieController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-
-      // ⭐ Utilise les propriétés TS partout
-      const count = await AppDataSource.getRepository(Message)
-        .createQueryBuilder('m')
-        .leftJoin('m.conversation', 'c')
-        .leftJoin('c.membres', 'u')
-        .where('u.id = :uid', { uid: userId })
-        .andWhere('m.expediteurId != :uid', { uid: userId }) // ⭐ expediteurId
-        .andWhere('m.lu = :isLue', { isLue: false }) // ⭐ lu
-        .getCount();
-
-      return successResponse(res, { count }, 'Messages non lus');
+      const result = await MessagerieService.countNonLus(userId);
+      return successResponse(res, result);
     } catch (e) {
       next(e);
     }

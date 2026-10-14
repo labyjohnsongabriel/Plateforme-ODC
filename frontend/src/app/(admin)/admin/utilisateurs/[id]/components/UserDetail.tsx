@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RoleSelector } from '../../components/RoleSelector';
+import { RoleSelector } from '../../components/RoleSelectorInline';
 import { api } from '@/lib/api';
 import { formatDate, formatDateTime } from '@/lib/formatters';
 import { getInitials } from '@/lib/utils';

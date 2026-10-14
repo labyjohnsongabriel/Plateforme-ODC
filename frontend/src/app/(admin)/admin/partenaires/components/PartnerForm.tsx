@@ -1,132 +1,172 @@
+// src/app/(admin)/admin/partenaires/components/PartnerForm.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import {
-  Loader2, Save, ArrowLeft, Upload, Building2, X,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Save, Upload, Building2, Wand2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { api } from '@/lib/api';
-import { getErrorMessage } from '@/lib/error-handler';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { cn } from '@/lib/utils';
+import { slugify } from '@/lib/slugify';
+import {
+  useUploadLogoPartenaire,
+  type Partenaire,
+  type PartenaireFormValues,
+} from '@/hooks/usePartenaires';
 
-interface Props {
+/* ============================================================================
+   SCHÉMA ZOD
+   ============================================================================ */
+
+const partenaireSchema = z.object({
+  nom: z
+    .string()
+    .trim()
+    .min(2, 'Minimum 2 caractères')
+    .max(120, 'Maximum 120 caractères'),
+  slug: z.string().trim().optional().or(z.literal('')),
+  secteur: z.string().trim().max(80).optional().or(z.literal('')),
+  description: z.string().trim().max(1000).optional().or(z.literal('')),
+  contactEmail: z
+    .string()
+    .trim()
+    .email('Email invalide')
+    .optional()
+    .or(z.literal('')),
+  contactTel: z.string().trim().max(30).optional().or(z.literal('')),
+  siteWeb: z
+    .string()
+    .trim()
+    .url('URL invalide')
+    .optional()
+    .or(z.literal('')),
+  logoUrl: z.string().trim().optional().or(z.literal('')),
+  actif: z.boolean().default(true),
+  estPubliee: z.boolean().default(true),
+  ordreAffichage: z.coerce.number().int().min(0).max(9999).default(0),
+});
+
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
+interface PartnerFormProps {
   mode: 'create' | 'edit';
   id?: string;
+  defaultValues?: Partial<Partenaire>;
+  onSubmit: (values: PartenaireFormValues) => Promise<void>;
+  onCancel?: () => void;
+  isSubmitting?: boolean;
+  showActions?: boolean;
 }
 
-export function PartnerForm({ mode, id }: Props) {
-  const router = useRouter();
-  const qc = useQueryClient();
+/* ============================================================================
+   COMPOSANT
+   ============================================================================ */
+
+export function PartnerForm({
+  mode,
+  id,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isSubmitting = false,
+  showActions = true,
+}: PartnerFormProps) {
   const isEdit = mode === 'edit';
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const lastSlugRef = React.useRef('');
+  const uploadLogo = useUploadLogoPartenaire(id ?? '');
 
-  const [form, setForm] = useState({
-    nom: '',
-    secteur: '',
-    description: '',
-    contactEmail: '',
-    contactTel: '',
-    siteWeb: '',
-    logoUrl: '',
-    actif: true,
-    estPubliee: true,
-    ordreAffichage: 0,
+  const form = useForm<PartenaireFormValues>({
+    resolver: zodResolver(partenaireSchema),
+    defaultValues: {
+      nom: defaultValues?.nom ?? '',
+      slug: defaultValues?.slug ?? '',
+      secteur: defaultValues?.secteur ?? '',
+      description: defaultValues?.description ?? '',
+      contactEmail: defaultValues?.contactEmail ?? '',
+      contactTel: defaultValues?.contactTel ?? '',
+      siteWeb: defaultValues?.siteWeb ?? '',
+      logoUrl: defaultValues?.logoUrl ?? '',
+      actif: defaultValues?.actif ?? true,
+      estPubliee: defaultValues?.estPubliee ?? true,
+      ordreAffichage: defaultValues?.ordreAffichage ?? 0,
+    },
+    mode: 'onBlur',
   });
 
-  const { data: existing } = useQuery({
-    queryKey: ['admin', 'partenaire', id],
-    queryFn: async () => {
-      const { data } = await api.get(`/admin/partenaires/${id}`);
-      return data.data;
-    },
-    enabled: isEdit && !!id,
-  });
+  /* -------------------- Auto-slug -------------------- */
+  const nomValue = form.watch('nom');
+  const slugValue = form.watch('slug');
+  const logoUrl = form.watch('logoUrl');
 
-  useEffect(() => {
-    if (existing) {
-      setForm({
-        nom: existing.nom ?? '',
-        secteur: existing.secteur ?? '',
-        description: existing.description ?? '',
-        contactEmail: existing.contactEmail ?? '',
-        contactTel: existing.contactTel ?? '',
-        siteWeb: existing.siteWeb ?? '',
-        logoUrl: existing.logoUrl ?? '',
-        actif: existing.actif ?? true,
-        estPubliee: existing.estPubliee ?? true,
-        ordreAffichage: existing.ordreAffichage ?? 0,
-      });
-    }
-  }, [existing]);
+  React.useEffect(() => {
+    if (isEdit) return;
+    if (!nomValue) return;
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (isEdit) {
-        await api.put(`/admin/partenaires/${id}`, form);
-      } else {
-        await api.post('/admin/partenaires', form);
-      }
-    },
-    onSuccess: () => {
-      toast.success(isEdit ? 'Partenaire mis à jour' : 'Partenaire créé');
-      qc.invalidateQueries({ queryKey: ['admin', 'partenaires'] });
-      router.push('/admin/partenaires');
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
+    const newSlug = slugify(nomValue);
+    if (newSlug === lastSlugRef.current) return;
+    if (slugValue && slugValue !== lastSlugRef.current) return;
 
-  const uploadLogo = async (file: File) => {
-    if (!isEdit || !id) {
-      toast.info('Enregistrez d\'abord, puis téléversez le logo');
-      return;
-    }
-    const fd = new FormData();
-    fd.append('logo', file);
+    lastSlugRef.current = newSlug;
+    form.setValue('slug', newSlug, { shouldValidate: false, shouldDirty: false });
+  }, [nomValue, slugValue, isEdit, form]);
+
+  /* -------------------- Upload logo -------------------- */
+  const handleLogoUpload = async (file: File) => {
+    if (!isEdit || !id) return;
     try {
-      const { data } = await api.post(`/admin/partenaires/${id}/logo`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setForm({ ...form, logoUrl: data.data.logoUrl });
-      toast.success('Logo mis à jour');
-    } catch (e) {
-      toast.error(getErrorMessage(e));
+      const url = await uploadLogo.mutateAsync(file);
+      if (url) form.setValue('logoUrl', url, { shouldDirty: true });
+    } catch {
+      /* Erreur déjà gérée */
     }
   };
 
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        mutation.mutate();
-      }}
-      className="space-y-6"
-    >
-      <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Retour
-      </Button>
+  /* -------------------- Submit -------------------- */
+  const handleSubmit = form.handleSubmit(async (values) => {
+    await onSubmit(values);
+  });
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Informations du partenaire</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+  /* -------------------- Rendu -------------------- */
+  return (
+    <Form {...form}>
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {/* ================================================================
+            Section — Identité
+            ================================================================ */}
+        <fieldset disabled={isSubmitting} className="space-y-5">
+          <legend className="mb-3 text-sm font-semibold uppercase tracking-wider text-odc-text-muted">
+            Identité du partenaire
+          </legend>
+
           {/* Logo */}
           <div>
-            <Label>Logo</Label>
+            <FormLabel>Logo</FormLabel>
             <div className="mt-1.5 flex items-center gap-4">
-              <div className="w-20 h-20 rounded-lg bg-odc-surface-alt flex items-center justify-center overflow-hidden shrink-0">
-                {form.logoUrl ? (
-                  <img src={form.logoUrl} alt="" className="w-full h-full object-contain" />
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-odc-surface-alt ring-1 ring-odc-border">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
                 ) : (
-                  <Building2 className="h-8 w-8 text-odc-muted" />
+                  <Building2 className="h-10 w-10 text-odc-text-muted" />
                 )}
               </div>
               <div className="flex-1">
@@ -137,7 +177,8 @@ export function PartnerForm({ mode, id }: Props) {
                   hidden
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) uploadLogo(f);
+                    if (f) handleLogoUpload(f);
+                    e.target.value = '';
                   }}
                 />
                 <Button
@@ -145,144 +186,262 @@ export function PartnerForm({ mode, id }: Props) {
                   variant="outline"
                   size="sm"
                   onClick={() => fileRef.current?.click()}
-                  disabled={!isEdit}
+                  disabled={!isEdit || uploadLogo.isPending}
+                  loading={uploadLogo.isPending}
+                  leftIcon={<Upload className="h-4 w-4" />}
                 >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Changer le logo
+                  {logoUrl ? 'Changer le logo' : 'Ajouter un logo'}
                 </Button>
                 {!isEdit && (
-                  <p className="text-xs text-odc-muted mt-1.5">
-                    Enregistrez le partenaire d&apos;abord
+                  <p className="mt-1.5 text-xs text-odc-text-muted">
+                    Enregistrez le partenaire d'abord, puis téléversez le logo.
                   </p>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="nom">Nom *</Label>
-              <Input
-                id="nom"
-                value={form.nom}
-                onChange={(e) => setForm({ ...form, nom: e.target.value })}
-                required
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="secteur">Secteur</Label>
-              <Input
-                id="secteur"
-                value={form.secteur}
-                onChange={(e) => setForm({ ...form, secteur: e.target.value })}
-                placeholder="Ex: Télécommunications"
-                className="mt-1.5"
-              />
-            </div>
-          </div>
+          {/* Nom */}
+          <FormField
+            control={form.control}
+            name="nom"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Nom <span className="text-odc-error">*</span>
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Ex : Telma Madagascar" autoFocus />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={4}
-              className="mt-1.5"
+          {/* Slug */}
+          <FormField
+            control={form.control}
+            name="slug"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Slug URL</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="telma-madagascar"
+                      className="font-mono text-sm"
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      const n = form.getValues('nom');
+                      if (n) form.setValue('slug', slugify(n));
+                    }}
+                    title="Régénérer depuis le nom"
+                  >
+                    <Wand2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Secteur */}
+          <FormField
+            control={form.control}
+            name="secteur"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Secteur d'activité</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Ex : Télécommunications" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Description */}
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    rows={4}
+                    placeholder="Présentation rapide du partenaire…"
+                    className="resize-none"
+                  />
+                </FormControl>
+                <FormDescription>
+                  {field.value?.length ?? 0}/1000 caractères
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </fieldset>
+
+        {/* ================================================================
+            Section — Contact
+            ================================================================ */}
+        <fieldset disabled={isSubmitting} className="space-y-5">
+          <legend className="mb-3 text-sm font-semibold uppercase tracking-wider text-odc-text-muted">
+            Coordonnées
+          </legend>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="contactEmail"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email de contact</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="email" placeholder="contact@exemple.mg" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="contactTel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Téléphone</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="+261 34 12 345 67" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="contactEmail">Email</Label>
-              <Input
-                id="contactEmail"
-                type="email"
-                value={form.contactEmail}
-                onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="contactTel">Téléphone</Label>
-              <Input
-                id="contactTel"
-                value={form.contactTel}
-                onChange={(e) => setForm({ ...form, contactTel: e.target.value })}
-                className="mt-1.5"
-              />
-            </div>
-          </div>
+          <FormField
+            control={form.control}
+            name="siteWeb"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Site web</FormLabel>
+                <FormControl>
+                  <Input {...field} type="url" placeholder="https://exemple.mg" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </fieldset>
 
-          <div>
-            <Label htmlFor="siteWeb">Site web</Label>
-            <Input
-              id="siteWeb"
-              type="url"
-              value={form.siteWeb}
-              onChange={(e) => setForm({ ...form, siteWeb: e.target.value })}
-              placeholder="https://..."
-              className="mt-1.5"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        {/* ================================================================
+            Section — Publication
+            ================================================================ */}
+        <fieldset disabled={isSubmitting} className="space-y-4">
+          <legend className="mb-3 text-sm font-semibold uppercase tracking-wider text-odc-text-muted">
+            Publication
+          </legend>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Publication</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="actif">Actif</Label>
-            <Switch
-              id="actif"
-              checked={form.actif}
-              onCheckedChange={(v) => setForm({ ...form, actif: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="publiee">Publié</Label>
-            <Switch
-              id="publiee"
-              checked={form.estPubliee}
-              onCheckedChange={(v) => setForm({ ...form, estPubliee: v })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="ordre">Ordre d&apos;affichage</Label>
-            <Input
-              id="ordre"
-              type="number"
-              value={form.ordreAffichage}
-              onChange={(e) =>
-                setForm({ ...form, ordreAffichage: Number(e.target.value) })
-              }
-              min={0}
-              className="mt-1.5"
-            />
-          </div>
-        </CardContent>
-      </Card>
+          <FormField
+            control={form.control}
+            name="actif"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-odc-border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-sm">Actif</FormLabel>
+                  <FormDescription>
+                    Le partenaire est disponible dans la plateforme
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
-          Annuler
-        </Button>
-        <Button type="submit" variant="odc" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <Save className="h-4 w-4 mr-2" />
-          {isEdit ? 'Mettre à jour' : 'Créer le partenaire'}
-        </Button>
-      </div>
-    </form>
+          <FormField
+            control={form.control}
+            name="estPubliee"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-odc-border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-sm">Publié</FormLabel>
+                  <FormDescription>
+                    Visible sur le site public ODC
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="ordreAffichage"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ordre d'affichage</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="number"
+                    min={0}
+                    max={9999}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Plus le chiffre est petit, plus le partenaire apparaît en premier.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </fieldset>
+
+        {/* Actions */}
+        {showActions && (
+          <div className="flex flex-col-reverse gap-3 border-t border-odc-border pt-5 sm:flex-row sm:justify-end">
+            {onCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={isSubmitting}
+              >
+                Annuler
+              </Button>
+            )}
+            <Button
+              type="submit"
+              variant="odc"
+              loading={isSubmitting}
+              loadingText={isEdit ? 'Mise à jour…' : 'Création…'}
+              leftIcon={<Save className="h-4 w-4" />}
+            >
+              {isEdit ? 'Mettre à jour' : 'Créer le partenaire'}
+            </Button>
+          </div>
+        )}
+      </form>
+    </Form>
   );
 }

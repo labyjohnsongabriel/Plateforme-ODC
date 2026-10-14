@@ -1,43 +1,72 @@
+// src/app/(admin)/admin/sessions/components/SessionsTable.tsx
 'use client';
 
-import { useState } from 'react';
+import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import {
   MoreVertical,
   Edit,
   Trash2,
-  Eye,
-  EyeOff,
   Calendar,
   MapPin,
   Users,
   QrCode,
   Clock,
   CheckCircle2,
+  XCircle,
+  PlayCircle,
+  CalendarClock,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Pagination } from '@/components/shared/Pagination';
-import { api } from '@/lib/api';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/formatters';
-import { getErrorMessage } from '@/lib/error-handler';
+import {
+  useSessions,
+  useChangeSessionStatut,
+  useTogglePresenceSession,
+  type Session,
+  type StatutSession,
+} from '@/hooks/useSessions';
+import { SessionFormModal } from './SessionFormModal';
+import { DeleteSessionDialog } from './DeleteSessionDialog';
 
-const STATUT_LABELS: Record<string, string> = {
+/* ============================================================================
+   CONFIGURATION
+   ============================================================================ */
+
+const STATUT_LABELS: Record<StatutSession, string> = {
   PLANIFIEE: 'Planifiée',
   OUVERTE: 'Ouverte',
   EN_COURS: 'En cours',
@@ -45,64 +74,114 @@ const STATUT_LABELS: Record<string, string> = {
   ANNULEE: 'Annulée',
 };
 
-const STATUT_COLORS: Record<string, string> = {
-  PLANIFIEE: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
-  OUVERTE: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
-  EN_COURS: 'bg-odc-primary-soft text-odc-primary',
-  TERMINEE: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
-  ANNULEE: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+const STATUT_COLORS: Record<StatutSession, string> = {
+  PLANIFIEE: 'bg-blue-50 text-blue-700 ring-blue-200',
+  OUVERTE: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  EN_COURS: 'bg-odc-primary-soft text-odc-primary-active ring-odc-primary-light/40',
+  TERMINEE: 'bg-odc-surface-alt text-odc-text-secondary ring-odc-border',
+  ANNULEE: 'bg-odc-error-soft text-odc-error-dark ring-odc-error/30',
 };
+
+function StatutBadge({ statut }: { statut: StatutSession }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
+        STATUT_COLORS[statut],
+      )}
+    >
+      {STATUT_LABELS[statut]}
+    </span>
+  );
+}
+
+/* ============================================================================
+   COMPTEUR CAPACITÉ
+   ============================================================================ */
+
+function CapaciteBadge({ count, capacite }: { count: number; capacite: number }) {
+  const ratio = capacite > 0 ? count / capacite : 0;
+  const full = ratio >= 1;
+
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1',
+            'text-xs font-semibold tabular-nums ring-1 ring-inset',
+            full
+              ? 'bg-odc-error-soft text-odc-error-dark ring-odc-error/30'
+              : 'bg-odc-primary-soft text-odc-primary-active ring-odc-primary-light/40',
+          )}
+        >
+          <Users className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>
+            {count}/{capacite}
+          </span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {count} inscrit{count > 1 ? 's' : ''} sur {capacite} place
+        {capacite > 1 ? 's' : ''}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/* ============================================================================
+   SQUELETTE
+   ============================================================================ */
+
+function TableSkeleton() {
+  return (
+    <Card className="overflow-hidden">
+      <div className="border-b border-odc-border bg-odc-surface-alt/50 p-4">
+        <Skeleton className="h-5 w-40" />
+      </div>
+      <div className="divide-y divide-odc-border">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 p-4">
+            <Skeleton className="h-12 w-12 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-64" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="h-8 w-8 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/* ============================================================================
+   COMPOSANT
+   ============================================================================ */
 
 export function SessionsTable() {
   const router = useRouter();
-  const qc = useQueryClient();
   const searchParams = useSearchParams();
 
   const filters = {
     page: Number(searchParams.get('page')) || 1,
     limit: 10,
-    statut: searchParams.get('statut') ?? undefined,
+    statut: (searchParams.get('statut') as StatutSession | 'all') ?? 'all',
     formationId: searchParams.get('formationId') ?? undefined,
   };
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'sessions', filters],
-    queryFn: async () => {
-      const { data } = await api.get('/admin/sessions', { params: filters });
-      return data;
-    },
-  });
+  const { data, isLoading, isError } = useSessions(filters);
+  const changeStatut = useChangeSessionStatut();
+  const togglePresence = useTogglePresenceSession();
 
-  const changerStatutMutation = useMutation({
-    mutationFn: async ({ id, statut }: { id: string; statut: string }) => {
-      await api.put(`/admin/sessions/${id}/statut`, { statut });
-    },
-    onSuccess: () => {
-      toast.success('Statut modifié');
-      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] });
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
-  const ouvrirPresenceMutation = useMutation({
-    mutationFn: async ({ id, ouverte }: { id: string; ouverte: boolean }) => {
-      await api.put(`/admin/sessions/${id}/ouvrir-presence`, { ouverte });
-    },
-    onSuccess: (_, vars) => {
-      toast.success(vars.ouverte ? 'Présence ouverte' : 'Présence fermée');
-      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/admin/sessions/${id}`);
-    },
-    onSuccess: () => {
-      toast.success('Session supprimée');
-      qc.invalidateQueries({ queryKey: ['admin', 'sessions'] });
-    },
-  });
+  const [editingSession, setEditingSession] = React.useState<Session | null>(
+    null,
+  );
+  const [deletingSession, setDeletingSession] = React.useState<Session | null>(
+    null,
+  );
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
 
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -112,12 +191,21 @@ export function SessionsTable() {
     router.push(`/admin/sessions?${params.toString()}`, { scroll: false });
   };
 
-  if (isLoading) {
+  if (isLoading) return <TableSkeleton />;
+
+  if (isError) {
     return (
-      <Card className="p-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-14 mb-2" />
-        ))}
+      <Card>
+        <EmptyState
+          icon={Calendar}
+          title="Erreur de chargement"
+          description="Impossible de charger les sessions."
+          action={
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Réessayer
+            </Button>
+          }
+        />
       </Card>
     );
   }
@@ -125,107 +213,141 @@ export function SessionsTable() {
   const sessions = data?.data ?? [];
 
   return (
-    <Card>
-      {/* Filtres */}
-      <div className="p-4 border-b border-odc-border flex flex-wrap gap-3">
-        <Select
-          value={searchParams.get('statut') ?? 'all'}
-          onValueChange={(v) => updateFilter('statut', v)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Tous les statuts" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les statuts</SelectItem>
-            {Object.entries(STATUT_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>
-                {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <TooltipProvider>
+      <Card className="overflow-hidden">
+        {/* Filtres */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-odc-border p-4">
+          <Select
+            value={searchParams.get('statut') ?? 'all'}
+            onValueChange={(v) => updateFilter('statut', v)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Tous les statuts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              {(Object.keys(STATUT_LABELS) as StatutSession[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  {STATUT_LABELS[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {sessions.length === 0 ? (
-        <EmptyState
-          icon={Calendar}
-          title="Aucune session"
-          description="Créez votre première session de formation."
-        />
-      ) : (
-        <>
+        {sessions.length === 0 ? (
+          <EmptyState
+            icon={Calendar}
+            title="Aucune session"
+            description="Créez votre première session de formation."
+            action={
+              <Button variant="odc" onClick={() => setIsCreateOpen(true)}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Créer une session
+              </Button>
+            }
+          />
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Session</TableHead>
+                <TableHead className="w-[28%]">Session</TableHead>
                 <TableHead className="hidden lg:table-cell">Dates</TableHead>
                 <TableHead className="hidden md:table-cell">Lieu</TableHead>
+                <TableHead className="hidden lg:table-cell text-center">
+                  Inscrits
+                </TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead className="hidden md:table-cell">Présence</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-[80px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
-              {sessions.map((s: any) => (
-                <TableRow key={s.id}>
+              {sessions.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="group cursor-pointer transition-colors hover:bg-odc-surface-hover"
+                  onClick={() => router.push(`/admin/sessions/${s.id}`)}
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-odc-primary-soft flex items-center justify-center shrink-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-odc-primary-soft">
                         <Calendar className="h-5 w-5 text-odc-primary" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">
+                        <p className="truncate text-sm font-semibold text-odc-text-primary">
                           {s.formation?.titre ?? 'Session'}
                         </p>
-                        <p className="text-xs text-odc-muted font-mono truncate">
+                        <p className="truncate font-mono text-xs text-odc-text-muted">
                           {s.codeSession}
                         </p>
                       </div>
                     </div>
                   </TableCell>
 
-                  <TableCell className="hidden lg:table-cell text-sm">
-                    {formatDate(s.dateDebut)}
-                    <span className="text-odc-muted"> → </span>
-                    {formatDate(s.dateFin)}
+                  <TableCell className="hidden lg:table-cell text-xs">
+                    <div className="flex items-center gap-1.5 text-odc-text-secondary">
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      {formatDate(s.dateDebut)}
+                      <span className="text-odc-text-muted">→</span>
+                      {formatDate(s.dateFin)}
+                    </div>
                   </TableCell>
 
-                  <TableCell className="hidden md:table-cell text-sm">
-                    {s.lieu || 'En ligne'}
+                  <TableCell className="hidden md:table-cell text-xs">
+                    <div className="flex items-center gap-1.5 text-odc-text-secondary">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {s.lieu || 'En ligne'}
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="hidden lg:table-cell text-center">
+                    <CapaciteBadge
+                      count={s.inscriptionsCount}
+                      capacite={s.capacite}
+                    />
                   </TableCell>
 
                   <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        STATUT_COLORS[s.statut]
-                      }`}
-                    >
-                      {STATUT_LABELS[s.statut]}
-                    </span>
+                    <StatutBadge statut={s.statut} />
                   </TableCell>
 
                   <TableCell className="hidden md:table-cell">
                     {s.presenceOuverte ? (
-                      <Badge className="bg-odc-success-bg text-odc-success">
+                      <Badge className="bg-odc-success-soft text-odc-success-dark hover:bg-odc-success-soft">
+                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-odc-success" />
                         Ouverte
                       </Badge>
                     ) : (
-                      <Badge variant="outline">Fermée</Badge>
+                      <Badge variant="outline" className="text-odc-text-muted">
+                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-odc-text-muted" />
+                        Fermée
+                      </Badge>
                     )}
                   </TableCell>
 
-                  <TableCell className="text-right">
+                  <TableCell
+                    className="text-right"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+                          aria-label="Actions"
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
+
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
-                          onClick={() => router.push(`/admin/sessions/${s.id}`)}
+                          onClick={() => setEditingSession(s)}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
+                          <Edit className="mr-2 h-4 w-4" />
                           Modifier
                         </DropdownMenuItem>
 
@@ -233,54 +355,76 @@ export function SessionsTable() {
 
                         <DropdownMenuItem
                           onClick={() =>
-                            changerStatutMutation.mutate({ id: s.id, statut: 'OUVERTE' })
+                            changeStatut.mutate({
+                              id: s.id,
+                              statut: 'OUVERTE',
+                            })
                           }
                         >
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          <PlayCircle className="mr-2 h-4 w-4" />
                           Marquer ouverte
                         </DropdownMenuItem>
+
                         <DropdownMenuItem
                           onClick={() =>
-                            changerStatutMutation.mutate({ id: s.id, statut: 'EN_COURS' })
+                            changeStatut.mutate({
+                              id: s.id,
+                              statut: 'EN_COURS',
+                            })
                           }
                         >
-                          <Clock className="h-4 w-4 mr-2" />
+                          <Clock className="mr-2 h-4 w-4" />
                           Marquer en cours
                         </DropdownMenuItem>
+
                         <DropdownMenuItem
                           onClick={() =>
-                            changerStatutMutation.mutate({ id: s.id, statut: 'TERMINEE' })
+                            changeStatut.mutate({
+                              id: s.id,
+                              statut: 'TERMINEE',
+                            })
                           }
                         >
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
                           Marquer terminée
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          onClick={() =>
+                            changeStatut.mutate({
+                              id: s.id,
+                              statut: 'ANNULEE',
+                            })
+                          }
+                          className="text-odc-error"
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Annuler la session
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator />
 
                         <DropdownMenuItem
                           onClick={() =>
-                            ouvrirPresenceMutation.mutate({
+                            togglePresence.mutate({
                               id: s.id,
                               ouverte: !s.presenceOuverte,
                             })
                           }
                         >
-                          <QrCode className="h-4 w-4 mr-2" />
-                          {s.presenceOuverte ? 'Fermer présence' : 'Ouvrir présence'}
+                          <QrCode className="mr-2 h-4 w-4" />
+                          {s.presenceOuverte
+                            ? 'Fermer la présence'
+                            : 'Ouvrir la présence'}
                         </DropdownMenuItem>
 
                         <DropdownMenuSeparator />
 
                         <DropdownMenuItem
-                          className="text-odc-error focus:text-odc-error"
-                          onClick={() => {
-                            if (confirm('Supprimer cette session ?')) {
-                              deleteMutation.mutate(s.id);
-                            }
-                          }}
+                          className="text-odc-error focus:bg-odc-error-soft focus:text-odc-error"
+                          onClick={() => setDeletingSession(s)}
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
+                          <Trash2 className="mr-2 h-4 w-4" />
                           Supprimer
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -290,17 +434,28 @@ export function SessionsTable() {
               ))}
             </TableBody>
           </Table>
+        )}
+      </Card>
 
-          {data?.pagination?.totalPages > 1 && (
-            <div className="p-4 border-t border-odc-border">
-              <Pagination
-                currentPage={data.pagination.page}
-                totalPages={data.pagination.totalPages}
-              />
-            </div>
-          )}
-        </>
-      )}
-    </Card>
+      {/* Modales */}
+      <SessionFormModal
+        mode="create"
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+      />
+
+      <SessionFormModal
+        mode="edit"
+        id={editingSession?.id}
+        open={!!editingSession}
+        onOpenChange={(open) => !open && setEditingSession(null)}
+      />
+
+      <DeleteSessionDialog
+        session={deletingSession}
+        open={!!deletingSession}
+        onOpenChange={(open) => !open && setDeletingSession(null)}
+      />
+    </TooltipProvider>
   );
 }

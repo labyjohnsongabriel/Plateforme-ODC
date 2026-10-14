@@ -7,13 +7,14 @@ import { successResponse, paginatedResponse } from '../utils/response.util';
 import { getPagination } from '../utils/pagination.util';
 import { BadRequestError, NotFoundError } from '../errors/AppError';
 import { slugify } from '../utils/string.util';
+import { logger } from '../config/logger';
 
 /* ============================================================================
-   REPOSITORY
+   REPOSITORY — Toujours appeler getRepository() dans la fonction
    ============================================================================ */
 
-// ⭐ CRUCIAL : toujours appeler AppDataSource.getRepository() DANS la fonction
 const domaineRepo = () => AppDataSource.getRepository(Domaine);
+const formationRepo = () => AppDataSource.getRepository(Formation);
 
 /* ============================================================================
    TYPES
@@ -33,7 +34,8 @@ interface DomaineQuery {
 
 export class DomaineController {
   /* ==========================================================================
-     🌐 PUBLIC — Liste
+     🌐 PUBLIC — Liste des domaines publiés
+     GET /api/public/domaines
      ========================================================================== */
   static async listPublic(
     _req: Request,
@@ -41,10 +43,16 @@ export class DomaineController {
     next: NextFunction,
   ): Promise<void> {
     try {
-      const domaines = await domaineRepo().find({
-        where: { actif: true, estPubliee: true },
-        order: { ordreAffichage: 'ASC', nom: 'ASC' }, // ⭐ propriétés TS
-      });
+      const domaines = await domaineRepo()
+        .createQueryBuilder('d')
+        .leftJoin('d.formations', 'f')
+        .loadRelationCountAndMap('d.formationsCount', 'd.formations')
+        .where('d.actif = :actif', { actif: true })
+        .andWhere('d.estPubliee = :publiee', { publiee: true })
+        .andWhere('d.deletedAt IS NULL')
+        .orderBy('d.ordreAffichage', 'ASC')
+        .addOrderBy('d.nom', 'ASC')
+        .getMany();
 
       return successResponse(res, domaines, 'Domaines publics');
     } catch (e) {
@@ -54,6 +62,7 @@ export class DomaineController {
 
   /* ==========================================================================
      🌐 PUBLIC — Détail par slug
+     GET /api/public/domaines/:slug
      ========================================================================== */
   static async detailPublic(
     req: Request,
@@ -63,12 +72,19 @@ export class DomaineController {
     try {
       const { slug } = req.params;
 
-      if (!slug) throw new BadRequestError('Slug requis');
+      if (!slug) {
+        throw new BadRequestError('Slug requis');
+      }
 
-      const domaine = await domaineRepo().findOne({
-        where: { slug, actif: true, estPubliee: true },
-        relations: ['formations'],
-      });
+      const domaine = await domaineRepo()
+        .createQueryBuilder('d')
+        .leftJoinAndSelect('d.formations', 'f')
+        .loadRelationCountAndMap('d.formationsCount', 'd.formations')
+        .where('d.slug = :slug', { slug })
+        .andWhere('d.actif = :actif', { actif: true })
+        .andWhere('d.estPubliee = :publiee', { publiee: true })
+        .andWhere('d.deletedAt IS NULL')
+        .getOne();
 
       if (!domaine) {
         throw new NotFoundError(`Domaine "${slug}" introuvable`);
@@ -81,7 +97,8 @@ export class DomaineController {
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Liste paginée
+     🔒 ADMIN — Liste paginée avec compteurs
+     GET /api/admin/domaines
      ========================================================================== */
   static async findAll(
     req: Request,
@@ -98,35 +115,52 @@ export class DomaineController {
 
       const qb = domaineRepo()
         .createQueryBuilder('d')
+        // ⭐ Compteur de formations
+        .loadRelationCountAndMap('d.formationsCount', 'd.formations')
         .where('d.deletedAt IS NULL');
 
-      if (q) {
-        qb.andWhere('(d.nom ILIKE :q OR d.slug ILIKE :q)', {
-          q: `%${q}%`,
+      /* -------------------- Recherche -------------------- */
+      if (q && String(q).trim()) {
+        qb.andWhere(
+          '(d.nom ILIKE :q OR d.slug ILIKE :q OR d.description ILIKE :q)',
+          { q: `%${q}%` },
+        );
+      }
+
+      /* -------------------- Filtre actif -------------------- */
+      if (actif !== undefined && actif !== 'all') {
+        qb.andWhere('d.actif = :actif', {
+          actif: actif === 'true',
         });
       }
 
-      if (actif !== undefined) {
-        qb.andWhere('d.actif = :actif', { actif: actif === 'true' });
-      }
-
-      if (estPubliee !== undefined) {
+      /* -------------------- Filtre estPubliee -------------------- */
+      if (estPubliee !== undefined && estPubliee !== 'all') {
         qb.andWhere('d.estPubliee = :estPubliee', {
           estPubliee: estPubliee === 'true',
         });
       }
 
-      // ⭐ Propriétés TS : createdAt, updatedAt, ordreAffichage
+      /* -------------------- Tri + Pagination -------------------- */
       qb.orderBy('d.ordreAffichage', 'ASC')
         .addOrderBy('d.createdAt', 'DESC')
-        .skip(skip)
-        .take(limit);
+        .offset(skip)
+        .limit(limit);
 
-      const [data, total] = await qb.getManyAndCount();
+      const total = await qb.getCount();
+      const data = await qb.getMany();
+
+      /* -------------------- Normalisation -------------------- */
+      const normalized = data.map((d) => ({
+        ...d,
+        formationsCount: Number(
+          (d as any).formationsCount ?? 0,
+        ),
+      }));
 
       return paginatedResponse(
         res,
-        data,
+        normalized,
         total,
         page,
         limit,
@@ -138,272 +172,42 @@ export class DomaineController {
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Détail par ID
+     ⭐ ADMIN — Statistiques globales des domaines
+     GET /api/admin/domaines/stats
+     ⚠️ Route spécifique AVANT /:id
      ========================================================================== */
-  static async findOne(
-    req: Request,
+  static async stats(
+    _req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const domaine = await domaineRepo().findOne({
-        where: { id: req.params.id },
-        relations: ['formations'],
+      const [total, published, draft, actifs] = await Promise.all([
+        domaineRepo().count(),
+        domaineRepo().count({ where: { estPubliee: true } }),
+        domaineRepo().count({ where: { estPubliee: false } }),
+        domaineRepo().count({ where: { actif: true } }),
+      ]);
+
+      /* -------------------- Nombre total de formations -------------------- */
+      const totalFormations = await formationRepo().count();
+
+      return successResponse(res, {
+        total,
+        published,
+        draft,
+        actifs,
+        totalFormations,
       });
-
-      if (!domaine) {
-        throw new NotFoundError('Domaine introuvable');
-      }
-
-      return successResponse(res, domaine);
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     ⭐🔒 ADMIN — Créer (LIGNE 98 CORRIGÉE)
-     ========================================================================== */
-  static async create(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const { nom, description, couleur, icone, ordreAffichage } = req.body;
-
-      /* -------------------- Validation -------------------- */
-      if (!nom || typeof nom !== 'string') {
-        throw new BadRequestError('Le nom est requis');
-      }
-
-      /* -------------------- Slug auto -------------------- */
-      const slug = req.body.slug || slugify(nom);
-
-      /* -------------------- Vérifier unicité -------------------- */
-      const existing = await domaineRepo().findOne({
-        where: [{ nom }, { slug }],
-      });
-
-      if (existing) {
-        throw new BadRequestError(
-          existing.nom === nom
-            ? 'Un domaine avec ce nom existe déjà'
-            : 'Un domaine avec ce slug existe déjà',
-        );
-      }
-
-      /* -------------------- ⭐ FIX LIGNE 98 -------------------- */
-      // ❌ AVANT (bug) : const domaine = await domaineService.create(req.body);
-      // ✅ APRÈS : utilise domaineRepo() qui est correctement défini
-      const domaine = domaineRepo().create({
-        nom: nom.trim(),
-        slug,
-        description: description ?? null,
-        couleur: couleur ?? null,
-        icone: icone ?? null,
-        ordreAffichage: ordreAffichage ?? 0,
-        actif: true,
-        estPubliee: true,
-      });
-
-      await domaineRepo().save(domaine);
-
-      return successResponse(res, domaine, 'Domaine créé', 201);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Mettre à jour
-     ========================================================================== */
-  static async update(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const domaine = await domaineRepo().findOne({
-        where: { id: req.params.id },
-      });
-
-      if (!domaine) {
-        throw new NotFoundError('Domaine introuvable');
-      }
-
-      /* -------------------- Champs modifiables -------------------- */
-      const { nom, description, couleur, icone, ordreAffichage } = req.body;
-
-      if (nom !== undefined) {
-        // Vérifier unicité du nouveau nom
-        const existing = await domaineRepo().findOne({
-          where: { nom },
-        });
-        if (existing && existing.id !== domaine.id) {
-          throw new BadRequestError('Un domaine avec ce nom existe déjà');
-        }
-
-        domaine.nom = nom.trim();
-        // Régénérer le slug si le nom change
-        if (req.body.slug === undefined) {
-          domaine.slug = slugify(nom);
-        }
-      }
-
-      if (description !== undefined) domaine.description = description;
-      if (couleur !== undefined) domaine.couleur = couleur;
-      if (icone !== undefined) domaine.icone = icone;
-      if (ordreAffichage !== undefined) domaine.ordreAffichage = ordreAffichage;
-      if (req.body.slug !== undefined) domaine.slug = req.body.slug;
-
-      await domaineRepo().save(domaine);
-
-      return successResponse(res, domaine, 'Domaine mis à jour');
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Publier / Dépublier
-     ========================================================================== */
-  static async publier(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const domaine = await domaineRepo().findOne({
-        where: { id: req.params.id },
-      });
-
-      if (!domaine) {
-        throw new NotFoundError('Domaine introuvable');
-      }
-
-      const estPubliee =
-        typeof req.body.estPubliee === 'boolean'
-          ? req.body.estPubliee
-          : !domaine.estPubliee; // toggle
-
-      domaine.estPubliee = estPubliee;
-      await domaineRepo().save(domaine);
-
-      return successResponse(
-        res,
-        domaine,
-        estPubliee ? 'Domaine publié' : 'Domaine dépublié',
-      );
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Toggle actif/inactif
-     ========================================================================== */
-  static async toggleActif(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const domaine = await domaineRepo().findOne({
-        where: { id: req.params.id },
-      });
-
-      if (!domaine) {
-        throw new NotFoundError('Domaine introuvable');
-      }
-
-      domaine.actif = !domaine.actif;
-      await domaineRepo().save(domaine);
-
-      return successResponse(
-        res,
-        domaine,
-        domaine.actif ? 'Domaine activé' : 'Domaine désactivé',
-      );
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Upload image
-     ========================================================================== */
-  static async uploadImage(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      if (!req.file) {
-        throw new BadRequestError('Aucun fichier fourni');
-      }
-
-      const domaine = await domaineRepo().findOne({
-        where: { id: req.params.id },
-      });
-
-      if (!domaine) {
-        throw new NotFoundError('Domaine introuvable');
-      }
-
-      /* -------------------- URL du fichier -------------------- */
-      const filename =
-        (req.file as any).filename ?? req.file.originalname ?? 'image';
-      const imageUrl = `/uploads/domaines/${Date.now()}-${filename}`;
-
-      domaine.imageUrl = imageUrl;
-      await domaineRepo().save(domaine);
-
-      return successResponse(
-        res,
-        domaine,
-        'Image mise à jour',
-      );
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Supprimer
-     ========================================================================== */
-  static async delete(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const domaine = await domaineRepo().findOne({
-        where: { id: req.params.id },
-        relations: ['formations'],
-      });
-
-      if (!domaine) {
-        throw new NotFoundError('Domaine introuvable');
-      }
-
-      /* -------------------- Vérifier formations liées -------------------- */
-      if (domaine.formations && domaine.formations.length > 0) {
-        throw new BadRequestError(
-          `Impossible de supprimer ce domaine : ${domaine.formations.length} formation(s) y sont rattachées`,
-        );
-      }
-
-      await domaineRepo().softRemove(domaine);
-
-      return successResponse(res, null, 'Domaine supprimé');
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Statistiques par domaine
+     ⭐ ADMIN — Statistiques par domaine (nb formations)
+     GET /api/admin/domaines/stats/formations
+     ⚠️ Route spécifique AVANT /:id
      ========================================================================== */
   static async statsByDomaine(
     _req: Request,
@@ -428,7 +232,10 @@ export class DomaineController {
         .getRawMany();
 
       const formatted = stats.map((s) => ({
-        ...s,
+        id: s.id,
+        nom: s.nom,
+        slug: s.slug,
+        couleur: s.couleur ?? '#6B7280',
         nbFormations: Number(s.nbFormations),
       }));
 
@@ -439,7 +246,354 @@ export class DomaineController {
   }
 
   /* ==========================================================================
+     🔒 ADMIN — Détail par ID
+     GET /api/admin/domaines/:id
+     ========================================================================== */
+  static async findOne(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const domaine = await domaineRepo()
+        .createQueryBuilder('d')
+        .leftJoinAndSelect('d.formations', 'f')
+        .loadRelationCountAndMap('d.formationsCount', 'd.formations')
+        .where('d.id = :id', { id: req.params.id })
+        .andWhere('d.deletedAt IS NULL')
+        .getOne();
+
+      if (!domaine) {
+        throw new NotFoundError('Domaine introuvable');
+      }
+
+      return successResponse(res, {
+        ...domaine,
+        formationsCount: Number(
+          (domaine as any).formationsCount ?? 0,
+        ),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN — Créer un domaine
+     POST /api/admin/domaines
+     ========================================================================== */
+  static async create(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const {
+        nom,
+        description,
+        couleur,
+        icone,
+        ordreAffichage,
+        actif,
+        estPubliee,
+      } = req.body;
+
+      /* -------------------- Validation -------------------- */
+      if (!nom || typeof nom !== 'string') {
+        throw new BadRequestError('Le nom est requis');
+      }
+
+      if (nom.trim().length < 2) {
+        throw new BadRequestError(
+          'Le nom doit contenir au moins 2 caractères',
+        );
+      }
+
+      /* -------------------- Slug auto -------------------- */
+      const slug = req.body.slug || slugify(nom);
+
+      /* -------------------- Vérifier unicité -------------------- */
+      const existing = await domaineRepo().findOne({
+        where: [{ nom: nom.trim() }, { slug }],
+      });
+
+      if (existing) {
+        throw new BadRequestError(
+          existing.nom === nom.trim()
+            ? 'Un domaine avec ce nom existe déjà'
+            : 'Un domaine avec ce slug existe déjà',
+        );
+      }
+
+      /* -------------------- Création -------------------- */
+      const domaine = domaineRepo().create({
+        nom: nom.trim(),
+        slug,
+        description: description ?? null,
+        couleur: couleur ?? null,
+        icone: icone ?? null,
+        ordreAffichage: Number(ordreAffichage) || 0,
+        actif: actif !== undefined ? actif : true,
+        estPubliee: estPubliee !== undefined ? estPubliee : true,
+      });
+
+      await domaineRepo().save(domaine);
+
+      logger.info(`📁 Domaine créé : ${domaine.nom} (${domaine.slug})`);
+
+      return successResponse(res, domaine, 'Domaine créé', 201);
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN — Mettre à jour un domaine
+     PUT /api/admin/domaines/:id
+     ========================================================================== */
+  static async update(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const domaine = await domaineRepo().findOne({
+        where: { id: req.params.id },
+      });
+
+      if (!domaine) {
+        throw new NotFoundError('Domaine introuvable');
+      }
+
+      const {
+        nom,
+        description,
+        couleur,
+        icone,
+        ordreAffichage,
+        actif,
+        estPubliee,
+        slug: newSlug,
+      } = req.body;
+
+      /* -------------------- Nom + slug -------------------- */
+      if (nom !== undefined && nom !== domaine.nom) {
+        const trimmedNom = nom.trim();
+
+        // Vérifier unicité du nouveau nom
+        const existing = await domaineRepo().findOne({
+          where: { nom: trimmedNom },
+        });
+
+        if (existing && existing.id !== domaine.id) {
+          throw new BadRequestError(
+            'Un domaine avec ce nom existe déjà',
+          );
+        }
+
+        domaine.nom = trimmedNom;
+
+        // Régénérer le slug si le nom change et pas de slug fourni
+        if (newSlug === undefined) {
+          domaine.slug = slugify(trimmedNom);
+        }
+      }
+
+      /* -------------------- Slug manuel -------------------- */
+      if (newSlug !== undefined) {
+        const existingSlug = await domaineRepo().findOne({
+          where: { slug: newSlug },
+        });
+
+        if (existingSlug && existingSlug.id !== domaine.id) {
+          throw new BadRequestError(
+            'Un domaine avec ce slug existe déjà',
+          );
+        }
+
+        domaine.slug = newSlug;
+      }
+
+      /* -------------------- Autres champs -------------------- */
+      if (description !== undefined) domaine.description = description;
+      if (couleur !== undefined) domaine.couleur = couleur;
+      if (icone !== undefined) domaine.icone = icone;
+      if (ordreAffichage !== undefined) {
+        domaine.ordreAffichage = Number(ordreAffichage) || 0;
+      }
+      if (actif !== undefined) domaine.actif = actif;
+      if (estPubliee !== undefined) domaine.estPubliee = estPubliee;
+
+      await domaineRepo().save(domaine);
+
+      logger.info(`📝 Domaine mis à jour : ${domaine.nom}`);
+
+      return successResponse(res, domaine, 'Domaine mis à jour');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN — Publier / Dépublier
+     PUT /api/admin/domaines/:id/publier
+     ========================================================================== */
+  static async publier(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const domaine = await domaineRepo().findOne({
+        where: { id: req.params.id },
+      });
+
+      if (!domaine) {
+        throw new NotFoundError('Domaine introuvable');
+      }
+
+      const estPubliee =
+        typeof req.body.estPubliee === 'boolean'
+          ? req.body.estPubliee
+          : !domaine.estPubliee;
+
+      domaine.estPubliee = estPubliee;
+      await domaineRepo().save(domaine);
+
+      logger.info(
+        `${estPubliee ? '📢' : '📴'} Domaine ${
+          estPubliee ? 'publié' : 'dépublié'
+        } : ${domaine.nom}`,
+      );
+
+      return successResponse(
+        res,
+        domaine,
+        estPubliee ? 'Domaine publié' : 'Domaine dépublié',
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN — Toggle actif/inactif
+     PUT /api/admin/domaines/:id/actif
+     ========================================================================== */
+  static async toggleActif(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const domaine = await domaineRepo().findOne({
+        where: { id: req.params.id },
+      });
+
+      if (!domaine) {
+        throw new NotFoundError('Domaine introuvable');
+      }
+
+      const actif =
+        typeof req.body.actif === 'boolean'
+          ? req.body.actif
+          : !domaine.actif;
+
+      domaine.actif = actif;
+      await domaineRepo().save(domaine);
+
+      return successResponse(
+        res,
+        domaine,
+        actif ? 'Domaine activé' : 'Domaine désactivé',
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN — Upload image
+     POST /api/admin/domaines/:id/image
+     ========================================================================== */
+  static async uploadImage(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      if (!req.file) {
+        throw new BadRequestError('Aucun fichier fourni');
+      }
+
+      const domaine = await domaineRepo().findOne({
+        where: { id: req.params.id },
+      });
+
+      if (!domaine) {
+        throw new NotFoundError('Domaine introuvable');
+      }
+
+      const filename =
+        (req.file as any).filename ?? req.file.originalname ?? 'image';
+      const imageUrl = `/uploads/domaines/${Date.now()}-${filename}`;
+
+      domaine.imageUrl = imageUrl;
+      await domaineRepo().save(domaine);
+
+      logger.info(`🖼️ Image mise à jour pour ${domaine.nom}`);
+
+      return successResponse(res, domaine, 'Image mise à jour');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN — Supprimer un domaine
+     DELETE /api/admin/domaines/:id
+     ========================================================================== */
+  static async delete(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const domaine = await domaineRepo()
+        .createQueryBuilder('d')
+        .leftJoinAndSelect('d.formations', 'f')
+        .loadRelationCountAndMap('d.formationsCount', 'd.formations')
+        .where('d.id = :id', { id: req.params.id })
+        .getOne();
+
+      if (!domaine) {
+        throw new NotFoundError('Domaine introuvable');
+      }
+
+      const formationsCount = Number(
+        (domaine as any).formationsCount ?? 0,
+      );
+
+      if (formationsCount > 0) {
+        throw new BadRequestError(
+          `Impossible de supprimer ce domaine : ${formationsCount} formation(s) y sont rattachées`,
+        );
+      }
+
+      await domaineRepo().softRemove(domaine);
+
+      logger.info(`🗑️ Domaine supprimé : ${domaine.nom}`);
+
+      return successResponse(res, null, 'Domaine supprimé');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
      🔒 ADMIN — Réorganiser l'ordre d'affichage
+     PUT /api/admin/domaines/reorder
+     ⚠️ Route spécifique AVANT /:id
      ========================================================================== */
   static async reorder(
     req: Request,
@@ -450,7 +604,7 @@ export class DomaineController {
       const { orderedIds }: { orderedIds: string[] } = req.body;
 
       if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-        throw new BadRequestError('orderedIds requis (tableau)');
+        throw new BadRequestError('orderedIds requis (tableau non vide)');
       }
 
       await Promise.all(
@@ -458,6 +612,8 @@ export class DomaineController {
           domaineRepo().update(id, { ordreAffichage: index }),
         ),
       );
+
+      logger.info(`🔀 ${orderedIds.length} domaines réordonnés`);
 
       return successResponse(
         res,
