@@ -1,3 +1,11 @@
+<<<<<<< HEAD
+import { z } from 'zod';
+export const createInscriptionSchema = z.object({
+  body: z.object({
+    sessionId: z.string().uuid(),
+    motivation: z.string().max(1000).optional(),
+  }),
+=======
 // src/validators/inscription.validator.ts
 import { z } from 'zod';
 import {
@@ -93,4 +101,5 @@ export const selectionAutoSchema = z.object({
     })
     .strict(),
   params: z.object({ sessionId: uuidSchema }),
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 });

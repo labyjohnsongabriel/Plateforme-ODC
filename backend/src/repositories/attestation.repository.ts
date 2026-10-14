@@ -1,7 +1,12 @@
+<<<<<<< HEAD
+import { BaseRepository } from './BaseRepository';
+import { Attestation } from '../models/Attestation.entity';
+=======
 // src/repositories/AttestationRepository.ts
 import { Brackets } from 'typeorm';
 import { Attestation } from '../entities/Attestation.entity';
 import { BaseRepository } from './base.repository';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
 /* ============================================================================
    TYPES
@@ -40,6 +45,60 @@ export class AttestationRepository extends BaseRepository<Attestation> {
      FIND BY NUMERO (public — vérification QR)
      ========================================================================== */
   async findByNumero(numero: string): Promise<Attestation | null> {
+<<<<<<< HEAD
+    return this.repository.findOne({
+      where: { numero },
+      relations: [
+        'participant',
+        'session',
+        'session.formation',
+        'session.formateur',
+      ],
+    });
+  }
+
+  async findMesAttestations(participantId: string): Promise<Attestation[]> {
+    return this.repository.find({
+      where: { participantId },
+      relations: ['session', 'session.formation'],
+      order: { dateEmission: 'DESC' },
+    });
+  }
+
+  async existsForSessionParticipant(
+    sessionId: string,
+    participantId: string
+  ): Promise<boolean> {
+    return (await this.repository.count({ where: { sessionId, participantId } })) > 0;
+  }
+
+  async statsGlobales(): Promise<any> {
+    const stats = await this.repository
+      .createQueryBuilder('a')
+      .select('COUNT(a.id)', 'total')
+      .addSelect('AVG(a.note_finale)', 'noteMoyenne')
+      .addSelect('AVG(a.taux_presence)', 'presenceMoyenne')
+      .getRawOne();
+
+    return {
+      total: Number(stats.total || 0),
+      noteMoyenne: Number(stats.noteMoyenne || 0).toFixed(2),
+      presenceMoyenne: Number(stats.presenceMoyenne || 0).toFixed(2),
+    };
+  }
+
+  async attestationsParMois(mois = 12): Promise<any[]> {
+    return this.repository
+      .createQueryBuilder('a')
+      .select("TO_CHAR(a.date_emission, 'YYYY-MM')", 'mois')
+      .addSelect('COUNT(a.id)', 'count')
+      .where(`a.date_emission >= NOW() - INTERVAL '${mois} months'`)
+      .groupBy('mois')
+      .orderBy('mois', 'ASC')
+      .getRawMany();
+  }
+}
+=======
     return this.qb('a')
       .leftJoinAndSelect('a.participant', 'p')
       .leftJoinAndSelect('a.session', 's')
@@ -273,8 +332,13 @@ export class AttestationRepository extends BaseRepository<Attestation> {
   }
 }
 
+<<<<<<< HEAD
 /* ============================================================================
    INSTANCE SINGLETON
    ============================================================================ */
 
 export const attestationRepository = new AttestationRepository();
+=======
+export const attestationRepository = new AttestationRepository();
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+>>>>>>> origin/main

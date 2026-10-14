@@ -1,3 +1,15 @@
+<<<<<<< HEAD
+import { z } from 'zod';
+export const createSessionSchema = z.object({
+  body: z.object({
+    formationId: z.string().uuid(),
+    formateurId: z.string().uuid().optional(),
+    dateDebut: z.string(),
+    dateFin: z.string(),
+    lieu: z.string().max(200).optional(),
+    capacite: z.number().int().min(1).max(500).default(30),
+  }),
+=======
 // src/validators/session.validator.ts
 import { z } from 'zod';
 import {
@@ -99,4 +111,5 @@ export const ouvrirPresenceSchema = z.object({
     })
     .strict(),
   params: z.object({ id: uuidSchema }),
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 });

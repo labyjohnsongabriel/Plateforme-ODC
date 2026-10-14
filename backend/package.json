@@ -15,7 +15,12 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
+<<<<<<< HEAD
+    "seed": "ts-node src/database/seeds/run-seeds.ts",
+      "sync": "typeorm-ts-node-commonjs schema:sync -d src/database/data-source.ts"
+=======
     "seed": "ts-node src/database/seeds/run-seeds.ts"
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   },
   "keywords": [
     "odc",
@@ -46,12 +51,18 @@
     "puppeteer": "^25.10.0",
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
+<<<<<<< HEAD
+=======
     "slugify": "^1.6.9",
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     "socket.io": "^4.8.3",
     "typeorm": "^0.3.20",
     "uuid": "^14.0.2",
     "winston": "^3.13.0",
+<<<<<<< HEAD
+=======
     "winston-daily-rotate-file": "^5.0.0",
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     "zod": "^3.23.8"
   },
   "devDependencies": {

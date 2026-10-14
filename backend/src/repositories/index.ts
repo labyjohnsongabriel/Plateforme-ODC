@@ -1,3 +1,30 @@
+<<<<<<< HEAD
+/**
+ * Export centralisé des repositories
+ * Instances uniques (singleton) pour éviter les re-créations
+ */
+import { UserRepository } from './UserRepository';
+import { FormationRepository } from './FormationRepository';
+import { SessionRepository } from './SessionRepository';
+import { InscriptionRepository } from './InscriptionRepository';
+import { PresenceRepository } from './PresenceRepository';
+import { AttestationRepository } from './AttestationRepository';
+import { NotificationRepository } from './NotificationRepository';
+import { ConversationRepository, MessageRepository } from './ConversationRepository';
+
+export const userRepository = new UserRepository();
+export const formationRepository = new FormationRepository();
+export const sessionRepository = new SessionRepository();
+export const inscriptionRepository = new InscriptionRepository();
+export const presenceRepository = new PresenceRepository();
+export const attestationRepository = new AttestationRepository();
+export const notificationRepository = new NotificationRepository();
+export const conversationRepository = new ConversationRepository();
+export const messageRepository = new MessageRepository();
+
+export {
+  UserRepository,
+=======
 // src/repositories/index.ts
 /**
  * =============================================================================
@@ -91,10 +118,18 @@ export {
   UserRepository,
   RoleRepository,
   DomaineRepository,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   FormationRepository,
   SessionRepository,
   InscriptionRepository,
   PresenceRepository,
+<<<<<<< HEAD
+  AttestationRepository,
+  NotificationRepository,
+  ConversationRepository,
+  MessageRepository,
+};
+=======
   EvaluationRepository,
   NoteRepository,
   AttestationRepository,
@@ -115,3 +150,4 @@ export type {
   PaginationOptions,
   PaginatedResult,
 } from './base.repository';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234

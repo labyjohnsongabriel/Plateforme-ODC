@@ -1,4 +1,12 @@
 {
+<<<<<<< HEAD
+  "rules": {
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ]
+  }
+=======
   "root": true,
   "extends": [
     "next/core-web-vitals",
@@ -23,4 +31,5 @@
     "*.config.js",
     "*.config.ts"
   ]
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 }

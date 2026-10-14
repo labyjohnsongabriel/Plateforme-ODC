@@ -1,3 +1,15 @@
+<<<<<<< HEAD
+import 'reflect-metadata';
+import AppDataSource from '../data-source';
+import { Role, RoleName } from '../../models/Role.entity';
+import { User } from '../../models/User.entity';
+import { Formation, NiveauFormation } from '../../models/Formation.entity';
+import { Session, StatutSession } from '../../models/Session.entity';
+import { Partenaire } from '../../models/Partenaire.entity';
+import { hashPassword } from '../../utils/password.util';
+import { logger } from '../../config/logger';
+
+=======
 // src/database/seeds/run-seeds.ts
 import 'reflect-metadata';
 import AppDataSource from '../../data-source';
@@ -42,10 +54,25 @@ function addDays(base: Date, days: number): Date {
    SEED
    ============================================================================ */
 
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 async function seed() {
   try {
     await AppDataSource.initialize();
     logger.info('🌱 Démarrage des seeds...');
+<<<<<<< HEAD
+
+    // =========================================================================
+    // 1. RÔLES
+    // =========================================================================
+    const roleRepo = AppDataSource.getRepository(Role);
+
+    const rolesData = [
+      { nom: RoleName.ADMIN, description: 'Administrateur de la plateforme' },
+      { nom: RoleName.STAFF, description: 'Personnel ODC' },
+      { nom: RoleName.FORMATEUR, description: 'Formateur' },
+      { nom: RoleName.PARTICIPANT, description: 'Participant aux formations' },
+      { nom: RoleName.PARTENAIRE, description: 'Partenaire externe' },
+=======
     logger.info('');
 
     /* ========================================================================
@@ -94,6 +121,7 @@ async function seed() {
         couleur: '#FF7900',
         icone: 'User',
       },
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     ];
 
     const roles: Record<string, Role> = {};
@@ -102,12 +130,17 @@ async function seed() {
       let role = await roleRepo.findOne({ where: { nom: r.nom } });
 
       if (!role) {
+<<<<<<< HEAD
+        const created = roleRepo.create(r);
+        role = (await roleRepo.save(created)) as unknown as Role;
+=======
         const created = roleRepo.create({
           ...r,
           actif: true,
           estSysteme: true,
         });
         role = await roleRepo.save(created);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         logger.info(`✅ Rôle créé : ${r.nom}`);
       } else {
         logger.info(`ℹ️  Rôle existant : ${r.nom}`);
@@ -116,6 +149,11 @@ async function seed() {
       roles[r.nom] = role;
     }
 
+<<<<<<< HEAD
+    // =========================================================================
+    // 2. UTILISATEURS
+    // =========================================================================
+=======
     /* ========================================================================
        2. DOMAINES (⭐ création automatique)
        ======================================================================== */
@@ -158,10 +196,18 @@ async function seed() {
     /* ========================================================================
        3. UTILISATEURS
        ======================================================================== */
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     const userRepo = AppDataSource.getRepository(User);
     const defaultPassword = await hashPassword('Password123');
 
     const usersData = [
+<<<<<<< HEAD
+      { nom: 'Admin', prenom: 'Super', email: 'admin@odc.mg', role: RoleName.ADMIN },
+      { nom: 'Rakoto', prenom: 'Marie', email: 'staff@odc.mg', role: RoleName.STAFF },
+      { nom: 'Dupont', prenom: 'Jean', email: 'formateur@odc.mg', role: RoleName.FORMATEUR },
+      { nom: 'Rasoa', prenom: 'Soa', email: 'participant@odc.mg', role: RoleName.PARTICIPANT },
+      { nom: 'Orange', prenom: 'Partner', email: 'partenaire@odc.mg', role: RoleName.PARTENAIRE },
+=======
       {
         nom: 'Admin',
         prenom: 'Super',
@@ -192,6 +238,7 @@ async function seed() {
         email: 'partenaire@odc.mg',
         roleNom: RoleName.PARTENAIRE,
       },
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     ];
 
     const users: Record<string, User> = {};
@@ -205,6 +252,38 @@ async function seed() {
         continue;
       }
 
+<<<<<<< HEAD
+      const data: any = {
+        nom: u.nom,
+        prenom: u.prenom,
+        email: u.email,
+        role_id: roles[u.role].id,
+        actif: true,
+        motDePasse: defaultPassword,
+        mot_de_passe: defaultPassword,
+        emailVerifie: true,
+        email_verifie: true,
+      };
+
+      const created = userRepo.create(data);
+      const saved = (await userRepo.save(created)) as unknown as User;
+      users[u.email] = saved;
+      logger.info(`✅ Utilisateur créé : ${u.email}`);
+    }
+
+    // =========================================================================
+    // 3. FORMATIONS
+    // =========================================================================
+    const formationRepo = AppDataSource.getRepository(Formation);
+
+    const formationsData: any[] = [
+      {
+        titre: 'Développement Web React',
+        description: 'Maîtrisez React avec TypeScript',
+        domaine: 'WEB',
+        dureeHeures: 40,
+        duree_heures: 40,
+=======
       const role = roles[u.roleNom];
       if (!role) {
         logger.warn(`⚠️  Rôle ${u.roleNom} introuvable — skip ${u.email}`);
@@ -241,25 +320,52 @@ async function seed() {
         description: 'Maîtrisez React avec TypeScript',
         domaineNom: 'Développement Web',
         dureeHeures: 40,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         niveau: NiveauFormation.INTERMEDIAIRE,
       },
       {
         titre: 'Data Science avec Python',
         description: 'Analyse de données et machine learning',
+<<<<<<< HEAD
+        domaine: 'DATA',
+        dureeHeures: 60,
+        duree_heures: 60,
+=======
         domaineNom: 'Data & IA',
         dureeHeures: 60,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         niveau: NiveauFormation.AVANCE,
       },
       {
         titre: 'Cybersécurité Fondamentaux',
         description: 'Bases de la sécurité informatique',
+<<<<<<< HEAD
+        domaine: 'CYBER',
+        dureeHeures: 30,
+        duree_heures: 30,
+=======
         domaineNom: 'Cybersécurité',
         dureeHeures: 30,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         niveau: NiveauFormation.DEBUTANT,
       },
       {
         titre: 'UI/UX Design',
         description: 'Concevoir des interfaces intuitives',
+<<<<<<< HEAD
+        domaine: 'DESIGN',
+        dureeHeures: 35,
+        duree_heures: 35,
+        niveau: NiveauFormation.DEBUTANT,
+      },
+      {
+        titre: 'Intelligence Artificielle',
+        description: 'Introduction au machine learning',
+        domaine: 'IA',
+        dureeHeures: 50,
+        duree_heures: 50,
+        niveau: NiveauFormation.AVANCE,
+=======
         domaineNom: 'Design UX/UI',
         dureeHeures: 35,
         niveau: NiveauFormation.DEBUTANT,
@@ -270,12 +376,20 @@ async function seed() {
         domaineNom: 'Marketing Digital',
         dureeHeures: 25,
         niveau: NiveauFormation.DEBUTANT,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       },
     ];
 
     const formations: Formation[] = [];
 
     for (const f of formationsData) {
+<<<<<<< HEAD
+      let formation = await formationRepo.findOne({ where: { titre: f.titre } });
+
+      if (!formation) {
+        const created = formationRepo.create(f);
+        formation = (await formationRepo.save(created)) as unknown as Formation;
+=======
       const slug = slugify(f.titre);
       let formation = await formationRepo.findOne({ where: { slug } });
 
@@ -305,6 +419,7 @@ async function seed() {
 
         const created = formationRepo.create(data);
         formation = await formationRepo.save(created);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         logger.info(`✅ Formation créée : ${f.titre}`);
       } else {
         logger.info(`ℹ️  Formation existante : ${f.titre}`);
@@ -313,6 +428,62 @@ async function seed() {
       formations.push(formation);
     }
 
+<<<<<<< HEAD
+    // =========================================================================
+    // 4. SESSIONS
+    // =========================================================================
+    const sessionRepo = AppDataSource.getRepository(Session);
+
+    const today = new Date();
+    const inDays = (d: number): Date => {
+      const date = new Date(today);
+      date.setDate(date.getDate() + d);
+      return date;
+    };
+
+    const formateurId = users['formateur@odc.mg']?.id;
+
+    if (formateurId && formations.length >= 3) {
+      const sessionsData: any[] = [
+        {
+          formationId: formations[0].id,
+          formation_id: formations[0].id,
+          formateurId,
+          formateur_id: formateurId,
+          dateDebut: inDays(7),
+          date_debut: inDays(7),
+          dateFin: inDays(21),
+          date_fin: inDays(21),
+          lieu: 'Salle A1 - ODC Antananarivo',
+          capacite: 25,
+          statut: StatutSession.OUVERTE,
+        },
+        {
+          formationId: formations[1].id,
+          formation_id: formations[1].id,
+          formateurId,
+          formateur_id: formateurId,
+          dateDebut: inDays(14),
+          date_debut: inDays(14),
+          dateFin: inDays(35),
+          date_fin: inDays(35),
+          lieu: 'Salle B2 - ODC Antananarivo',
+          capacite: 20,
+          statut: StatutSession.OUVERTE,
+        },
+        {
+          formationId: formations[2].id,
+          formation_id: formations[2].id,
+          formateurId,
+          formateur_id: formateurId,
+          dateDebut: inDays(-7),
+          date_debut: inDays(-7),
+          dateFin: inDays(7),
+          date_fin: inDays(7),
+          lieu: 'Salle C1 - ODC Antananarivo',
+          capacite: 30,
+          statut: StatutSession.EN_COURS,
+=======
     /* ========================================================================
        5. SESSIONS
        ======================================================================== */
@@ -347,10 +518,16 @@ async function seed() {
           placesMax: 30,
           statut: StatutSession.EN_COURS,
           code: 'ODC-2026-0003',
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         },
       ];
 
       for (const s of sessionsData) {
+<<<<<<< HEAD
+        const created = sessionRepo.create(s);
+        await sessionRepo.save(created);
+        logger.info(`✅ Session créée : ${s.lieu}`);
+=======
         const existing = await sessionRepo.findOne({
           where: { codeSession: s.code },
         });
@@ -379,35 +556,60 @@ async function seed() {
         const created = sessionRepo.create(data);
         await sessionRepo.save(created);
         logger.info(`✅ Session créée : ${s.code} (${s.lieu})`);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       }
     } else {
       logger.warn('⚠️  Formateur ou formations manquants — sessions ignorées');
     }
 
+<<<<<<< HEAD
+    // =========================================================================
+    // 5. PARTENAIRES
+    // =========================================================================
+    const partenaireRepo = AppDataSource.getRepository(Partenaire);
+
+    const partenairesData: any[] = [
+=======
     /* ========================================================================
        6. PARTENAIRES
        ======================================================================== */
     const partenaireRepo = AppDataSource.getRepository(Partenaire);
 
     const partenairesData = [
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       {
         nom: 'Orange Madagascar',
         secteur: 'Télécommunications',
         description: 'Opérateur télécom partenaire principal',
+<<<<<<< HEAD
+        contactEmail: 'contact@orange.mg',
+        contact_email: 'contact@orange.mg',
+        siteWeb: 'https://orange.mg',
+        site_web: 'https://orange.mg',
+=======
         contactEmail: 'contact@orange.mg',   // ⭐ PAS contact_email
         siteWeb: 'https://orange.mg',        // ⭐ PAS site_web
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       },
       {
         nom: 'Université Antananarivo',
         secteur: 'Éducation',
         description: 'Partenaire académique',
         contactEmail: 'contact@univ-antananarivo.mg',
+<<<<<<< HEAD
+        contact_email: 'contact@univ-antananarivo.mg',
+=======
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       },
       {
         nom: 'Tech Hub Madagascar',
         secteur: 'Technologie',
         description: 'Incubateur de startups',
         contactEmail: 'hello@techhub.mg',
+<<<<<<< HEAD
+        contact_email: 'hello@techhub.mg',
+=======
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       },
     ];
 
@@ -415,6 +617,9 @@ async function seed() {
       const existing = await partenaireRepo.findOne({ where: { nom: p.nom } });
 
       if (!existing) {
+<<<<<<< HEAD
+        const created = partenaireRepo.create(p);
+=======
         const data = {
           nom: p.nom,
           secteur: p.secteur,
@@ -424,6 +629,7 @@ async function seed() {
           estPubliee: true,
         };
         const created = partenaireRepo.create(data);
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         await partenaireRepo.save(created);
         logger.info(`✅ Partenaire créé : ${p.nom}`);
       } else {
@@ -431,6 +637,19 @@ async function seed() {
       }
     }
 
+<<<<<<< HEAD
+    // =========================================================================
+    // RÉSUMÉ
+    // =========================================================================
+    logger.info('🎉 Seeds terminés avec succès !');
+    logger.info('');
+    logger.info('📊 Comptes de test :');
+    logger.info('   admin@odc.mg       / Password123');
+    logger.info('   staff@odc.mg       / Password123');
+    logger.info('   formateur@odc.mg   / Password123');
+    logger.info('   participant@odc.mg / Password123');
+    logger.info('   partenaire@odc.mg  / Password123');
+=======
     /* ========================================================================
        RÉSUMÉ
        ======================================================================== */
@@ -446,6 +665,7 @@ async function seed() {
     logger.info('   📚 participant@odc.mg / Password123');
     logger.info('   🤝 partenaire@odc.mg  / Password123');
     logger.info('');
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
     await AppDataSource.destroy();
     process.exit(0);

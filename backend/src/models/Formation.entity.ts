@@ -1,0 +1,59 @@
+import { Entity, Column, OneToMany, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { BaseEntity } from './BaseEntity';
+import { Session } from './Session.entity';
+import { Domaine } from './Domaine.entity';
+
+export enum NiveauFormation {
+  DEBUTANT = 'DEBUTANT',
+  INTERMEDIAIRE = 'INTERMEDIAIRE',
+  AVANCE = 'AVANCE',
+}
+
+@Entity('formations')
+@Index(['domaine'])
+@Index(['actif'])
+export class Formation extends BaseEntity {
+  @Column({ type: 'varchar', length: 200 })
+  titre: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;;
+
+  @Column({ type: 'varchar', length: 100 })
+  domaine: string;
+
+  @Column({ type: 'int', name: 'duree_heures' })
+  dureeHeures: number;
+
+  @Column({ type: 'varchar', length: 50 })
+  niveau: NiveauFormation;
+
+  @Column({ type: 'text', nullable: true })
+  prerequis: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  objectifs: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  programme: string | null ;
+
+  @Column({ type: 'text', nullable: true, name: 'image_url' })
+  imageUrl: string | null;
+
+  @Column({ type: 'boolean', default: true })
+  actif: boolean;
+
+  @Column({ type: 'int', default: 0, name: 'nb_participants_max' })
+  nbParticipantsMax: number;
+
+  @ManyToOne(() => Domaine, (d) => d.formations, {
+     nullable: true, 
+     onDelete: 'SET NULL',
+     eager: true
+    })
+  @JoinColumn({name: 'domaine_id'})
+  domaineRelation: Domaine | null ;
+  
+  @OneToMany(() => Session, (s) => s.formation)
+  sessions: Session[];
+}

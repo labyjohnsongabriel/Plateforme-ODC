@@ -1,3 +1,14 @@
+<<<<<<< HEAD
+import { Router } from 'express';
+import { UploadController } from '../controllers/upload.controller';
+import { authMiddleware } from '../middlewares';
+import { uploadAvatar, upload } from '../middlewares/upload.middleware';
+
+const router = Router();
+router.use(authMiddleware);
+router.post('/avatar', uploadAvatar.single('file'), UploadController.avatar);
+router.post('/file', upload.single('file'), UploadController.file);
+=======
 // src/routes/upload.routes.ts
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
@@ -24,4 +35,5 @@ router.post('/document', uploadDocument.single('fichier'), UploadController.uplo
 // DELETE /api/uploads/:filename
 router.delete('/:filename', UploadController.deleteFile);
 
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 export default router;

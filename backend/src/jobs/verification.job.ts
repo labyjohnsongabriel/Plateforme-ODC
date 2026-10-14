@@ -1,10 +1,19 @@
 import { AppDataSource } from '../config/database';
+<<<<<<< HEAD
+import { Inscription, StatutInscription } from '../models/Inscription.entity';
+import { Session, StatutSession } from '../models/Session.entity';
+import { Presence } from '../models/Presence.entity';
+import { Note } from '../models/Note.entity';
+import { NotificationService } from '../services/notification.service';
+import { TypeNotification } from '../models/Notification.entity';
+=======
 import { Inscription, StatutInscription } from '../entities/Inscription.entity';
 import { Session, StatutSession } from '../entities/Session.entity';
 import { Presence } from '../entities/Presence.entity';
 import { Note } from '../entities/Note.entity';
 import { NotificationService } from '../services/notification.service';
 import { TypeNotification } from '../entities/Notification.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import { logger } from '../config/logger';
 
 export class VerificationJob {

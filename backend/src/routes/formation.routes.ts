@@ -2,9 +2,19 @@ import { Router } from 'express';
 import { FormationController } from '../controllers/formation.controller';
 import {
   authMiddleware,
+<<<<<<< HEAD
+  optionalAuthMiddleware,
   roleMiddleware,
   validate,
   paginationMiddleware,
+  moderateLimiter,
+  auditMiddleware,
+  asyncHandler,
+=======
+  roleMiddleware,
+  validate,
+  paginationMiddleware,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 } from '../middlewares';
 import {
   createFormationSchema,
@@ -24,8 +34,15 @@ router.get('/:id', FormationController.findOne);
 router.post(
   '/',
   roleMiddleware(['ADMIN', 'STAFF']),
+<<<<<<< HEAD
+  moderateLimiter,
+  validate(createFormationSchema),
+  auditMiddleware('CREAT_FORMATION'),
+  asyncHandler(FormationController.create)
+=======
   validate(createFormationSchema),
   FormationController.create
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 );
 router.put(
   '/:id',

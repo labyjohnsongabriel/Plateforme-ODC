@@ -1,3 +1,22 @@
+<<<<<<< HEAD
+import { Request, Response, NextFunction } from 'express';
+import { successResponse } from '../utils/response.util';
+import { ValidationError } from '../errors/AppError';
+
+export class UploadController {
+  static async avatar(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) throw new ValidationError('Aucun fichier');
+      return successResponse(res, { url: `/uploads/avatars/${req.file.filename}` }, 'Avatar uploade', 201);
+    } catch (e) { next(e); }
+  }
+  static async file(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) throw new ValidationError('Aucun fichier');
+      return successResponse(res, { url: `/uploads/temp/${req.file.filename}`, filename: req.file.filename, size: req.file.size }, 'Fichier uploade', 201);
+    } catch (e) { next(e); }
+  }
+=======
 // src/controllers/UploadController.ts
 import { Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
@@ -131,4 +150,5 @@ export class UploadController {
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
     return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   }
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 }

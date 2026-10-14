@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
+<<<<<<< HEAD
+import { Permission } from '../models/Permission.entity';
+import { Role } from '../models/Role.entity';
+=======
 import { Permission } from '../entities/Permission.entity';
 import { Role } from '../entities/Role.entity';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import { ForbiddenError, UnauthorizedError } from '../errors/AppError';
 
 /**

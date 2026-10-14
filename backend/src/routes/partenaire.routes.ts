@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+import { Router } from 'express';
+import { PartenaireController } from '../controllers/partenaire.controller';
+import { authMiddleware, roleMiddleware, paginationMiddleware } from '../middlewares';
+
+const router = Router();
+router.use(authMiddleware);
+router.use(paginationMiddleware);
+router.get('/', PartenaireController.findAll);
+router.get('/:id', PartenaireController.findOne);
+router.post('/', roleMiddleware(['ADMIN']), PartenaireController.create);
+router.put('/:id', roleMiddleware(['ADMIN']), PartenaireController.update);
+router.delete('/:id', roleMiddleware(['ADMIN']), PartenaireController.delete);
+=======
 // src/routes/partenaire.routes.ts
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
@@ -60,4 +74,5 @@ router.get ('/fiche',           PartenaireController.moi);
 // PUT  /api/partenaire/fiche
 router.put ('/fiche',           PartenaireController.updateMoi);
 
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 export default router;

@@ -1,13 +1,38 @@
+<<<<<<< HEAD
+import { Router } from 'express';
+import { AuthController } from '../controllers/auth.controller';
+import { authMiddleware } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+=======
 // src/routes/auth.routes.ts
 import { Router } from 'express';                         // ✅ CORRECT
 import { AuthController } from '../controllers/auth.controller'; // ✅ CORRECT
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { validateRequest } from '../middlewares/validation.middleware';
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import {
   registerSchema,
   loginSchema,
   refreshTokenSchema,
   changePasswordSchema,
+<<<<<<< HEAD
+} from '../validators/auth.validator';
+
+const router = Router();
+
+// Routes publiques
+router.post('/register', validate(registerSchema), AuthController.register);
+router.post('/login', validate(loginSchema), AuthController.login);
+router.post('/refresh', validate(refreshTokenSchema), AuthController.refresh);
+
+// Routes protégées
+router.get('/me', authMiddleware, AuthController.me);
+router.post(
+  '/change-password',
+  authMiddleware,
+  validate(changePasswordSchema),
+  AuthController.changePassword
+=======
   forgotPasswordSchema,
   resetPasswordSchema,
 } from '../validators/auth.validator';
@@ -73,6 +98,7 @@ router.post(
   authMiddleware,
   validateRequest(changePasswordSchema),
   AuthController.changePassword,
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 );
 
 export default router;

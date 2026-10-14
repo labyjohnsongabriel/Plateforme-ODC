@@ -11,6 +11,9 @@ import { useAuth } from '@/context/AuthContext';
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useAuth();
+<<<<<<< HEAD
+
+=======
 // src/pages/auth/RegisterPage.tsx
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -78,6 +81,7 @@ function getDashboardRoute(role?: string | null): string {
   if (!role) return ROUTES.PUBLIC.HOME;
   return ROLE_DASHBOARD[role] ?? ROUTES.PUBLIC.HOME;
 }
+>>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   // Redirection si déjà connecté
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
