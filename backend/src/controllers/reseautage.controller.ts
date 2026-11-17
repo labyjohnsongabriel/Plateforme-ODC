@@ -1,45 +1,3 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-import { getPagination } from '../utils/pagination.util';
-
-export class ReseautageController {
-  static async annuaire(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { page, limit, skip } = getPagination(req.query.page, req.query.limit);
-      const qb = AppDataSource.getRepository(User).createQueryBuilder('u')
-        .leftJoinAndSelect('u.role', 'r')
-        .where('u.id != :uid', { uid: req.userId! })
-        .andWhere('u.actif = true')
-        .orderBy('u.created_at', 'DESC').skip(skip).take(limit);
-      const [data, total] = await qb.getManyAndCount();
-      const cleaned = data.map(({ motDePasse, ...rest }) => rest);
-      return paginatedResponse(res, cleaned, total, page, limit);
-    } catch (e) { next(e); }
-  }
-  static async envoyerDemande(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, {}, 'Demande envoyee', 201); } catch (e) { next(e); }
-  }
-  static async repondre(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, {}, 'Reponse enregistree'); } catch (e) { next(e); }
-  }
-  static async mesConnections(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, []); } catch (e) { next(e); }
-  }
-  static async demandesEnAttente(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, []); } catch (e) { next(e); }
-  }
-  static async suggestions(req: Request, res: Response, next: NextFunction) {
-    try {
-      const users = await AppDataSource.getRepository(User).createQueryBuilder('u')
-        .leftJoinAndSelect('u.role', 'r')
-        .where('u.id != :uid', { uid: req.userId! })
-        .andWhere('u.actif = true')
-        .orderBy('RANDOM()').limit(Number(req.query.limit) || 10).getMany();
-      return successResponse(res, users.map(({ motDePasse, ...r }) => r));
-=======
 // src/controllers/ReseautageController.ts
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
@@ -48,12 +6,7 @@ import { Connection } from '../entities/Connection.entity';
 import { StatutConnection, TypeNotification } from '../entities/enums';
 import { successResponse, paginatedResponse } from '../utils/response.util';
 import { getPagination } from '../utils/pagination.util';
-import {
-  NotFoundError,
-  ConflictError,
-  ForbiddenError,
-  BadRequestError,
-} from '../errors/AppError';
+import { NotFoundError, ConflictError, ForbiddenError, BadRequestError } from '../errors/AppError';
 import { notificationService } from '../services/notification.service';
 import { logger } from '../config/logger';
 
@@ -64,7 +17,10 @@ export class ReseautageController {
   /** GET /api/reseau/annuaire */
   static async annuaire(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page, limit, skip } = getPagination(req.query.page, req.query.limit);
+      const { page, limit, skip } = getPagination(
+        typeof req.query.page === 'string' ? req.query.page : undefined,
+        typeof req.query.limit === 'string' ? req.query.limit : undefined
+      );
 
       const qb = AppDataSource.getRepository(User)
         .createQueryBuilder('u')
@@ -76,16 +32,33 @@ export class ReseautageController {
       if (req.query.q) {
         qb.andWhere(
           '(u.nom ILIKE :q OR u.prenom ILIKE :q OR u.entreprise ILIKE :q OR u.competences::text ILIKE :q)',
-          { q: `%${req.query.q}%` },
+          { q: `%${req.query.q}%` }
         );
       }
-      if (req.query.roleId) qb.andWhere('u.role_id = :rid', { rid: req.query.roleId });
+      if (req.query.roleId) {
+        qb.andWhere('u.role_id = :rid', { rid: req.query.roleId });
+      }
+      if (req.query.role) {
+        qb.andWhere('r.nom = :role', { role: req.query.role });
+      }
+      if (typeof req.query.ville === 'string' && req.query.ville.trim()) {
+        qb.andWhere('u.ville ILIKE :ville', {
+          ville: `%${req.query.ville.trim()}%`,
+        });
+      }
+      if (typeof req.query.competence === 'string' && req.query.competence.trim()) {
+        qb.andWhere('u.competences::text ILIKE :competence', {
+          competence: `%${req.query.competence.trim()}%`,
+        });
+      }
 
-      qb.orderBy('u.created_at', 'DESC').skip(skip).take(limit);
+      qb.orderBy('u.createdAt', 'DESC').skip(skip).take(limit);
 
       const [data, total] = await qb.getManyAndCount();
       return paginatedResponse(res, data, total, page, limit, 'Annuaire');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   // ==========================================================================
@@ -98,7 +71,7 @@ export class ReseautageController {
       const { message } = req.body;
 
       if (destinataireId === req.userId) {
-        throw new BadRequestError('Impossible de s\'ajouter soi-même');
+        throw new BadRequestError("Impossible de s'ajouter soi-même");
       }
 
       const destinataire = await AppDataSource.getRepository(User).findOne({
@@ -143,7 +116,9 @@ export class ReseautageController {
 
       logger.info(`👥 Demande : ${req.userId} → ${destinataireId}`);
       return successResponse(res, conn, 'Demande envoyée', 201);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   /** PUT /api/reseau/demandes/:id — Répondre (accepter/refuser) */
@@ -168,19 +143,22 @@ export class ReseautageController {
 
       await notificationService.create({
         userId: conn.expediteurId,
-        titre: statut === StatutConnection.ACCEPTEE
-          ? '✅ Connexion acceptée'
-          : '❌ Connexion refusée',
-        message: statut === StatutConnection.ACCEPTEE
-          ? 'Votre demande de connexion a été acceptée'
-          : 'Votre demande de connexion a été refusée',
-        type: statut === StatutConnection.ACCEPTEE
-          ? TypeNotification.SUCCESS
-          : TypeNotification.WARNING,
+        titre:
+          statut === StatutConnection.ACCEPTEE ? '✅ Connexion acceptée' : '❌ Connexion refusée',
+        message:
+          statut === StatutConnection.ACCEPTEE
+            ? 'Votre demande de connexion a été acceptée'
+            : 'Votre demande de connexion a été refusée',
+        type:
+          statut === StatutConnection.ACCEPTEE
+            ? TypeNotification.SUCCESS
+            : TypeNotification.WARNING,
       });
 
       return successResponse(res, conn, 'Réponse enregistrée');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   /** GET /api/reseau/demandes/en-attente — Reçues */
@@ -192,7 +170,9 @@ export class ReseautageController {
         order: { createdAt: 'DESC' },
       });
       return successResponse(res, demandes, 'Demandes en attente');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   /** GET /api/reseau/demandes/envoyees — Envoyées */
@@ -204,7 +184,9 @@ export class ReseautageController {
         order: { createdAt: 'DESC' },
       });
       return successResponse(res, demandes, 'Demandes envoyées');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   // ==========================================================================
@@ -228,7 +210,9 @@ export class ReseautageController {
       }));
 
       return successResponse(res, contacts, 'Mes connexions');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   /** DELETE /api/reseau/connections/:id */
@@ -245,9 +229,7 @@ export class ReseautageController {
 
       await repo.softDelete(id);
 
-      const otherId = conn.expediteurId === req.userId
-        ? conn.destinataireId
-        : conn.expediteurId;
+      const otherId = conn.expediteurId === req.userId ? conn.destinataireId : conn.expediteurId;
 
       await notificationService.create({
         userId: otherId,
@@ -258,7 +240,9 @@ export class ReseautageController {
 
       logger.info(`🗑️ Connexion supprimée : ${id}`);
       return successResponse(res, null, 'Connexion supprimée');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   // ==========================================================================
@@ -271,10 +255,7 @@ export class ReseautageController {
       const connRepo = AppDataSource.getRepository(Connection);
 
       const existing = await connRepo.find({
-        where: [
-          { expediteurId: req.userId! },
-          { destinataireId: req.userId! },
-        ],
+        where: [{ expediteurId: req.userId! }, { destinataireId: req.userId! }],
       });
 
       const excludedIds = new Set<string>([req.userId!]);
@@ -293,7 +274,9 @@ export class ReseautageController {
         .getMany();
 
       return successResponse(res, users, 'Suggestions de connexion');
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 
   // ==========================================================================
@@ -319,12 +302,139 @@ export class ReseautageController {
         }),
       ]);
 
-      return successResponse(res, {
-        connections,
-        demandesEnvoyees: envoyees,
-        demandesRecues: recues,
-      }, 'Statistiques réseau');
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-    } catch (e) { next(e); }
+      return successResponse(
+        res,
+        {
+          connections,
+          demandesEnvoyees: envoyees,
+          demandesRecues: recues,
+        },
+        'Statistiques réseau'
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+  /** GET /api/reseau/profil/:id — Profil public d'un membre */
+  static async getProfil(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const currentUserId = req.userId!;
+
+      // Debug (à retirer en prod)
+      logger.info(`[getProfil] id=${id} currentUserId=${currentUserId}`);
+
+      // 1. Charger l'utilisateur
+      const user = await AppDataSource.getRepository(User).findOne({
+        where: { id },
+        relations: ['role'],
+      });
+
+      if (!user) {
+        throw new NotFoundError('Utilisateur introuvable');
+      }
+
+      // 2. Vérifier que le compte est actif
+      if (!user.actif) {
+        throw new ForbiddenError('Ce compte est désactivé');
+      }
+
+      // 3. Vérifier la visibilité du profil
+      // ✅ CORRECTION : rejeter uniquement si false explicite
+      // (NULL = accessible par défaut)
+      if ((user as any).profil_public === false) {
+        throw new ForbiddenError("Ce profil n'est pas accessible");
+      }
+
+      // 4. Connexion avec le user courant
+      const connRepo = AppDataSource.getRepository(Connection);
+      let isConnected = false;
+      let hasPendingRequest = false;
+
+      if (currentUserId && currentUserId !== id) {
+        const connection = await connRepo.findOne({
+          where: [
+            {
+              expediteurId: currentUserId,
+              destinataireId: id,
+              statut: StatutConnection.ACCEPTEE,
+            },
+            {
+              expediteurId: id,
+              destinataireId: currentUserId,
+              statut: StatutConnection.ACCEPTEE,
+            },
+          ],
+        });
+        isConnected = !!connection;
+
+        if (!isConnected) {
+          const pending = await connRepo.findOne({
+            where: [
+              {
+                expediteurId: currentUserId,
+                destinataireId: id,
+                statut: StatutConnection.EN_ATTENTE,
+              },
+              {
+                expediteurId: id,
+                destinataireId: currentUserId,
+                statut: StatutConnection.EN_ATTENTE,
+              },
+            ],
+          });
+          hasPendingRequest = !!pending;
+        }
+      }
+
+      // 5. Nombre de connexions
+      const connectionsCount = await connRepo.count({
+        where: [
+          { expediteurId: id, statut: StatutConnection.ACCEPTEE },
+          { destinataireId: id, statut: StatutConnection.ACCEPTEE },
+        ],
+      });
+
+      // 6. Compétences
+      const competences: string[] = Array.isArray((user as any).competences)
+        ? (user as any).competences
+        : [];
+
+      // 7. Réponse
+      return successResponse(
+        res,
+        {
+          id: user.id,
+          prenom: user.prenom,
+          nom: user.nom,
+          email: user.email,
+          photoUrl: user.photoUrl,
+          telephone: (user as any).telephone ?? null,
+          ville: (user as any).ville ?? null,
+          pays: (user as any).pays ?? null,
+          entreprise: (user as any).entreprise ?? null,
+          poste: (user as any).poste ?? null,
+          bio: (user as any).bio ?? null,
+          siteWeb: (user as any).siteWeb ?? null,
+          linkedinUrl: (user as any).linkedinUrl ?? null,
+          createdAt: user.createdAt,
+          role: user.role
+            ? {
+                nom: user.role.nom,
+                libelle: (user.role as any).libelle ?? user.role.nom,
+              }
+            : null,
+          competences,
+          isConnected,
+          hasPendingRequest,
+          stats: {
+            connections: connectionsCount,
+          },
+        },
+        'Profil récupéré'
+      );
+    } catch (e) {
+      next(e);
+    }
   }
 }

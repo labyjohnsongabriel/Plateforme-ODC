@@ -379,9 +379,9 @@ export function formatFileSize(bytes: number | null | undefined): string {
   return `${size.toFixed(i === 0 ? 0 : 1).replace('.', ',')} ${units[i]}`;
 }
 
-/* ============================================================================
-   DIVERS
-   ============================================================================ */
+export const formatBytes = formatFileSize;
+
+/* DIVERS */
 
 /**
  * Formate un code session avec mise en valeur.

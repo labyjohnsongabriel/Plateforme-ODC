@@ -1,292 +1,240 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { EvaluationService } from '../services/evaluation.service';
-import { successResponse } from '../utils/response.util';
-
-export class EvaluationController {
-  static async findAll(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await EvaluationService.findAll(req.query.sessionId as string | undefined)); }
-    catch (e) { next(e); }
-  }
-
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await EvaluationService.create(req.userId!, req.body), 'Evaluation creee', 201); }
-    catch (e) { next(e); }
-  }
-  static async findBySession(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await EvaluationService.findBySession(req.params.sessionId)); }
-    catch (e) { next(e); }
-  }
-  static async saisirNote(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await EvaluationService.saisirNote(req.userId!, req.params.evaluationId, req.body.participantId, req.body.note, req.body.commentaire), 'Note enregistree'); }
-    catch (e) { next(e); }
-  }
-  static async moyenne(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, { moyenne: await EvaluationService.calculerMoyenne(req.params.sessionId, req.params.participantId) }); }
-    catch (e) { next(e); }
-=======
 // src/controllers/EvaluationController.ts
 import { Request, Response, NextFunction } from 'express';
 import { EvaluationService } from '../services/evaluation.service';
 import { successResponse, paginatedResponse } from '../utils/response.util';
-import { TypeEvaluation } from '../entities/enums';
-import { BadRequestError } from '../errors/AppError';
+import { RoleName } from '../entities/enums';
+import { BadRequestError, ForbiddenError } from '../errors/AppError';
+import { uuidSchema } from '../validators/common.validator';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
-   ============================================================================ */
-
-const VALID_TYPES = Object.values(TypeEvaluation);
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function getUserId(req: Request): string {
-  const userId = (req as any).user?.sub ?? (req as any).userId;
-  if (!userId) throw new BadRequestError('Utilisateur non authentifié');
-  return userId;
+  if (!req.userId) throw new BadRequestError('Utilisateur non authentifié');
+  return req.userId;
 }
 
-function getUserRole(req: Request): string {
-  const role = (req as any).user?.role ?? (req as any).userRole;
-  if (!role) throw new BadRequestError('Rôle manquant');
-  return role;
-}
-
-function validateType(type: unknown): void {
-  if (
-    type !== undefined &&
-    !VALID_TYPES.includes(type as TypeEvaluation)
-  ) {
-    throw new BadRequestError(
-      `Type d'évaluation invalide. Valeurs : ${VALID_TYPES.join(', ')}`,
-    );
+function getUserRole(req: Request): RoleName {
+  const role = req.user?.role?.nom ?? req.userRole;
+  if (!role || !Object.values(RoleName).includes(role as RoleName)) {
+    throw new BadRequestError('Rôle utilisateur invalide');
   }
+  return role as RoleName;
 }
 
-function validateNote(note: unknown): asserts note is number {
-  const n = Number(note);
-  if (isNaN(n) || n < 0 || n > 20) {
-    throw new BadRequestError('La note doit être entre 0 et 20');
+function validateUuid(value: string, field: string): string {
+  if (!uuidSchema.safeParse(value).success) {
+    throw new BadRequestError(`${field} invalide`);
   }
+  return value;
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    CONTROLLER
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export class EvaluationController {
-  /* ==========================================================================
-     GET /api/evaluations
-     ========================================================================== */
-  static async findAll(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  /* ─── LIST ───────────────────────────────────────────────────────────── */
+  static async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userId = getUserId(req);
-      const userRole = getUserRole(req);
-
       const result = await EvaluationService.findAll(
-        req.query,
-        userId,
-        userRole,
+        {
+          sessionId: typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined,
+          type: typeof req.query.type === 'string' ? req.query.type : undefined,
+          publiee: typeof req.query.publiee === 'string' ? req.query.publiee : undefined,
+          page: typeof req.query.page === 'string' ? req.query.page : undefined,
+          limit: typeof req.query.limit === 'string' ? req.query.limit : undefined,
+        },
+        getUserId(req),
+        getUserRole(req),
       );
-
-      return paginatedResponse(
-        res,
-        result.data,
-        result.total,
-        result.page,
-        result.limit,
-      );
-    } catch (e) {
-      next(e);
+      paginatedResponse(res, result.data, result.total, result.page, result.limit);
+    } catch (error) {
+      next(error);
     }
   }
 
-  /* ==========================================================================
-     POST /api/evaluations
-     ========================================================================== */
-  static async create(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  /* ─── CREATE ─────────────────────────────────────────────────────────── */
+  static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userId = getUserId(req);
-
-      if (!req.body.sessionId || !req.body.titre) {
+      if (
+        !req.body?.sessionId ||
+        typeof req.body.titre !== 'string' ||
+        !req.body.titre.trim()
+      ) {
         throw new BadRequestError('sessionId et titre requis');
       }
-
-      validateType(req.body.type);
-
-      const evaluation = await EvaluationService.create(userId, req.body);
-
-      return successResponse(res, evaluation, 'Évaluation créée', 201);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     GET /api/evaluations/session/:sessionId
-     ========================================================================== */
-  static async findBySession(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const data = await EvaluationService.findBySession(
-        req.params.sessionId,
-      );
-      return successResponse(res, data);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     GET /api/evaluations/:id
-     ========================================================================== */
-  static async findOne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const data = await EvaluationService.findById(req.params.id);
-      return successResponse(res, data);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     PUT /api/evaluations/:id
-     ========================================================================== */
-  static async update(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const userId = getUserId(req);
-
-      if (req.body.type) {
-        validateType(req.body.type);
-      }
-
-      const evaluation = await EvaluationService.update(
-        req.params.id,
-        userId,
+      validateUuid(req.body.sessionId, 'sessionId');
+      const evaluation = await EvaluationService.create(
+        getUserId(req),
+        getUserRole(req),
         req.body,
       );
-
-      return successResponse(res, evaluation, 'Évaluation mise à jour');
-    } catch (e) {
-      next(e);
+      successResponse(res, evaluation, 'Évaluation créée', 201);
+    } catch (error) {
+      next(error);
     }
   }
 
-  /* ==========================================================================
-     PUT /api/evaluations/:id/publier
-     ========================================================================== */
-  static async publier(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  /* ─── FIND BY SESSION ────────────────────────────────────────────────── */
+  static async findBySession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userId = getUserId(req);
-      const publiee =
-        typeof req.body.publiee === 'boolean' ? req.body.publiee : true;
+      const evaluations = await EvaluationService.findBySession(
+        validateUuid(req.params.sessionId, 'sessionId'),
+        getUserId(req),
+        getUserRole(req),
+      );
+      successResponse(res, evaluations);
+    } catch (error) {
+      next(error);
+    }
+  }
 
+  /* ─── FIND ONE ───────────────────────────────────────────────────────── */
+  static async findOne(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const evaluation = await EvaluationService.findById(
+        validateUuid(req.params.id, 'id'),
+        getUserId(req),
+        getUserRole(req),
+      );
+      successResponse(res, evaluation);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /* ─── UPDATE ─────────────────────────────────────────────────────────── */
+  static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const evaluation = await EvaluationService.update(
+        validateUuid(req.params.id, 'id'),
+        getUserId(req),
+        getUserRole(req),
+        req.body ?? {},
+      );
+      successResponse(res, evaluation, 'Évaluation mise à jour');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /* ─── PUBLIER / DÉPUBLIER ────────────────────────────────────────────── */
+  static async publier(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.body?.publiee !== undefined && typeof req.body.publiee !== 'boolean') {
+        throw new BadRequestError('publiee doit être un booléen');
+      }
+      const publiee = req.body?.publiee ?? true;
       const evaluation = await EvaluationService.togglePublication(
-        req.params.id,
-        userId,
+        validateUuid(req.params.id, 'id'),
+        getUserId(req),
+        getUserRole(req),
         publiee,
       );
-
-      return successResponse(
+      successResponse(
         res,
         evaluation,
         publiee ? 'Évaluation publiée' : 'Évaluation dépubliée',
       );
-    } catch (e) {
-      next(e);
+    } catch (error) {
+      next(error);
     }
   }
 
-  /* ==========================================================================
-     POST /api/evaluations/:id/notes
-     ========================================================================== */
-  static async saisirNote(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  /* ─── SAISIR NOTE ────────────────────────────────────────────────────── */
+  static async saisirNote(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userId = getUserId(req);
-      const { participantId, note, commentaire } = req.body;
-
-      if (!participantId) {
-        throw new BadRequestError('participantId requis');
+      const participantId = validateUuid(req.body?.participantId, 'participantId');
+      const note = req.body?.note;
+      if (
+        note === '' || note === null || note === undefined ||
+        !Number.isFinite(Number(note)) || Number(note) < 0
+      ) {
+        throw new BadRequestError('La note doit être un nombre positif ou nul');
       }
-
-      validateNote(note);
-
+      if (req.body?.commentaire !== undefined && typeof req.body.commentaire !== 'string') {
+        throw new BadRequestError('Le commentaire doit être du texte');
+      }
       const result = await EvaluationService.saisirNote(
-        userId,
-        req.params.id, // ⭐ cohérent avec la route
+        getUserId(req),
+        getUserRole(req),
+        validateUuid(req.params.evaluationId ?? req.params.id, 'evaluationId'),
         participantId,
         Number(note),
-        commentaire,
+        req.body.commentaire,
       );
-
-      return successResponse(res, result, 'Note enregistrée');
-    } catch (e) {
-      next(e);
+      successResponse(res, result, 'Note enregistrée');
+    } catch (error) {
+      next(error);
     }
   }
 
-  /* ==========================================================================
-     GET /api/evaluations/session/:sessionId/participant/:participantId/moyenne
-     ========================================================================== */
-  static async moyenne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  /* ─── SOUMETTRE (participant) ────────────────────────────────────────── */
+  static async soumettre(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { sessionId, participantId } = req.params;
-
-      const moyenne = await EvaluationService.calculerMoyenne(
-        sessionId,
-        participantId,
+      if (getUserRole(req) !== RoleName.PARTICIPANT) {
+        throw new ForbiddenError('Cette action est réservée aux participants');
+      }
+      const reponses = req.body?.reponses;
+      if (!reponses || typeof reponses !== 'object' || Array.isArray(reponses)) {
+        throw new BadRequestError('reponses doit être un objet');
+      }
+      const submission = await EvaluationService.soumettre(
+        validateUuid(req.params.id, 'evaluationId'),
+        getUserId(req),
+        reponses,
       );
-
-      return successResponse(res, { moyenne });
-    } catch (e) {
-      next(e);
+      successResponse(res, submission, 'Évaluation soumise', 201);
+    } catch (error) {
+      next(error);
     }
   }
 
-  /* ==========================================================================
-     DELETE /api/evaluations/:id
-     ========================================================================== */
-  static async delete(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  /* ─── FIND SUBMISSIONS ───────────────────────────────────────────────── */
+  static async findSubmissions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const submissions = await EvaluationService.findSubmissions(
+        validateUuid(req.params.id, 'evaluationId'),
+        getUserId(req),
+        getUserRole(req),
+      );
+      successResponse(res, submissions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /* ─── MOYENNE ────────────────────────────────────────────────────────── */
+  static async moyenne(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sessionId = validateUuid(req.params.sessionId, 'sessionId');
+      const participantId = validateUuid(req.params.participantId, 'participantId');
+      const role = getUserRole(req);
       const userId = getUserId(req);
-      await EvaluationService.delete(req.params.id, userId);
-      return successResponse(res, null, 'Évaluation supprimée');
-    } catch (e) {
-      next(e);
+      if (role === RoleName.PARTICIPANT && participantId !== userId) {
+        throw new ForbiddenError('Vous ne pouvez consulter que votre propre moyenne');
+      }
+      await EvaluationService.assertCanViewSession(sessionId, userId, role);
+      const moyenne = await EvaluationService.calculerMoyenne(sessionId, participantId);
+      successResponse(res, { moyenne });
+    } catch (error) {
+      next(error);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+  }
+
+  /* ─── DELETE ─────────────────────────────────────────────────────────── */
+  static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      await EvaluationService.delete(
+        validateUuid(req.params.id, 'id'),
+        getUserId(req),
+        getUserRole(req),
+      );
+      successResponse(res, null, 'Évaluation supprimée');
+    } catch (error) {
+      next(error);
+    }
   }
 }

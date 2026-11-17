@@ -1,9 +1,11 @@
-<<<<<<< HEAD
-import { ID, Timestamp, PaginationParams } from './common.types';
-import { User } from './user.types';
-import { Session } from './session.types';
+import type { ID, PaginationParams, Timestamp } from './common.types';
+import type { User } from './user.types';
+import type { Session } from './session.types';
+import type { Note } from './note.types';
 
 export enum TypeEvaluation {
+  PRE_TEST = 'PRE_TEST',
+  POST_TEST = 'POST_TEST',
   QUIZ = 'QUIZ',
   EXAMEN = 'EXAMEN',
   PROJET = 'PROJET',
@@ -18,50 +20,22 @@ export interface Evaluation {
   titre: string;
   type: TypeEvaluation;
   noteMax: number;
-  noteMin: number;
-=======
-import type { Session } from './session.types';
-import type { Note } from './note.types';
-
-export type TypeEvaluation =
-  | 'PRE_TEST'
-  | 'POST_TEST'
-  | 'QUIZ'
-  | 'PROJET'
-  | 'EXAMEN'
-  | 'TP'
-  | 'ORAL';
-
-export interface Evaluation {
-  id: string;
-  titre: string;
-  type: TypeEvaluation;
-  noteMax: number;
-  noteMinPassage: number;
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+  noteMinPassage?: number;
   coefficient: number;
-  dateEvaluation?: string;
+  dateEvaluation?: Timestamp;
   dureeMinutes?: number;
   description?: string;
   consignes?: string;
   publiee: boolean;
-<<<<<<< HEAD
+  createurId?: ID;
   notes?: Note[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
-}
-
-export interface Note {
-  id: ID;
-  evaluation: Evaluation;
-  evaluationId: ID;
-  participant: User;
-  participantId: ID;
-  note: number;
-  commentaire?: string;
-  saisiePar?: ID;
-  dateSaisie?: Timestamp;
-  createdAt: Timestamp;
+  dejaSoumise?: boolean;
+  maSoumission?: {
+    reponses: Record<string, unknown>;
+    soumisAt: Timestamp;
+  } | null;
 }
 
 export interface CreateEvaluationPayload {
@@ -69,9 +43,13 @@ export interface CreateEvaluationPayload {
   titre: string;
   type: TypeEvaluation;
   noteMax: number;
+  noteMinPassage?: number;
   coefficient?: number;
-  dateEvaluation?: string;
+  dateEvaluation?: Timestamp;
+  dureeMinutes?: number;
   description?: string;
+  consignes?: string;
+  publiee?: boolean;
 }
 
 export interface SaisirNotePayload {
@@ -96,19 +74,55 @@ export interface EvaluationStats {
   distribution: Array<{ range: string; count: number }>;
 }
 
-export const TYPE_EVALUATION_CONFIG: Record<TypeEvaluation, { label: string; variant: string; icon: string }> = {
-  [TypeEvaluation.QUIZ]: { label: 'Quiz', variant: 'info', icon: 'question-mark-circle' },
-  [TypeEvaluation.EXAMEN]: { label: 'Examen', variant: 'error', icon: 'document-text' },
-  [TypeEvaluation.PROJET]: { label: 'Projet', variant: 'purple', icon: 'folder' },
-  [TypeEvaluation.TP]: { label: 'Travaux pratiques', variant: 'success', icon: 'wrench' },
-  [TypeEvaluation.ORAL]: { label: 'Présentation orale', variant: 'warning', icon: 'microphone' },
-};
-=======
-  session: Session;
-  sessionId: string;
-  createurId?: string;
-  notes?: Note[];
-  createdAt: string;
-  updatedAt: string;
+export interface EvaluationFilters extends PaginationParams {
+  sessionId?: ID;
+  type?: TypeEvaluation;
+  publiee?: boolean;
 }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+
+export interface EvaluationNote {
+  evaluation: Evaluation;
+  participant: User;
+  note: Note;
+}
+
+export const TYPE_EVALUATION_CONFIG: Record<
+  TypeEvaluation,
+  { label: string; variant: string; icon: string }
+> = {
+  [TypeEvaluation.PRE_TEST]: {
+    label: 'Pré-test',
+    variant: 'info',
+    icon: 'clipboard',
+  },
+  [TypeEvaluation.POST_TEST]: {
+    label: 'Post-test',
+    variant: 'success',
+    icon: 'clipboard-check',
+  },
+  [TypeEvaluation.QUIZ]: {
+    label: 'Quiz',
+    variant: 'info',
+    icon: 'question-mark-circle',
+  },
+  [TypeEvaluation.EXAMEN]: {
+    label: 'Examen',
+    variant: 'error',
+    icon: 'document-text',
+  },
+  [TypeEvaluation.PROJET]: {
+    label: 'Projet',
+    variant: 'purple',
+    icon: 'folder',
+  },
+  [TypeEvaluation.TP]: {
+    label: 'Travaux pratiques',
+    variant: 'success',
+    icon: 'wrench',
+  },
+  [TypeEvaluation.ORAL]: {
+    label: 'Présentation orale',
+    variant: 'warning',
+    icon: 'microphone',
+  },
+};

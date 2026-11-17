@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-// ============================================================================
-//  API TYPES — Export centralisé
-// ============================================================================
-
 export * from './common.types';
 export * from './user.types';
 export * from './role.types';
@@ -14,28 +9,18 @@ export * from './evaluation.types';
 export * from './attestation.types';
 export * from './messagerie.types';
 export * from './dashboard.types';
+export * from './note.types';
+export * from './ressource.types';
+export * from './partenaire.types';
+export * from './notification.types';
 
-// Notification
-export interface Notification {
-  id: string;
-  userId: string;
-  titre: string;
-  message: string;
-  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
-  lue: boolean;
-  lien?: string;
-  icone?: string;
-  metadata?: Record<string, any>;
-  dateLecture?: string;
-  createdAt: string;
-=======
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data: T;
 }
 
-export interface PaginatedResponse<T = any> {
+export interface PaginatedResponse<T = unknown> {
   success: boolean;
   message?: string;
   data: T[];
@@ -55,14 +40,20 @@ export interface ApiError {
     code: string | null;
     statusCode: number;
     timestamp: string;
-    details?: any;
+    details?: unknown;
   };
 }
 
-export interface PaginationParams {
-  page?: number;
-  limit?: number;
-  sort?: string;
-  order?: 'ASC' | 'DESC';
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+export interface Notification {
+  id: string;
+  userId: string;
+  titre: string;
+  message: string;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+  lue: boolean;
+  lien?: string;
+  icone?: string;
+  metadata?: Record<string, unknown>;
+  dateLecture?: string;
+  createdAt: string;
 }

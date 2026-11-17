@@ -82,10 +82,15 @@ export function useNotificationSocket() {
       qc.invalidateQueries({ queryKey: queryKeys.notifications.all });
       qc.invalidateQueries({ queryKey: queryKeys.notifications.nonLues });
     };
+    const onUnreadCount = ({ count }: { count: number }) => {
+      qc.setQueryData(queryKeys.notifications.nonLues, count);
+    };
 
     socket.on('notification:new', handler);
+    socket.on('notifications:count', onUnreadCount);
     return () => {
       socket.off('notification:new', handler);
+      socket.off('notifications:count', onUnreadCount);
     };
   }, [socket, addNotification, qc]);
 }

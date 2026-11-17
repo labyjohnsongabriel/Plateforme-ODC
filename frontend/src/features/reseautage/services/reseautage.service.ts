@@ -4,6 +4,7 @@ import type {
   MemberUser,
   MesConnectionsResponse,
   DirectoryFilters,
+  StatutConnection,
 } from '../types/reseautage.types';
 import type { PaginatedResponse } from '@/types/common.types';
 
@@ -15,7 +16,9 @@ export class ReseautageService {
   /**
    * Annuaire des membres
    */
-  static async getAnnuaire(filters?: DirectoryFilters): Promise<PaginatedResponse<MemberUser>> {
+  static async getAnnuaire(
+    filters?: DirectoryFilters,
+  ): Promise<PaginatedResponse<MemberUser>> {
     return reseautageApi.annuaire(filters);
   }
 
@@ -43,7 +46,10 @@ export class ReseautageService {
   /**
    * Envoyer une demande
    */
-  static async envoyerDemande(destinataireId: string, message?: string): Promise<Connection> {
+  static async envoyerDemande(
+    destinataireId: string,
+    message?: string,
+  ): Promise<Connection> {
     return reseautageApi.envoyerDemande({ destinataireId, message });
   }
 
@@ -51,14 +57,18 @@ export class ReseautageService {
    * Accepter une demande
    */
   static async accepter(connectionId: string): Promise<Connection> {
-    return reseautageApi.repondre(connectionId, { statut: 'ACCEPTEE' as any });
+    return reseautageApi.repondre(connectionId, {
+      statut: StatutConnection.ACCEPTEE,
+    });
   }
 
   /**
    * Refuser une demande
    */
   static async refuser(connectionId: string): Promise<Connection> {
-    return reseautageApi.repondre(connectionId, { statut: 'REFUSEE' as any });
+    return reseautageApi.repondre(connectionId, {
+      statut: StatutConnection.REFUSEE,
+    });
   }
 
   // ========================================================================
@@ -72,7 +82,7 @@ export class ReseautageService {
     members: MemberUser[],
     search: string,
     role?: string,
-    ville?: string
+    ville?: string,
   ): MemberUser[] {
     let result = members;
 
@@ -84,12 +94,13 @@ export class ReseautageService {
           m.prenom.toLowerCase().includes(q) ||
           m.entreprise?.toLowerCase().includes(q) ||
           m.poste?.toLowerCase().includes(q) ||
-          m.competences?.some((c) => c.toLowerCase().includes(q))
+          m.competences?.some((c) => c.toLowerCase().includes(q)),
       );
     }
 
     if (role) result = result.filter((m) => m.role.nom === role);
-    if (ville) result = result.filter((m) => m.ville?.toLowerCase().includes(ville.toLowerCase()));
+    if (ville)
+      result = result.filter((m) => m.ville?.toLowerCase().includes(ville.toLowerCase()));
 
     return result;
   }

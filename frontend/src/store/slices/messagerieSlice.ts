@@ -27,7 +27,8 @@ export const fetchConversations = createAsyncThunk(
   'messagerie/fetchConversations',
   async (_, { rejectWithValue }) => {
     try {
-      return await messagerieApi.mesConversations();
+      const response = await messagerieApi.getConversations();
+      return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Erreur');
     }
@@ -39,7 +40,7 @@ export const fetchMessages = createAsyncThunk(
   async (conversationId: string, { rejectWithValue }) => {
     try {
       const response = await messagerieApi.getMessages(conversationId);
-      return { conversationId, messages: response.data };
+      return { conversationId, messages: response.data.messages };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Erreur');
     }
@@ -53,10 +54,10 @@ export const sendMessage = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const message = await messagerieApi.envoyer(payload.conversationId, {
+      const response = await messagerieApi.sendMessage(payload.conversationId, {
         contenu: payload.contenu,
       });
-      return { conversationId: payload.conversationId, message };
+      return { conversationId: payload.conversationId, message: response.data };
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Erreur');
     }

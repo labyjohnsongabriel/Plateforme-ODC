@@ -1,45 +1,9 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { AttestationService } from '../services/attestation.service';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-
-export class AttestationController {
-  static async genererUne(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await AttestationService.generer(req.body.sessionId, req.body.participantId), 'Attestation generee', 201); }
-    catch (e) { next(e); }
-  }
-  static async genererParSession(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await AttestationService.genererParSession(req.params.sessionId), 'Generation terminee'); }
-    catch (e) { next(e); }
-  }
-  static async verifier(req: Request, res: Response, next: NextFunction) {
-    try {
-      const r = await AttestationService.verifierAuthenticite(req.params.numero);
-      if (!r.valide) return res.status(404).json({ success: false, message: 'Attestation invalide' });
-      return successResponse(res, r.attestation);
-    } catch (e) { next(e); }
-  }
-  static async mesAttestations(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await AttestationService.mesAttestations(req.userId!)); }
-    catch (e) { next(e); }
-  }
-
-  static async findAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await AttestationService.findAll(req.query);
-      return paginatedResponse(res, result.data, result.total, result.page, result.limit);
-    } catch (e) { next(e); }
-  }
-  static async verifierEligibilite(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await AttestationService.verifierEligibilite(req.params.sessionId, req.params.participantId)); }
-    catch (e) { next(e); }
-=======
 // src/controllers/AttestationController.ts
 import { Request, Response, NextFunction } from 'express';
-import * as fs from 'fs';
 import { AttestationService } from '../services/attestation.service';
 import { successResponse, paginatedResponse } from '../utils/response.util';
 import { BadRequestError, NotFoundError } from '../errors/AppError';
+import { logger } from '../config/logger';
 
 /* ============================================================================
    HELPERS
@@ -51,6 +15,52 @@ function getUserId(req: Request): string {
   return userId;
 }
 
+function parseIntBounded(value: unknown, min: number, max: number, fallback: number): number {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Number(value);
+  if (isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function parseBool(value: unknown, fallback = true): boolean {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const s = String(value).toLowerCase().trim();
+  if (s === 'false' || s === '0' || s === 'non' || s === 'no') return false;
+  if (s === 'true' || s === '1' || s === 'oui' || s === 'yes') return true;
+  return fallback;
+}
+
+function buildCriteria(source: any) {
+  return {
+    presenceMin: parseIntBounded(source?.presenceMin, 0, 100, 75),
+    noteMin: parseIntBounded(source?.noteMin, 0, 20, 10),
+    selectionValidee: parseBool(source?.selectionValidee, true),
+    inscriptionValidee: parseBool(source?.inscriptionValidee, true),
+  };
+}
+
+function sendPdfBuffer(
+  res: Response,
+  buffer: Buffer,
+  nom: string,
+  disposition: 'attachment' | 'inline' = 'attachment'
+): void {
+  const safeName = nom.replace(/[^\w.-]+/g, '_');
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `${disposition}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(nom)}`
+  );
+  res.setHeader('Content-Length', String(buffer.length));
+  res.setHeader('Cache-Control', 'no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  res.send(buffer);
+}
+
 /* ============================================================================
    CONTROLLER
    ============================================================================ */
@@ -59,224 +69,235 @@ export class AttestationController {
   /* ==========================================================================
      🌐 PUBLIC — Vérification QR
      ========================================================================== */
-  static async verifyPublic(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async verifyPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { numero } = req.params;
 
-      if (!numero) {
+      if (!numero || !numero.trim()) {
         throw new BadRequestError("Numéro d'attestation requis");
       }
 
-      const result = await AttestationService.verifierAuthenticite(numero);
+      const result = await AttestationService.verifierAuthenticite(numero.trim());
 
-      if (!result.valide) {
-        return res.status(404).json({
-          success: false,
-          message: 'Attestation invalide ou inexistante',
+      if (!result.attestation) {
+        throw new NotFoundError('Attestation introuvable');
+      }
+
+      successResponse(
+        res,
+        result.attestation,
+        result.valide ? 'Attestation authentique' : 'Attestation invalidée'
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN / STAFF — Liste paginée
+     ========================================================================== */
+  static async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await AttestationService.findAll(req.query);
+      paginatedResponse(res, result.data, result.total, result.page, result.limit, 'Attestations');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN / STAFF — Statistiques
+     ========================================================================== */
+  static async stats(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const stats = await AttestationService.getStats();
+      successResponse(res, stats, 'Statistiques des attestations');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     🔒 ADMIN / STAFF — Détail
+     ========================================================================== */
+  static async findOne(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.params.id) {
+        throw new BadRequestError('Identifiant requis');
+      }
+      const attestation = await AttestationService.findOne(req.params.id);
+      successResponse(res, attestation, 'Attestation');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ PARTICIPANT — Détail d'une de MES attestations
+     ========================================================================== */
+  static async findOneForParticipant(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userId = getUserId(req);
+      const { id } = req.params;
+
+      if (!id) {
+        throw new BadRequestError('Identifiant requis');
+      }
+
+      const attestation = await AttestationService.findOneForParticipant(id, userId);
+
+      successResponse(res, attestation, 'Attestation');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ==========================================================================
+     ⭐ ADMIN / STAFF — Aperçu d'une session
+     ========================================================================== */
+  static async previewSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { sessionId } = req.params;
+
+      if (!sessionId) {
+        throw new BadRequestError('sessionId requis');
+      }
+
+      const criteria = buildCriteria(req.query);
+
+      if (process.env.NODE_ENV !== 'production') {
+        logger.debug('[PREVIEW SESSION]', {
+          sessionId,
+          criteria,
+          rawQuery: req.query,
         });
       }
 
-      return successResponse(res, result.attestation, 'Attestation authentique');
+      const preview = await AttestationService.previewSession(sessionId, criteria);
+
+      if (process.env.NODE_ENV !== 'production') {
+        logger.debug('[PREVIEW SESSION] résultat:', {
+          total: preview.stats.total,
+          eligibles: preview.stats.eligibles,
+          ineligibles: preview.stats.ineligibles,
+          dejaGenerees: preview.stats.dejaGenerees,
+          sampleTaux: preview.participants[0]?.tauxPresence,
+        });
+      }
+
+      successResponse(res, preview, "Aperçu de l'éligibilité");
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Liste paginée
+     ⭐ ADMIN / STAFF — Générer pour une session (batch)
      ========================================================================== */
-  static async findAll(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async genererParSession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await AttestationService.findAll(req.query);
-      return paginatedResponse(
-        res,
-        result.data,
-        result.total,
-        result.page,
-        result.limit,
-      );
+      const { sessionId } = req.params;
+
+      if (!sessionId) {
+        throw new BadRequestError('sessionId requis');
+      }
+
+      const criteria = buildCriteria(req.body);
+
+      if (process.env.NODE_ENV !== 'production') {
+        logger.info('[GENERATE SESSION]', { sessionId, criteria });
+      }
+
+      const result = await AttestationService.genererParSession(sessionId, criteria);
+
+      successResponse(res, result, `${result.generes} attestation(s) générée(s)`);
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Statistiques
+     🔒 ADMIN / STAFF — Générer une attestation
      ========================================================================== */
-  static async stats(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async genererUne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const stats = await AttestationService.getStats();
-      return successResponse(res, stats);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Détail
-     ========================================================================== */
-  static async findOne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const attestation = await AttestationService.findOne(req.params.id);
-      return successResponse(res, attestation);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Aperçu d'une session (avant génération)
-     ========================================================================== */
-  static async previewSession(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const criteria = {
-        presenceMin: Number(req.query.presenceMin) || 75,
-        noteMin: Number(req.query.noteMin) || 10,
-        selectionValidee: req.query.selectionValidee !== 'false',
-        inscriptionValidee: req.query.inscriptionValidee !== 'false',
-      };
-
-      const preview = await AttestationService.previewSession(
-        req.params.sessionId,
-        criteria,
-      );
-
-      return successResponse(res, preview);
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Générer pour une session
-     ========================================================================== */
-  static async genererParSession(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const criteria = {
-        presenceMin: Number(req.body.presenceMin) || 75,
-        noteMin: Number(req.body.noteMin) || 10,
-        selectionValidee: req.body.selectionValidee !== false,
-        inscriptionValidee: req.body.inscriptionValidee !== false,
-      };
-
-      const result = await AttestationService.genererParSession(
-        req.params.sessionId,
-        criteria,
-      );
-
-      return successResponse(res, result, 'Génération terminée');
-    } catch (e) {
-      next(e);
-    }
-  }
-
-  /* ==========================================================================
-     🔒 ADMIN — Générer une attestation
-     ========================================================================== */
-  static async genererUne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
-    try {
-      const { sessionId, participantId } = req.body;
+      const { sessionId, participantId } = req.body ?? {};
 
       if (!sessionId || !participantId) {
         throw new BadRequestError('sessionId et participantId requis');
       }
 
-      const attestation = await AttestationService.generer(
-        sessionId,
-        participantId,
-      );
+      if (typeof sessionId !== 'string' || typeof participantId !== 'string') {
+        throw new BadRequestError('sessionId et participantId doivent être des chaînes');
+      }
 
-      return successResponse(res, attestation, 'Attestation générée', 201);
+      const attestation = await AttestationService.generer(sessionId, participantId);
+
+      successResponse(res, attestation, 'Attestation générée', 201);
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Invalider
+     🔒 ADMIN / STAFF — Invalider
      ========================================================================== */
-  static async invalider(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async invalider(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { motif } = req.body;
+      const { motif } = req.body ?? {};
 
-      if (!motif || typeof motif !== 'string') {
+      if (!motif || typeof motif !== 'string' || !motif.trim()) {
         throw new BadRequestError("Motif d'invalidation requis");
       }
 
-      const attestation = await AttestationService.invalider(
-        req.params.id,
-        motif,
-      );
+      if (motif.trim().length < 3) {
+        throw new BadRequestError("Le motif d'invalidation doit contenir au moins 3 caractères");
+      }
 
-      return successResponse(res, attestation, 'Attestation invalidée');
+      const attestation = await AttestationService.invalider(req.params.id, motif.trim());
+
+      successResponse(res, attestation, 'Attestation invalidée');
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Réactiver
+     🔒 ADMIN / STAFF — Réactiver
      ========================================================================== */
-  static async reactiver(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async reactiver(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const attestation = await AttestationService.reactiver(req.params.id);
-      return successResponse(res, attestation, 'Attestation réactivée');
+      successResponse(res, attestation, 'Attestation réactivée');
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 ADMIN — Vérifier éligibilité
+     🔒 ADMIN / STAFF / FORMATEUR — Vérifier éligibilité d'un participant
      ========================================================================== */
-  static async verifierEligibilite(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async verifierEligibilite(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { sessionId, participantId } = req.params;
+
+      if (!sessionId || !participantId) {
+        throw new BadRequestError('sessionId et participantId requis');
+      }
+
+      const criteria = buildCriteria(req.query);
+
       const result = await AttestationService.verifierEligibilite(
         sessionId,
         participantId,
+        criteria
       );
-      return successResponse(res, result);
+
+      successResponse(res, result, 'Éligibilité vérifiée');
     } catch (e) {
       next(e);
     }
@@ -285,84 +306,76 @@ export class AttestationController {
   /* ==========================================================================
      🔒 PARTICIPANT — Mes attestations
      ========================================================================== */
-  static async mesAttestations(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async mesAttestations(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = getUserId(req);
       const attestations = await AttestationService.mesAttestations(userId);
-      return successResponse(res, attestations);
+      successResponse(res, attestations, 'Mes attestations');
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 — Télécharger PDF
+     ⭐ TÉLÉCHARGER — PDF (attachment)
      ========================================================================== */
-  static async telecharger(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async telecharger(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = getUserId(req);
-      const file = await AttestationService.telecharger(
-        req.params.id,
-        userId,
-      );
+      const file = await AttestationService.telecharger(req.params.id, userId);
 
-      if (!file || !file.path) {
-        throw new NotFoundError('Fichier introuvable');
+      if (!file?.buffer) {
+        throw new NotFoundError('PDF introuvable');
       }
 
-      if (!fs.existsSync(file.path)) {
-        throw new NotFoundError('Fichier PDF introuvable sur le serveur');
-      }
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(file.nom)}"`,
-      );
-
-      return res.sendFile(file.path);
+      sendPdfBuffer(res, file.buffer, file.nom, 'attachment');
     } catch (e) {
       next(e);
     }
   }
 
   /* ==========================================================================
-     🔒 — Voir le PDF dans le navigateur
+     ⭐ VOIR — PDF (inline)
      ========================================================================== */
-  static async voir(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async voir(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = getUserId(req);
-      const file = await AttestationService.telecharger(
-        req.params.id,
-        userId,
-      );
+      const file = await AttestationService.telecharger(req.params.id, userId);
 
-      if (!fs.existsSync(file.path)) {
-        throw new NotFoundError('Fichier introuvable');
+      if (!file?.buffer) {
+        throw new NotFoundError('PDF introuvable');
       }
 
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `inline; filename="${encodeURIComponent(file.nom)}"`,
-      );
-
-      return res.sendFile(file.path);
+      sendPdfBuffer(res, file.buffer, file.nom, 'inline');
     } catch (e) {
       next(e);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+  }
+
+  /* ==========================================================================
+   🔒 ADMIN / STAFF — Envoyer une attestation par email
+   ========================================================================== */
+  static async envoyerParEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        throw new BadRequestError('Identifiant requis');
+      }
+
+      const sent = await AttestationService.envoyerParEmail(id);
+
+      if (!sent) {
+        res.status(500).json({
+          success: false,
+          message: "Impossible d'envoyer l'email. Vérifiez la configuration SMTP.",
+        });
+        return;
+      }
+
+      successResponse(res, { sent: true }, 'Attestation envoyée par email');
+    } catch (e) {
+      next(e);
+    }
   }
 }

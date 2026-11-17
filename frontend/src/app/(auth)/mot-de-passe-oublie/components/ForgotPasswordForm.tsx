@@ -1,3 +1,4 @@
+// src/app/(auth)/mot-de-passe-oublie/components/ForgotPasswordForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -10,19 +11,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 
 const schema = z.object({
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(1, 'Email requis')
-    .email('Adresse email invalide'),
+  email: z.string().trim().toLowerCase().email('Adresse email invalide'),
 });
-
 type FormData = z.infer<typeof schema>;
 
 export function ForgotPasswordForm() {
@@ -33,9 +27,7 @@ export function ForgotPasswordForm() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -47,61 +39,50 @@ export function ForgotPasswordForm() {
     }
   };
 
-  /* -------------------------------------------------------------------- */
-  /* ÉTAT 2 : EMAIL ENVOYÉ                                                */
-  /* -------------------------------------------------------------------- */
   if (sent) {
     return (
-      <Card>
-        <CardContent className="py-10 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="h-8 w-8 text-green-600" />
-          </div>
+      <div className="animate-fade-in rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-md dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-950/40">
+          <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+        </div>
 
-          <h2 className="font-display text-xl font-semibold mb-2">
-            Email envoyé !
-          </h2>
+        <h2 className="mb-2 font-display text-xl font-bold text-slate-900 dark:text-slate-50">
+          Email envoyé !
+        </h2>
 
-          <p className="text-sm text-odc-muted mb-6 max-w-sm mx-auto">
-            Si un compte existe pour <strong>{sentEmail}</strong>, un lien de
-            réinitialisation vous a été envoyé. Vérifiez votre boîte de réception
-            (et le dossier spam).
-          </p>
+        <p className="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+          Si un compte existe pour <strong className="text-slate-900 dark:text-slate-50">{sentEmail}</strong>,
+          un lien de réinitialisation vous a été envoyé. Vérifiez votre boîte de réception
+          (et le dossier spam).
+        </p>
 
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setSent(false)}
-            >
-              Renvoyer l&apos;email
-            </Button>
+        <div className="space-y-3">
+          <Button variant="outline" className="w-full" onClick={() => setSent(false)}>
+            Renvoyer l'email
+          </Button>
+          <Button variant="ghost" className="w-full" asChild>
+            <Link href="/connexion">
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+              Retour à la connexion
+            </Link>
+          </Button>
+        </div>
 
-            <Button variant="ghost" className="w-full" asChild>
-              <Link href="/connexion">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Retour à la connexion
-              </Link>
-            </Button>
-          </div>
-
-          <p className="mt-6 text-xs text-odc-muted">
-            Le lien est valide pendant 1 heure.
-          </p>
-        </CardContent>
-      </Card>
+        <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">
+          Le lien est valide pendant 1 heure.
+        </p>
+      </div>
     );
   }
 
-  /* -------------------------------------------------------------------- */
-  /* ÉTAT 1 : FORMULAIRE                                                  */
-  /* -------------------------------------------------------------------- */
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       <div>
-        <Label htmlFor="email">Adresse email</Label>
+        <Label htmlFor="email" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Adresse email
+        </Label>
         <div className="relative mt-1.5">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-odc-muted pointer-events-none" />
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             id="email"
             type="email"
@@ -110,12 +91,12 @@ export function ForgotPasswordForm() {
             autoFocus
             disabled={isSubmitting}
             {...register('email')}
-            className="pl-10"
+            className="h-11 pl-10"
             aria-invalid={!!errors.email}
           />
         </div>
         {errors.email && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.email.message}
           </p>
         )}
@@ -123,18 +104,17 @@ export function ForgotPasswordForm() {
 
       <Button
         type="submit"
-        variant="odc"
         size="lg"
         disabled={isSubmitting}
-        className="w-full"
+        className="h-11 w-full bg-slate-900 text-white shadow-md hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
       >
-        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Envoyer le lien de réinitialisation
       </Button>
 
-      <p className="text-center text-xs text-odc-muted">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">
         Vous vous souvenez de votre mot de passe ?{' '}
-        <Link href="/connexion" className="link-odc">
+        <Link href="/connexion" className="font-medium text-orange-600 hover:underline dark:text-orange-400">
           Se connecter
         </Link>
       </p>

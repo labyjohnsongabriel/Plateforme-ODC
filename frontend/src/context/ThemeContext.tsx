@@ -1,3 +1,6 @@
+// src/contexts/ThemeContext.tsx
+'use client';
+
 import {
   createContext,
   useCallback,
@@ -5,21 +8,26 @@ import {
   useEffect,
   useMemo,
   useState,
-  ReactNode,
+  type ReactNode,
 } from 'react';
 
-// ============================================================================
-//  TYPES
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 interface ThemeContextValue {
+  /** Mode effectif (light ou dark) */
   mode: ThemeMode;
+  /** Préférence utilisateur (light, dark ou system) */
   preference: ThemePreference;
+  /** Change la préférence (met à jour le mode automatiquement) */
   setPreference: (pref: ThemePreference) => void;
+  /** Bascule entre light et dark */
   toggleTheme: () => void;
+  /** Change directement le mode (équivalent à setPreference) */
   setTheme: (mode: ThemeMode) => void;
 }
 
@@ -28,105 +36,93 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEY = 'odc-theme';
 const PREFERENCE_KEY = 'odc-theme-preference';
 
-// ============================================================================
-//  HELPERS
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function getSystemTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 }
 
 function getStoredPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(PREFERENCE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-    return 'system';
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
+    }
   } catch {
-    return 'system';
+    /* ignore */
   }
+  return 'system';
 }
 
-function getStoredTheme(): ThemeMode | null {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function applyTheme(mode: ThemeMode): void {
+function applyThemeClass(mode: ThemeMode): void {
+  if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  if (mode === 'dark') {
-    root.classList.add('dark');
-  } else {
-    root.classList.remove('dark');
-  }
+  root.classList.toggle('dark', mode === 'dark');
+  root.setAttribute('data-theme', mode);
+  root.style.colorScheme = mode;
 }
 
-// ============================================================================
-//  PROVIDER
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROVIDER
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface ThemeProviderProps {
   children: ReactNode;
+  /** Thème par défaut si rien dans localStorage */
+  defaultPreference?: ThemePreference;
 }
 
-export function ThemeProvider({ children }: ThemeProviderProps) {
+export function ThemeProvider({
+  children,
+  defaultPreference = 'system',
+}: ThemeProviderProps) {
   const [preference, setPreferenceState] = useState<ThemePreference>(() => {
     const stored = getStoredPreference();
-    return stored;
+    return stored ?? defaultPreference;
   });
 
   const [mode, setMode] = useState<ThemeMode>(() => {
-    const stored = getStoredTheme();
-    if (stored) return stored;
-
-    const pref = getStoredPreference();
-    if (pref === 'system') return getSystemTheme();
-    return pref;
+    const stored = getStoredPreference();
+    if (stored === 'system') return getSystemTheme();
+    if (stored === 'light' || stored === 'dark') return stored;
+    return defaultPreference === 'system'
+      ? getSystemTheme()
+      : defaultPreference;
   });
 
-  // ========================================================================
-  // Apply theme on mount and change
-  // ========================================================================
+  /* ─── Applique la classe CSS + persiste ─────────────────────────────── */
   useEffect(() => {
-    applyTheme(mode);
+    applyThemeClass(mode);
     try {
       localStorage.setItem(STORAGE_KEY, mode);
+      localStorage.setItem(PREFERENCE_KEY, preference);
     } catch {
-      // ignore
+      /* ignore */
     }
-  }, [mode]);
+  }, [mode, preference]);
 
-  // ========================================================================
-  // Listen for system theme changes
-  // ========================================================================
+  /* ─── Écoute `prefers-color-scheme` (uniquement si pref = system) ──── */
   useEffect(() => {
     if (preference !== 'system') return;
+    if (typeof window === 'undefined') return;
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e: MediaQueryListEvent) => {
       setMode(e.matches ? 'dark' : 'light');
     };
 
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, [preference]);
 
-  // ========================================================================
-  // Actions
-  // ========================================================================
+  /* ─── Actions ───────────────────────────────────────────────────────── */
   const setPreference = useCallback((pref: ThemePreference) => {
     setPreferenceState(pref);
-    try {
-      localStorage.setItem(PREFERENCE_KEY, pref);
-    } catch {
-      // ignore
-    }
-
     if (pref === 'system') {
       setMode(getSystemTheme());
     } else {
@@ -137,17 +133,17 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const setTheme = useCallback((newMode: ThemeMode) => {
     setMode(newMode);
     setPreferenceState(newMode);
-    try {
-      localStorage.setItem(PREFERENCE_KEY, newMode);
-    } catch {
-      // ignore
-    }
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme(mode === 'light' ? 'dark' : 'light');
-  }, [mode, setTheme]);
+    setMode((current) => {
+      const next: ThemeMode = current === 'light' ? 'dark' : 'light';
+      setPreferenceState(next);
+      return next;
+    });
+  }, []);
 
+  /* ─── Valeur mémorisée ──────────────────────────────────────────────── */
   const value = useMemo<ThemeContextValue>(
     () => ({
       mode,
@@ -156,15 +152,17 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       toggleTheme,
       setTheme,
     }),
-    [mode, preference, setPreference, toggleTheme, setTheme]
+    [mode, preference, setPreference, toggleTheme, setTheme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
-// ============================================================================
-//  HOOK
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOOK
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);

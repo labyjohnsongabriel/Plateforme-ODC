@@ -1,36 +1,35 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Search, Home, Menu } from 'lucide-react';
+import { Search, Home, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
-import { useNotificationStore } from '@/store/notification.store';
 import { useUIStore } from '@/store/ui.store';
+import { NotificationModal } from '@/components/layout/NotificationModal';
 
 export function PartenaireHeader() {
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
   return (
-    <header className="h-16 border-b border-odc-border bg-odc-surface sticky top-0 z-30 shrink-0">
-      <div className="h-full px-4 sm:px-6 flex items-center gap-3">
+    <header className="border-odc-border bg-odc-surface sticky top-0 z-30 h-16 shrink-0 border-b">
+      <div className="flex h-full items-center gap-3 px-4 sm:px-6">
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleSidebar}
-          className="lg:hidden h-9 w-9"
+          className="h-9 w-9 lg:hidden"
           aria-label="Ouvrir le menu"
         >
           <Menu className="h-5 w-5" />
         </Button>
 
-        <div className="flex-1 max-w-md relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-odc-muted pointer-events-none" />
+        <div className="relative hidden max-w-md flex-1 sm:block">
+          <Search className="text-odc-muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             type="search"
             placeholder="Rechercher une formation, une session…"
-            className="pl-9 h-9 input-odc"
+            className="input-odc h-9 pl-9"
           />
         </div>
 
@@ -41,22 +40,7 @@ export function PartenaireHeader() {
             </Link>
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            asChild
-            className="h-9 w-9 relative"
-            aria-label="Notifications"
-          >
-            <Link href="/notifications">
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-odc-error text-white text-[10px] font-bold flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </Link>
-          </Button>
+          <NotificationModal />
 
           <ThemeToggle />
         </div>

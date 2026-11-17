@@ -1,81 +1,120 @@
 // src/routes/public.routes.ts
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';   // ⭐ IMPORT MANQUANT — cause du crash
 
-import { FormationController }    from '../controllers/formation.controller';
-import { SessionController }      from '../controllers/session.controller';
-import { PartenaireController }   from '../controllers/partenaire.controller';
-import { AttestationController }  from '../controllers/attestation.controller';
-import { InscriptionController }  from '../controllers/inscription.controller';
-import { DomaineController }      from '../controllers/domaine.controller';
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTROLLERS
+   ⚠️ CASSE EXACTE des noms de fichiers (PascalCase)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+import { FormationController } from '../controllers/formation.controller';
+import { SessionController } from '../controllers/session.controller';
+import { PartenaireController } from '../controllers/partenaire.controller';
+import { AttestationController } from '../controllers/attestation.controller';
+import { InscriptionController } from '../controllers/inscription.controller';
+import { PublicTeamController } from '../controllers/publicTeam.controller';
+import { DomaineController } from '../controllers/domaine.controller';
+import { PublicFormationController } from '../controllers/publicFormation.controller';
+import { PublicController } from '../controllers/public.controller';
+import { PublicContactController } from '../controllers/public-contact.controller';
 
 const router = Router();
 
-/* ============================================================
- *  📚 CATALOGUE DE FORMATIONS (cahier des charges)
- * ============================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ RATE LIMITER CONTACT — déclaré AVANT son utilisation
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-// Liste des formations publiées + actives (pagination, filtres)
-// GET /api/public/formations?page=1&limit=10&domaine=web&niveau=DEBUTANT&q=react
-router.get('/formations',        FormationController.listPublic);
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 5,                    // 5 messages max par IP par heure
+  message: {
+    success: false,
+    message: 'Trop de messages envoyés. Réessayez dans une heure.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-// Top formations mises en avant (page d'accueil)
-// GET /api/public/formations/top?limit=6
-router.get('/formations/top',    FormationController.topPublic);
+/* ═══════════════════════════════════════════════════════════════════════════
+   📊 STATS GLOBALES
+   ⚠️ Routes STATIQUES AVANT les routes dynamiques
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-// Détail d'une formation par slug (page publique dédiée)
-// GET /api/public/formations/developpement-web-react
-router.get('/formations/:slug',  FormationController.detailPublic);
+// GET /api/public/stats
+router.get('/stats', PublicController.stats);
 
-/* ============================================================
- *  📅 SESSIONS PUBLIQUES
- * ============================================================ */
+// GET /api/public/users/count?role=PARTICIPANT
+router.get('/users/count', PublicController.usersCount);
 
-// Sessions ouvertes et publiées (planning public)
-// GET /api/public/sessions?page=1&limit=10&statut=OUVERTE
-router.get('/sessions',                SessionController.listPublic);
+// GET /api/public/attestations/count  ⚠️ AVANT /attestations/verifier/:numero
+router.get('/attestations/count', PublicController.attestationsCount);
 
-// Détail d'une session par codeSession
-// GET /api/public/sessions/ODC-2025-001
-router.get('/sessions/:codeSession',   SessionController.detailPublic);
+/* ═══════════════════════════════════════════════════════════════════════════
+   📬 CONTACT
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ============================================================
- *  🏷️ DOMAINES (catégories de formation)
- * ============================================================ */
+// POST /api/public/contact
+router.post('/contact', contactLimiter, PublicContactController.send);
 
-// Liste des domaines actifs avec icône/image
-// GET /api/public/domaines
-router.get('/domaines',           DomaineController.listPublic);
+/* ═══════════════════════════════════════════════════════════════════════════
+   📚 FORMATIONS
+   ⚠️ /formations/top AVANT /formations/:slug
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-// Détail d'un domaine par slug
-// GET /api/public/domaines/developpement-web
-router.get('/domaines/:slug',     DomaineController.detailPublic);
+router.get('/formations/top', FormationController.topPublic);
+router.get('/formations', FormationController.listPublic);
+router.get(
+  '/formations/:id/temoignages',
+  PublicFormationController.getTemoignages,
+);
+router.get('/formations/:slug', FormationController.detailPublic);
 
-/* ============================================================
- *  🤝 PARTENAIRES PUBLICS
- * ============================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   📅 SESSIONS
+   ⚠️ /sessions/formation/:id AVANT /sessions/:codeSession
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-// Partenaires publiés avec logo
-// GET /api/public/partenaires
-router.get('/partenaires',         PartenaireController.listPublic);
+router.get(
+  '/sessions/formation/:formationId',
+  SessionController.listPublicByFormation,
+);
+router.get('/sessions', SessionController.listPublic);
+router.get('/sessions/:codeSession', SessionController.detailPublic);
 
-// Détail d'un partenaire
-// GET /api/public/partenaires/orange
-router.get('/partenaires/:slug',   PartenaireController.detailPublic);
+/* ═══════════════════════════════════════════════════════════════════════════
+   🏷️ DOMAINES
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ============================================================
- *  🎓 VÉRIFICATION D'ATTESTATION (scan QR)
- * ============================================================ */
+router.get('/domaines', DomaineController.listPublic);
+router.get('/domaines/:slug', DomaineController.detailPublic);
 
-// Vérification publique d'une attestation par numéro
-// GET /api/public/attestations/verifier/ODC-ATT-2025-000123
-router.get('/attestations/verifier/:numero', AttestationController.verifyPublic);
+/* ═══════════════════════════════════════════════════════════════════════════
+   🎓 ÉQUIPE
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ============================================================
- *  📝 INSCRIPTION PUBLIQUE EN LIGNE
- * ============================================================ */
+router.get('/team', PublicTeamController.findAll);
 
-// Inscription en ligne sans compte (création auto d'un participant)
-// POST /api/public/inscriptions
+/* ═══════════════════════════════════════════════════════════════════════════
+   🤝 PARTENAIRES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+router.get('/partenaires', PartenaireController.listPublic);
+router.get('/partenaires/:slug', PartenaireController.detailPublic);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   🎓 VÉRIFICATION D'ATTESTATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// GET /api/public/attestations/verifier/ATT-2026-000123
+router.get(
+  '/attestations/verifier/:numero',
+  AttestationController.verifyPublic,
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   📝 INSCRIPTION PUBLIQUE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 router.post('/inscriptions', InscriptionController.createPublic);
 
 export default router;

@@ -1,11 +1,5 @@
 {
   "compilerOptions": {
-<<<<<<< HEAD
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true
-  }
-}
-=======
     "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -26,6 +20,7 @@
     "plugins": [{ "name": "next" }],
     "baseUrl": ".",
     "paths": {
+      "@/pages/*": ["./legacy-pages/*"],
       "@/*": ["./src/*"],
       "@/app/*": ["./src/app/*"],
       "@/components/*": ["./src/components/*"],
@@ -41,10 +36,19 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "middleware.ts",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".next", "out", "dist"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out",
+    "dist",
+    "legacy-pages",
+    "src/App.tsx",
+    "src/main.tsx",
+    "src/routes"
+  ]
 }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234

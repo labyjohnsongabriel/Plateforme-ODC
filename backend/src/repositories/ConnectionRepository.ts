@@ -1,7 +1,7 @@
 // src/repositories/ConnectionRepository.ts
-import { Connection } from '../entities/Connection.entity';
+import { Connection } from '../models/Connection.entity';
 import { BaseRepository } from './base.repository';
-import { StatutConnection } from '../entities/enums';
+import { StatutConnection } from '../models/enums';
 
 export class ConnectionRepository extends BaseRepository<Connection> {
   constructor() { super(Connection); }

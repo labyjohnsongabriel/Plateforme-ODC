@@ -1,6 +1,12 @@
 import { api } from '@/lib/api';
 import type { ApiResponse, PaginatedResponse, ID } from '@/types/common.types';
-import type { Connection, DirectoryFilters } from '@/types/reseautage.types';
+import type {
+  Connection,
+  DirectoryFilters,
+  MemberUser,
+  MesConnectionsResponse,
+  RepondrePayload,
+} from '@/features/reseautage/types/reseautage.types';
 
 export interface EnvoyerDemandePayload {
   destinataireId: ID;
@@ -8,26 +14,62 @@ export interface EnvoyerDemandePayload {
 }
 
 export const reseautageApi = {
-  getDirectory: (filters?: DirectoryFilters) =>
-    api.get<unknown, PaginatedResponse<any>>('/reseautage/directory', {
-      params: filters,
-    }),
+  annuaire: async (
+    filters?: DirectoryFilters,
+  ): Promise<PaginatedResponse<MemberUser>> => {
+    const response = await api.get<PaginatedResponse<MemberUser>>('/reseau/annuaire', {
+      params: {
+        page: filters?.page,
+        limit: filters?.limit,
+        q: filters?.search,
+        role: filters?.role,
+        ville: filters?.ville,
+        competence: filters?.competences?.[0],
+      },
+    });
+    return response.data;
+  },
 
-  searchUsers: (q: string) =>
-    api.get<unknown, ApiResponse<any[]>>('/reseautage/search', { params: { q } }),
+  suggestions: async (limit = 10): Promise<MemberUser[]> => {
+    const response = await api.get<ApiResponse<MemberUser[]>>('/reseau/suggestions', {
+      params: { limit },
+    });
+    return response.data.data;
+  },
 
-  envoyerDemande: (payload: EnvoyerDemandePayload) =>
-    api.post<unknown, ApiResponse<Connection>>('/reseautage/connections', payload),
+  mesConnections: async (): Promise<MesConnectionsResponse[]> => {
+    const response =
+      await api.get<ApiResponse<MesConnectionsResponse[]>>('/reseau/connections');
+    return response.data.data;
+  },
 
-  repondreDemande: (id: ID, statut: 'ACCEPTEE' | 'REFUSEE') =>
-    api.patch<unknown, ApiResponse<Connection>>(
-      `/reseautage/connections/${id}`,
-      { statut }
-    ),
+  demandeEnAttente: async (): Promise<Connection[]> => {
+    const response = await api.get<ApiResponse<Connection[]>>(
+      '/reseau/demandes/en-attente',
+    );
+    return response.data.data;
+  },
 
-  getMesConnections: () =>
-    api.get<unknown, ApiResponse<Connection[]>>('/reseautage/connections'),
+  envoyerDemande: async ({
+    destinataireId,
+    message,
+  }: EnvoyerDemandePayload): Promise<Connection> => {
+    const response = await api.post<ApiResponse<Connection>>(
+      `/reseau/demandes/${destinataireId}`,
+      { message },
+    );
+    return response.data.data;
+  },
 
-  removeConnection: (id: ID) =>
-    api.delete<unknown, ApiResponse<void>>(`/reseautage/connections/${id}`),
+  repondre: async (id: ID, payload: RepondrePayload): Promise<Connection> => {
+    const response = await api.patch<ApiResponse<Connection>>(
+      `/reseau/demandes/${id}/repondre`,
+      payload,
+    );
+    return response.data.data;
+  },
+
+  removeConnection: async (id: ID): Promise<void> => {
+    await api.delete<ApiResponse<null>>(`/reseau/connections/${id}`);
+  },
 };

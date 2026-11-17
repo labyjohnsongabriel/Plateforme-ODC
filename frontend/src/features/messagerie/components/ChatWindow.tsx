@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+// src/components/messagerie/ChatWindow.tsx
+'use client';
+
+import { useState } from 'react';
 import { ArrowLeft, MoreVertical, Phone, Video, Users, Info, Search } from 'lucide-react';
 import { Conversation } from '../types/messagerie.types';
 import { Avatar } from '@/components/common/Avatar';
@@ -22,14 +25,12 @@ interface ChatWindowProps {
 
 export function ChatWindow({ conversation, currentUserId, onBack }: ChatWindowProps) {
   const { messages, loading, sendMessage, messagesEndRef } = useMessages(conversation?.id);
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [typingUsers] = useState<string[]>([]);
 
-  // ========================================================================
-  // Pas de conversation
-  // ========================================================================
+  /* ── Pas de conversation ────────────────────────────── */
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-odc-bg-light dark:bg-odc-bg-dark">
+      <div className="flex flex-1 items-center justify-center bg-slate-50 dark:bg-slate-950">
         <EmptyState
           icon={<Users size={64} />}
           title="Sélectionnez une conversation"
@@ -42,9 +43,7 @@ export function ChatWindow({ conversation, currentUserId, onBack }: ChatWindowPr
   const displayName = MessagerieService.getDisplayName(conversation, currentUserId);
   const avatar = MessagerieService.getAvatar(conversation, currentUserId);
 
-  // ========================================================================
-  // Render messages groupés par jour
-  // ========================================================================
+  /* ── Groupage par jour ──────────────────────────────── */
   const groupedMessages: Array<{ date: string; messages: typeof messages }> = [];
   let currentDate = '';
 
@@ -63,67 +62,49 @@ export function ChatWindow({ conversation, currentUserId, onBack }: ChatWindowPr
   });
 
   return (
-    <div className="flex flex-col h-full bg-odc-bg-light dark:bg-odc-bg-dark">
-      {/* ====================================================================
+    <div className="flex h-full flex-col bg-slate-50 dark:bg-slate-950">
+      {/* ═══════════════════════════════════════════════════
           HEADER
-          ==================================================================== */}
-      <div className="flex items-center gap-3 p-3 bg-white dark:bg-odc-surface-dark border-b border-odc-border-light dark:border-odc-border-dark flex-shrink-0">
+          ═══════════════════════════════════════════════════ */}
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
         {onBack && (
           <button
             onClick={onBack}
-            className="lg:hidden p-2 rounded-lg hover:bg-odc-surface-alt-light dark:hover:bg-odc-surface-alt-dark transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-500/10 dark:hover:text-orange-400 lg:hidden"
+            aria-label="Retour"
           >
             <ArrowLeft size={20} />
           </button>
         )}
 
         {avatar.isGroup ? (
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-odc-primary to-odc-primary-dark flex items-center justify-center text-white flex-shrink-0">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-orange-700 text-white">
             <Users size={18} />
           </div>
         ) : (
           <Avatar src={avatar.photoUrl} name={avatar.name} size="md" status="online" />
         )}
 
-        <div className="flex-1 min-w-0">
-          <h3 className="font-heading font-semibold text-sm text-odc-text-light dark:text-odc-text-dark truncate">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate font-heading text-sm font-semibold text-slate-900 dark:text-slate-50">
             {displayName}
           </h3>
-          <div className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark truncate">
+          <div className="truncate text-xs text-slate-500 dark:text-slate-400">
             {typingUsers.length > 0
-              ? 'En train d\'écrire...'
+              ? "En train d'écrire..."
               : avatar.isGroup
-              ? `${conversation.membres.length} membres`
-              : 'En ligne'}
+                ? `${conversation.membres.length} membres`
+                : 'En ligne'}
           </div>
         </div>
 
         <div className="flex items-center gap-1">
-          <IconButton
-            icon={<Phone size={16} />}
-            variant="ghost"
-            size="sm"
-            tooltip="Appel"
-          />
-          <IconButton
-            icon={<Video size={16} />}
-            variant="ghost"
-            size="sm"
-            tooltip="Vidéo"
-          />
-          <IconButton
-            icon={<Search size={16} />}
-            variant="ghost"
-            size="sm"
-            tooltip="Rechercher"
-          />
+          <IconButton icon={<Phone size={16} />} variant="ghost" size="sm" tooltip="Appel" />
+          <IconButton icon={<Video size={16} />} variant="ghost" size="sm" tooltip="Vidéo" />
+          <IconButton icon={<Search size={16} />} variant="ghost" size="sm" tooltip="Rechercher" />
           <Dropdown
             trigger={
-              <IconButton
-                icon={<MoreVertical size={16} />}
-                variant="ghost"
-                size="sm"
-              />
+              <IconButton icon={<MoreVertical size={16} />} variant="ghost" size="sm" />
             }
           >
             <DropdownItem icon={<Info size={14} />}>Voir les détails</DropdownItem>
@@ -134,9 +115,9 @@ export function ChatWindow({ conversation, currentUserId, onBack }: ChatWindowPr
         </div>
       </div>
 
-      {/* ====================================================================
+      {/* ═══════════════════════════════════════════════════
           MESSAGES
-          ==================================================================== */}
+          ═══════════════════════════════════════════════════ */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <Loader />
@@ -150,13 +131,13 @@ export function ChatWindow({ conversation, currentUserId, onBack }: ChatWindowPr
           <div className="space-y-4">
             {groupedMessages.map((group, idx) => (
               <div key={idx}>
-                {/* Date separator */}
-                <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px bg-odc-border-light dark:bg-odc-border-dark" />
-                  <span className="text-[10px] font-semibold text-odc-text-muted-light dark:text-odc-text-muted-dark uppercase">
+                {/* Séparateur de date */}
+                <div className="my-4 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                  <span className="text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">
                     {group.date}
                   </span>
-                  <div className="flex-1 h-px bg-odc-border-light dark:bg-odc-border-dark" />
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                 </div>
 
                 {/* Messages */}
@@ -186,15 +167,15 @@ export function ChatWindow({ conversation, currentUserId, onBack }: ChatWindowPr
         )}
       </div>
 
-      {/* ====================================================================
-          TYPING INDICATOR
-          ==================================================================== */}
+      {/* ═══════════════════════════════════════════════════
+          TYPING
+          ═══════════════════════════════════════════════════ */}
       {typingUsers.length > 0 && <TypingIndicator users={typingUsers} />}
 
-      {/* ====================================================================
+      {/* ═══════════════════════════════════════════════════
           INPUT
-          ==================================================================== */}
-      <div className="p-3 bg-white dark:bg-odc-surface-dark border-t border-odc-border-light dark:border-odc-border-dark flex-shrink-0">
+          ═══════════════════════════════════════════════════ */}
+      <div className="flex-shrink-0 border-t border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
         <MessageInput onSend={async (msg) => { await sendMessage(msg); }} />
       </div>
     </div>

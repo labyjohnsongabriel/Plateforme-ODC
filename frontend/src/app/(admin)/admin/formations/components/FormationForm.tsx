@@ -20,6 +20,7 @@ import {
   Plus,
   X,
   Image as ImageIcon,
+  Upload,
 } from 'lucide-react';
 
 import {
@@ -47,6 +48,7 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 import { cn } from '@/lib/utils';
 import { slugify } from '@/lib/slugify';
+import { getMediaUrl } from '@/lib/media';
 
 /* ============================================================================
    NORMALISATION — Garantit un tableau de chaînes
@@ -167,17 +169,15 @@ const NIVEAUX = [
    COMPOSANT
    ============================================================================ */
 
-export function FormationForm({
-  mode,
-  id,
-  onSuccess,
-  onCancel,
-}: FormationFormProps) {
+export function FormationForm({ mode, id, onSuccess, onCancel }: FormationFormProps) {
   const qc = useQueryClient();
   const isEdit = mode === 'edit';
 
   const [newObjectif, setNewObjectif] = React.useState('');
   const [newPrerequis, setNewPrerequis] = React.useState('');
+  const [selectedImage, setSelectedImage] = React.useState<File | null>(null);
+  const [imagePreview, setImagePreview] = React.useState<string>();
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
   const lastSlugRef = React.useRef('');
 
   /* -------------------- Formulaire -------------------- */
@@ -212,8 +212,20 @@ export function FormationForm({
 
   const titreValue = watch('titre');
   const slugValue = watch('slug');
+  const imageUrlValue = watch('imageUrl');
   const objectifsValue = toArray(watch('objectifs'));
   const prerequisValue = toArray(watch('prerequis'));
+
+  React.useEffect(() => {
+    if (!selectedImage) {
+      setImagePreview(undefined);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedImage);
+    setImagePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [selectedImage]);
 
   /* -------------------- Slug auto -------------------- */
   React.useEffect(() => {
@@ -275,7 +287,13 @@ export function FormationForm({
 
   /* -------------------- Mutation -------------------- */
   const mutation = useMutation({
-    mutationFn: async (data: FormationFormData) => {
+    mutationFn: async ({
+      data,
+      image,
+    }: {
+      data: FormationFormData;
+      image: File | null;
+    }) => {
       const payload = {
         ...data,
         slug: data.slug || slugify(data.titre),
@@ -287,18 +305,43 @@ export function FormationForm({
         prerequis: toArray(data.prerequis),
       };
 
+      let formationId = isEdit ? id : undefined;
       if (isEdit && id) {
-        const { data: res } = await api.put(
-          `/admin/formations/${id}`,
-          payload,
-        );
-        return res?.data ?? res;
+        const { data: res } = await api.put(`/admin/formations/${id}`, payload);
+      } else {
+        const { data: res } = await api.post('/admin/formations', payload);
+        formationId = (res?.data ?? res)?.id;
       }
-      const { data: res } = await api.post('/admin/formations', payload);
-      return res?.data ?? res;
+
+      if (image) {
+        if (!formationId) {
+          return {
+            id: formationId,
+            imageError:
+              "La formation est enregistrée, mais son identifiant manque pour téléverser l'image.",
+          };
+        }
+        const formData = new FormData();
+        formData.append('image', image);
+        try {
+          await api.post(`/admin/formations/${formationId}/image`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } catch (error) {
+          return {
+            id: formationId,
+            imageError: `La formation est enregistrée, mais l’image n’a pas pu être téléversée : ${getErrorMessage(error)}`,
+          };
+        }
+      }
+      return { id: formationId, imageError: null };
     },
-    onSuccess: () => {
-      toast.success(isEdit ? 'Formation mise à jour' : 'Formation créée');
+    onSuccess: (result) => {
+      if (result.imageError) {
+        toast.error(result.imageError);
+      } else {
+        toast.success(isEdit ? 'Formation mise à jour' : 'Formation créée');
+      }
       qc.invalidateQueries({ queryKey: ['admin', 'formations'] });
       qc.invalidateQueries({ queryKey: ['formations', 'public'] });
       onSuccess?.();
@@ -345,7 +388,7 @@ export function FormationForm({
 
   /* -------------------- Submit -------------------- */
   const onSubmit = (data: FormationFormData) => {
-    mutation.mutate(data);
+    mutation.mutate({ data, image: selectedImage });
   };
 
   /* -------------------- Rendu -------------------- */
@@ -377,7 +420,7 @@ export function FormationForm({
               aria-invalid={!!errors.titre}
             />
             {errors.titre && (
-              <p className="text-odc-error text-xs mt-1.5" role="alert">
+              <p className="mt-1.5 text-xs text-odc-error" role="alert">
                 {errors.titre.message}
               </p>
             )}
@@ -392,7 +435,7 @@ export function FormationForm({
               {...register('slug')}
               className="mt-1.5 font-mono text-sm"
             />
-            <p className="text-xs text-odc-muted mt-1.5">
+            <p className="text-odc-muted mt-1.5 text-xs">
               Auto-généré depuis le titre si laissé vide
             </p>
           </div>
@@ -411,13 +454,13 @@ export function FormationForm({
               aria-invalid={!!errors.description}
             />
             {errors.description && (
-              <p className="text-odc-error text-xs mt-1.5" role="alert">
+              <p className="mt-1.5 text-xs text-odc-error" role="alert">
                 {errors.description.message}
               </p>
             )}
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label>
                 Domaine <span className="text-odc-error">*</span>
@@ -431,10 +474,7 @@ export function FormationForm({
                     onValueChange={field.onChange}
                     disabled={isSubmitting}
                   >
-                    <SelectTrigger
-                      className="mt-1.5"
-                      aria-invalid={!!errors.domaineId}
-                    >
+                    <SelectTrigger className="mt-1.5" aria-invalid={!!errors.domaineId}>
                       <SelectValue placeholder="Sélectionner un domaine" />
                     </SelectTrigger>
                     <SelectContent>
@@ -448,7 +488,7 @@ export function FormationForm({
                 )}
               />
               {errors.domaineId && (
-                <p className="text-odc-error text-xs mt-1.5">
+                <p className="mt-1.5 text-xs text-odc-error">
                   {errors.domaineId.message}
                 </p>
               )}
@@ -498,7 +538,7 @@ export function FormationForm({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <Label htmlFor="dureeHeures" className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
@@ -514,17 +554,14 @@ export function FormationForm({
                 className="mt-1.5"
               />
               {errors.dureeHeures && (
-                <p className="text-odc-error text-xs mt-1.5">
+                <p className="mt-1.5 text-xs text-odc-error">
                   {errors.dureeHeures.message}
                 </p>
               )}
             </div>
 
             <div>
-              <Label
-                htmlFor="nbParticipantsMax"
-                className="flex items-center gap-1.5"
-              >
+              <Label htmlFor="nbParticipantsMax" className="flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" />
                 Places max
               </Label>
@@ -558,17 +595,68 @@ export function FormationForm({
           </div>
 
           <div>
+            {imagePreview || imageUrlValue ? (
+              <img
+                src={getMediaUrl(imagePreview || imageUrlValue)}
+                alt="Aperçu de l’image de la formation"
+                className="mb-3 aspect-video max-h-56 w-full rounded-lg object-cover"
+              />
+            ) : null}
             <Label htmlFor="imageUrl" className="flex items-center gap-1.5">
               <ImageIcon className="h-3.5 w-3.5" />
-              URL de l&apos;image
+              Image de la formation
             </Label>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  if (!file.type.startsWith('image/')) {
+                    toast.error('Le fichier doit être une image.');
+                    event.target.value = '';
+                    return;
+                  }
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast.error('La taille maximale de l’image est de 5 Mo.');
+                    event.target.value = '';
+                    return;
+                  }
+                  setSelectedImage(file);
+                  event.target.value = '';
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {selectedImage ? 'Changer l’image' : 'Téléverser une image'}
+              </Button>
+              {selectedImage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={isSubmitting}
+                  onClick={() => setSelectedImage(null)}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Annuler
+                </Button>
+              )}
+            </div>
             <Input
               id="imageUrl"
               type="url"
-              placeholder="https://..."
-              disabled={isSubmitting}
+              placeholder="Ou collez une URL d’image"
+              disabled={isSubmitting || !!selectedImage}
               {...register('imageUrl')}
-              className="mt-1.5"
+              className="mt-2"
             />
           </div>
         </CardContent>
@@ -604,7 +692,7 @@ export function FormationForm({
               onClick={addObjectif}
               disabled={!newObjectif.trim() || isSubmitting}
             >
-              <Plus className="h-4 w-4 mr-1.5" />
+              <Plus className="mr-1.5 h-4 w-4" />
               Ajouter
             </Button>
           </div>
@@ -614,14 +702,14 @@ export function FormationForm({
               {objectifsValue.map((o, i) => (
                 <li
                   key={i}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-odc-primary-soft/30 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-md bg-odc-primary-soft/30 px-3 py-2 text-sm"
                 >
                   <span className="flex-1">{o}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-odc-muted hover:text-odc-error"
+                    className="text-odc-muted h-7 w-7 hover:text-odc-error"
                     onClick={() => removeObjectif(i)}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -630,7 +718,7 @@ export function FormationForm({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-odc-muted italic">Aucun objectif</p>
+            <p className="text-odc-muted text-sm italic">Aucun objectif</p>
           )}
         </CardContent>
       </Card>
@@ -665,7 +753,7 @@ export function FormationForm({
               onClick={addPrerequis}
               disabled={!newPrerequis.trim() || isSubmitting}
             >
-              <Plus className="h-4 w-4 mr-1.5" />
+              <Plus className="mr-1.5 h-4 w-4" />
               Ajouter
             </Button>
           </div>
@@ -675,14 +763,14 @@ export function FormationForm({
               {prerequisValue.map((p, i) => (
                 <li
                   key={i}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-odc-surface-alt text-sm"
+                  className="bg-odc-surface-alt flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm"
                 >
                   <span className="flex-1">{p}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-odc-muted hover:text-odc-error"
+                    className="text-odc-muted h-7 w-7 hover:text-odc-error"
                     onClick={() => removePrerequis(i)}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -691,7 +779,7 @@ export function FormationForm({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-odc-muted italic">Aucun prérequis</p>
+            <p className="text-odc-muted text-sm italic">Aucun prérequis</p>
           )}
         </CardContent>
       </Card>
@@ -730,10 +818,10 @@ export function FormationForm({
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Label htmlFor="actif" className="font-medium cursor-pointer">
+              <Label htmlFor="actif" className="cursor-pointer font-medium">
                 Compte actif
               </Label>
-              <p className="text-xs text-odc-muted mt-0.5">
+              <p className="text-odc-muted mt-0.5 text-xs">
                 La formation peut être modifiée
               </p>
             </div>
@@ -755,10 +843,10 @@ export function FormationForm({
 
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Label htmlFor="estPubliee" className="font-medium cursor-pointer">
+              <Label htmlFor="estPubliee" className="cursor-pointer font-medium">
                 Publier la formation
               </Label>
-              <p className="text-xs text-odc-muted mt-0.5">
+              <p className="text-odc-muted mt-0.5 text-xs">
                 Visible dans le catalogue public
               </p>
             </div>
@@ -780,13 +868,10 @@ export function FormationForm({
 
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Label
-                htmlFor="miseEnAvant"
-                className="font-medium cursor-pointer"
-              >
+              <Label htmlFor="miseEnAvant" className="cursor-pointer font-medium">
                 Mettre en avant
               </Label>
-              <p className="text-xs text-odc-muted mt-0.5">
+              <p className="text-odc-muted mt-0.5 text-xs">
                 Affichée en tête du catalogue
               </p>
             </div>
@@ -809,7 +894,7 @@ export function FormationForm({
       {/* ================================================================
           ACTIONS
           ================================================================ */}
-      <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-odc-border bg-odc-surface pt-4">
+      <div className="border-odc-border bg-odc-surface sticky bottom-0 flex items-center justify-end gap-3 border-t pt-4">
         <Button
           type="button"
           variant="outline"
@@ -826,12 +911,12 @@ export function FormationForm({
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               {isEdit ? 'Enregistrement…' : 'Création…'}
             </>
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               {isEdit ? 'Enregistrer' : 'Créer la formation'}
             </>
           )}
@@ -851,11 +936,11 @@ function FormationFormSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <Card key={i}>
           <CardHeader>
-            <div className="h-5 w-40 bg-odc-surface-alt rounded animate-pulse" />
+            <div className="bg-odc-surface-alt h-5 w-40 animate-pulse rounded" />
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="h-16 bg-odc-surface-alt rounded animate-pulse" />
-            <div className="h-16 bg-odc-surface-alt rounded animate-pulse" />
+            <div className="bg-odc-surface-alt h-16 animate-pulse rounded" />
+            <div className="bg-odc-surface-alt h-16 animate-pulse rounded" />
           </CardContent>
         </Card>
       ))}

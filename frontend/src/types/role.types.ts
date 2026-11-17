@@ -1,150 +1,23 @@
-<<<<<<< HEAD
-import { ID } from './common.types';
-import { RoleName } from './user.types';
+export const RoleName = {
+  ADMIN: 'ADMIN',
+  STAFF: 'STAFF',
+  FORMATEUR: 'FORMATEUR',
+  PARTICIPANT: 'PARTICIPANT',
+  PARTENAIRE: 'PARTENAIRE',
+  ADMINISTRATEUR: 'ADMINISTRATEUR',
+  STAFF_ODC: 'STAFF_ODC',
+} as const;
 
-// ============================================================================
-//  PERMISSIONS
-// ============================================================================
+export type RoleName = (typeof RoleName)[keyof typeof RoleName];
 
-export enum PermissionCode {
-  // Users
-  USER_CREATE = 'users.create',
-  USER_READ = 'users.read',
-  USER_UPDATE = 'users.update',
-  USER_DELETE = 'users.delete',
-  USER_CHANGE_ROLE = 'users.change_role',
-
-  // Formations
-  FORMATION_CREATE = 'formations.create',
-  FORMATION_READ = 'formations.read',
-  FORMATION_UPDATE = 'formations.update',
-  FORMATION_DELETE = 'formations.delete',
-
-  // Sessions
-  SESSION_CREATE = 'sessions.create',
-  SESSION_READ = 'sessions.read',
-  SESSION_UPDATE = 'sessions.update',
-  SESSION_DELETE = 'sessions.delete',
-
-  // Inscriptions
-  INSCRIPTION_CREATE = 'inscriptions.create',
-  INSCRIPTION_READ = 'inscriptions.read',
-  INSCRIPTION_SELECT = 'inscriptions.select',
-
-  // Présences
-  PRESENCE_SCAN = 'presences.scan',
-  PRESENCE_MANAGE = 'presences.manage',
-
-  // Évaluations
-  EVALUATION_CREATE = 'evaluations.create',
-  EVALUATION_GRADE = 'evaluations.grade',
-
-  // Attestations
-  ATTESTATION_GENERATE = 'attestations.generate',
-  ATTESTATION_DOWNLOAD = 'attestations.download',
-
-  // Admin
-  ADMIN_AUDIT = 'admin.audit',
-  ADMIN_CONFIG = 'admin.config',
-}
-
-export interface Permission {
-  id: ID;
-  code: PermissionCode;
-  libelle: string;
-  categorie: string;
-  description?: string;
-}
-
-export interface RoleWithPermissions {
-  id: ID;
-  nom: RoleName;
-  description?: string;
-  permissions: Permission[];
-}
-
-// ============================================================================
-//  MATRICE RBAC
-// ============================================================================
-
-export const ROLE_PERMISSIONS: Record<RoleName, PermissionCode[]> = {
-  ADMIN: Object.values(PermissionCode),
-
-  STAFF: [
-    PermissionCode.USER_READ,
-    PermissionCode.FORMATION_CREATE,
-    PermissionCode.FORMATION_READ,
-    PermissionCode.FORMATION_UPDATE,
-    PermissionCode.SESSION_CREATE,
-    PermissionCode.SESSION_READ,
-    PermissionCode.SESSION_UPDATE,
-    PermissionCode.INSCRIPTION_READ,
-    PermissionCode.INSCRIPTION_SELECT,
-    PermissionCode.PRESENCE_MANAGE,
-    PermissionCode.ATTESTATION_GENERATE,
-  ],
-
-  FORMATEUR: [
-    PermissionCode.FORMATION_READ,
-    PermissionCode.SESSION_READ,
-    PermissionCode.INSCRIPTION_READ,
-    PermissionCode.PRESENCE_SCAN,
-    PermissionCode.PRESENCE_MANAGE,
-    PermissionCode.EVALUATION_CREATE,
-    PermissionCode.EVALUATION_GRADE,
-  ],
-
-  PARTICIPANT: [
-    PermissionCode.FORMATION_READ,
-    PermissionCode.SESSION_READ,
-    PermissionCode.INSCRIPTION_CREATE,
-    PermissionCode.INSCRIPTION_READ,
-    PermissionCode.PRESENCE_SCAN,
-    PermissionCode.ATTESTATION_DOWNLOAD,
-  ],
-
-  PARTENAIRE: [
-    PermissionCode.FORMATION_READ,
-    PermissionCode.SESSION_READ,
-  ],
-};
-
-// ============================================================================
-//  HELPERS
-// ============================================================================
-
-export function roleHasPermission(role: RoleName, permission: PermissionCode): boolean {
-  const permissions = ROLE_PERMISSIONS[role];
-  if (!permissions) return false;
-  return permissions.includes(permission);
-}
-
-export function roleHasAnyPermission(role: RoleName, permissions: PermissionCode[]): boolean {
-  return permissions.some((p) => roleHasPermission(role, p));
-}
-
-export function roleHasAllPermissions(role: RoleName, permissions: PermissionCode[]): boolean {
-  return permissions.every((p) => roleHasPermission(role, p));
-}
-=======
-// src/types/role.types.ts
-
-/* ============================================================================
-   RÔLES — Type union
-   ============================================================================ */
-
-export type RoleName =
+export type AppRoleName =
   | 'ADMINISTRATEUR'
   | 'STAFF_ODC'
   | 'FORMATEUR'
   | 'PARTICIPANT'
   | 'PARTENAIRE';
 
-/* ============================================================================
-   LIBELLÉS
-   ============================================================================ */
-
-export const ROLE_LABELS: Record<RoleName, string> = {
+export const ROLE_LABELS: Record<AppRoleName, string> = {
   ADMINISTRATEUR: 'Administrateur',
   STAFF_ODC: 'Staff ODC',
   FORMATEUR: 'Formateur',
@@ -152,24 +25,9 @@ export const ROLE_LABELS: Record<RoleName, string> = {
   PARTENAIRE: 'Partenaire',
 };
 
-/* ============================================================================
-   COULEURS (pour l'UI)
-   ============================================================================ */
-
 export const ROLE_COLORS: Record<
-  RoleName,
-  {
-    /** Nom Tailwind court (ex: 'red') */
-    name: string;
-    /** Classes Tailwind complètes (background + texte) */
-    bg: string;
-    /** Classe texte */
-    text: string;
-    /** Classe bordure */
-    border: string;
-    /** Code hexadécimal */
-    hex: string;
-  }
+  AppRoleName,
+  { name: string; bg: string; text: string; border: string; hex: string }
 > = {
   ADMINISTRATEUR: {
     name: 'red',
@@ -208,11 +66,7 @@ export const ROLE_COLORS: Record<
   },
 };
 
-/**
- * Version simplifiée (compatibilité descendante)
- * @deprecated Utiliser `ROLE_COLORS[role].name` à la place
- */
-export const ROLE_COLORS_SIMPLE: Record<RoleName, string> = {
+export const ROLE_COLORS_SIMPLE: Record<AppRoleName, string> = {
   ADMINISTRATEUR: 'red',
   STAFF_ODC: 'orange',
   FORMATEUR: 'blue',
@@ -220,11 +74,7 @@ export const ROLE_COLORS_SIMPLE: Record<RoleName, string> = {
   PARTENAIRE: 'purple',
 };
 
-/* ============================================================================
-   ICÔNES (noms Lucide)
-   ============================================================================ */
-
-export const ROLE_ICONS: Record<RoleName, string> = {
+export const ROLE_ICONS: Record<AppRoleName, string> = {
   ADMINISTRATEUR: 'Shield',
   STAFF_ODC: 'Users',
   FORMATEUR: 'GraduationCap',
@@ -232,11 +82,7 @@ export const ROLE_ICONS: Record<RoleName, string> = {
   PARTENAIRE: 'Building2',
 };
 
-/* ============================================================================
-   HIÉRARCHIE
-   ============================================================================ */
-
-export const ROLE_HIERARCHY: Record<RoleName, number> = {
+export const ROLE_HIERARCHY: Record<AppRoleName, number> = {
   ADMINISTRATEUR: 100,
   STAFF_ODC: 80,
   FORMATEUR: 60,
@@ -244,21 +90,40 @@ export const ROLE_HIERARCHY: Record<RoleName, number> = {
   PARTICIPANT: 20,
 };
 
-/* ============================================================================
-   DESCRIPTIONS
-   ============================================================================ */
-
-export const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
+export const ROLE_DESCRIPTIONS: Record<AppRoleName, string> = {
   ADMINISTRATEUR: 'Accès total à la plateforme',
   STAFF_ODC: 'Gestion des formations et sessions',
   FORMATEUR: 'Animation des sessions de formation',
   PARTICIPANT: 'Apprenant suivant des formations',
-  PARTENAIRE: 'Organisation partenaire de l\'ODC',
+  PARTENAIRE: "Organisation partenaire de l'ODC",
 };
 
-/* ============================================================================
-   PERMISSIONS
-   ============================================================================ */
+export enum PermissionCode {
+  USER_CREATE = 'users.create',
+  USER_READ = 'users.read',
+  USER_UPDATE = 'users.update',
+  USER_DELETE = 'users.delete',
+  USER_CHANGE_ROLE = 'users.change_role',
+  FORMATION_CREATE = 'formations.create',
+  FORMATION_READ = 'formations.read',
+  FORMATION_UPDATE = 'formations.update',
+  FORMATION_DELETE = 'formations.delete',
+  SESSION_CREATE = 'sessions.create',
+  SESSION_READ = 'sessions.read',
+  SESSION_UPDATE = 'sessions.update',
+  SESSION_DELETE = 'sessions.delete',
+  INSCRIPTION_CREATE = 'inscriptions.create',
+  INSCRIPTION_READ = 'inscriptions.read',
+  INSCRIPTION_SELECT = 'inscriptions.select',
+  PRESENCE_SCAN = 'presences.scan',
+  PRESENCE_MANAGE = 'presences.manage',
+  EVALUATION_CREATE = 'evaluations.create',
+  EVALUATION_GRADE = 'evaluations.grade',
+  ATTESTATION_GENERATE = 'attestations.generate',
+  ATTESTATION_DOWNLOAD = 'attestations.download',
+  ADMIN_AUDIT = 'admin.audit',
+  ADMIN_CONFIG = 'admin.config',
+}
 
 export interface Permission {
   id: string;
@@ -268,13 +133,9 @@ export interface Permission {
   description?: string;
 }
 
-/* ============================================================================
-   RÔLE
-   ============================================================================ */
-
 export interface Role {
   id: string;
-  nom: RoleName;
+  nom: AppRoleName;
   libelle: string;
   description?: string | null;
   niveauHierarchie: number;
@@ -287,34 +148,73 @@ export interface Role {
   updatedAt?: string;
 }
 
-/* ============================================================================
-   RÔLE SIMPLIFIÉ (pour user.role)
-   ============================================================================ */
-
 export interface RoleSummary {
   id?: string;
-  nom: RoleName;
+  nom: AppRoleName;
   libelle?: string;
   permissions?: Permission[];
 }
 
-/* ============================================================================
-   HELPERS
-   ============================================================================ */
-
-/**
- * Récupère le libellé d'un rôle.
- */
-export function getRoleLabel(role?: RoleName | string | null): string {
-  if (!role) return '—';
-  return ROLE_LABELS[role as RoleName] ?? role;
+export interface RoleWithPermissions {
+  id: string;
+  nom: AppRoleName;
+  description?: string;
+  permissions: Permission[];
 }
 
-/**
- * Récupère les classes Tailwind d'un rôle.
- */
+const ADMIN_PERMISSIONS = Object.values(PermissionCode);
+const STAFF_PERMISSIONS = [
+  PermissionCode.USER_READ,
+  PermissionCode.FORMATION_CREATE,
+  PermissionCode.FORMATION_READ,
+  PermissionCode.FORMATION_UPDATE,
+  PermissionCode.SESSION_CREATE,
+  PermissionCode.SESSION_READ,
+  PermissionCode.SESSION_UPDATE,
+  PermissionCode.INSCRIPTION_READ,
+  PermissionCode.INSCRIPTION_SELECT,
+  PermissionCode.PRESENCE_MANAGE,
+  PermissionCode.ATTESTATION_GENERATE,
+];
+const FORMATEUR_PERMISSIONS = [
+  PermissionCode.FORMATION_READ,
+  PermissionCode.SESSION_READ,
+  PermissionCode.INSCRIPTION_READ,
+  PermissionCode.PRESENCE_SCAN,
+  PermissionCode.PRESENCE_MANAGE,
+  PermissionCode.EVALUATION_CREATE,
+  PermissionCode.EVALUATION_GRADE,
+];
+const PARTICIPANT_PERMISSIONS = [
+  PermissionCode.FORMATION_READ,
+  PermissionCode.SESSION_READ,
+  PermissionCode.INSCRIPTION_CREATE,
+  PermissionCode.INSCRIPTION_READ,
+  PermissionCode.PRESENCE_SCAN,
+  PermissionCode.ATTESTATION_DOWNLOAD,
+];
+const PARTENAIRE_PERMISSIONS = [
+  PermissionCode.FORMATION_READ,
+  PermissionCode.SESSION_READ,
+];
+
+export const ROLE_PERMISSIONS: Record<RoleName, PermissionCode[]> = {
+  ADMIN: ADMIN_PERMISSIONS,
+  ADMINISTRATEUR: ADMIN_PERMISSIONS,
+  STAFF: STAFF_PERMISSIONS,
+  STAFF_ODC: STAFF_PERMISSIONS,
+  FORMATEUR: FORMATEUR_PERMISSIONS,
+  PARTICIPANT: PARTICIPANT_PERMISSIONS,
+  PARTENAIRE: PARTENAIRE_PERMISSIONS,
+};
+
+export function getRoleLabel(role?: RoleName | string | null): string {
+  if (!role) return '—';
+  return ROLE_LABELS[role as AppRoleName] ?? role;
+}
+
 export function getRoleClasses(role?: RoleName | string | null) {
-  if (!role) {
+  if (!role || !(role in ROLE_COLORS)) {
     return {
       name: 'gray',
       bg: 'bg-gray-100 dark:bg-gray-800',
@@ -323,109 +223,76 @@ export function getRoleClasses(role?: RoleName | string | null) {
       hex: '#6B7280',
     };
   }
-  return ROLE_COLORS[role as RoleName] ?? ROLE_COLORS.PARTICIPANT;
+  return ROLE_COLORS[role as AppRoleName];
 }
 
-/**
- * Récupère l'icône d'un rôle.
- */
-export function getRoleIcon(role?: RoleName | string | null): string {
-  if (!role) return 'User';
-  return ROLE_ICONS[role as RoleName] ?? 'User';
+export function getRoleIcon(role?: AppRoleName | null): string {
+  return role ? ROLE_ICONS[role] : 'User';
 }
 
-/**
- * Récupère le niveau hiérarchique d'un rôle.
- */
-export function getRoleLevel(role?: RoleName | string | null): number {
-  if (!role) return 0;
-  return ROLE_HIERARCHY[role as RoleName] ?? 0;
+export function getRoleLevel(role?: AppRoleName | null): number {
+  return role ? ROLE_HIERARCHY[role] : 0;
 }
 
-/**
- * Vérifie si un rôle a au moins le niveau d'un autre.
- *
- * @example
- * atLeastRole('ADMINISTRATEUR', 'STAFF_ODC') // → true (100 >= 80)
- * atLeastRole('PARTICIPANT', 'FORMATEUR')    // → false (20 < 60)
- */
-export function atLeastRole(
-  userRole: RoleName | string | null | undefined,
-  minRole: RoleName,
-): boolean {
-  if (!userRole) return false;
-  const userLevel = getRoleLevel(userRole);
-  const minLevel = getRoleLevel(minRole);
-  return userLevel >= minLevel;
-}
-
-/**
- * Vérifie si un rôle fait partie d'une liste.
- */
 export function hasRole(
   userRole: RoleName | string | null | undefined,
   allowedRoles: RoleName | RoleName[],
 ): boolean {
   if (!userRole) return false;
-  const list = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-  return list.includes(userRole as RoleName);
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  return roles.includes(userRole as RoleName);
 }
 
-/**
- * Retourne tous les rôles sous forme de tableau.
- */
-export function getAllRoles(): Array<{
-  value: RoleName;
-  label: string;
-  description: string;
-  couleur: string;
-  icone: string;
-}> {
-  return (Object.keys(ROLE_LABELS) as RoleName[]).map((role) => ({
-    value: role,
-    label: ROLE_LABELS[role],
-    description: ROLE_DESCRIPTIONS[role],
-    couleur: ROLE_COLORS[role].hex,
-    icone: ROLE_ICONS[role],
-  }));
+export function atLeastRole(
+  userRole: AppRoleName | string | null | undefined,
+  minRole: AppRoleName,
+): boolean {
+  if (!userRole) return false;
+  return getRoleLevel(userRole as AppRoleName) >= getRoleLevel(minRole);
 }
 
-/**
- * Vérifie si un rôle est un rôle système (non supprimable).
- */
-export function isSystemRole(role: RoleName): boolean {
-  return true; // Tous les rôles actuels sont système
+export function roleHasPermission(
+  role: RoleName,
+  permission: PermissionCode,
+): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-/**
- * Vérifie si un rôle peut gérer des utilisateurs.
- */
+export function roleHasAnyPermission(
+  role: RoleName,
+  permissions: PermissionCode[],
+): boolean {
+  return permissions.some((permission) => roleHasPermission(role, permission));
+}
+
+export function roleHasAllPermissions(
+  role: RoleName,
+  permissions: PermissionCode[],
+): boolean {
+  return permissions.every((permission) => roleHasPermission(role, permission));
+}
+
 export function canManageUsers(role?: RoleName | string | null): boolean {
-  return hasRole(role, ['ADMINISTRATEUR', 'STAFF_ODC']);
+  return hasRole(role, [RoleName.ADMINISTRATEUR, RoleName.STAFF_ODC]);
 }
 
-/**
- * Vérifie si un rôle peut gérer des formations.
- */
 export function canManageFormations(role?: RoleName | string | null): boolean {
-  return hasRole(role, ['ADMINISTRATEUR', 'STAFF_ODC']);
+  return canManageUsers(role);
 }
 
-/**
- * Vérifie si un rôle peut animer des sessions.
- */
 export function canAnimateSessions(role?: RoleName | string | null): boolean {
-  return hasRole(role, ['ADMINISTRATEUR', 'STAFF_ODC', 'FORMATEUR']);
+  return hasRole(role, [
+    RoleName.ADMINISTRATEUR,
+    RoleName.STAFF_ODC,
+    RoleName.FORMATEUR,
+  ]);
 }
 
-/* ============================================================================
-   CONSTANTES
-   ============================================================================ */
+export function isSystemRole(_role: AppRoleName): boolean {
+  return true;
+}
 
-/**
- * Liste des rôles disponibles.
- */
-export const ROLE_NAMES: RoleName[] = [
+export const ROLE_NAMES: AppRoleName[] = [
   'ADMINISTRATEUR',
   'STAFF_ODC',
   'FORMATEUR',
@@ -433,28 +300,15 @@ export const ROLE_NAMES: RoleName[] = [
   'PARTENAIRE',
 ];
 
-/**
- * Rôles qui peuvent se connecter au back-office.
- */
-export const BACK_OFFICE_ROLES: RoleName[] = [
+export const BACK_OFFICE_ROLES: AppRoleName[] = [
   'ADMINISTRATEUR',
   'STAFF_ODC',
   'FORMATEUR',
 ];
 
-/**
- * Rôles publics (front-office).
- */
-export const FRONT_OFFICE_ROLES: RoleName[] = [
+export const FRONT_OFFICE_ROLES: AppRoleName[] = [
   'PARTICIPANT',
   'PARTENAIRE',
 ];
 
-/**
- * Rôles avec accès administration.
- */
-export const ADMIN_ROLES: RoleName[] = [
-  'ADMINISTRATEUR',
-  'STAFF_ODC',
-];
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+export const ADMIN_ROLES: AppRoleName[] = ['ADMINISTRATEUR', 'STAFF_ODC'];

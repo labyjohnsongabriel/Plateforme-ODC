@@ -1,149 +1,175 @@
+// src/contexts/ThemeContext.tsx
+'use client';
+
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
-  ReactNode,
+  useState,
+  type ReactNode,
 } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
 
-// ============================================================================
-//  TYPES
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-interface ToastContextValue {
-  success: (message: string, options?: any) => void;
-  error: (message: string, options?: any) => void;
-  info: (message: string, options?: any) => void;
-  warning: (message: string, options?: any) => void;
-  loading: (message: string, options?: any) => string;
-  dismiss: (id?: string) => void;
-  dismissAll: () => void;
-  promise: <T>(
-    promise: Promise<T>,
-    messages: { loading: string; success: string; error: string }
-  ) => Promise<T>;
+export type ThemeMode = 'light' | 'dark';
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+interface ThemeContextValue {
+  /** Mode effectif (light ou dark) */
+  mode: ThemeMode;
+  /** Préférence utilisateur (light, dark ou system) */
+  preference: ThemePreference;
+  /** Change la préférence (met à jour le mode automatiquement) */
+  setPreference: (pref: ThemePreference) => void;
+  /** Bascule entre light et dark */
+  toggleTheme: () => void;
+  /** Change directement le mode (équivalent à setPreference) */
+  setTheme: (mode: ThemeMode) => void;
 }
 
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-// ============================================================================
-//  PROVIDER
-// ============================================================================
+const STORAGE_KEY = 'odc-theme';
+const PREFERENCE_KEY = 'odc-theme-preference';
 
-interface ToastProviderProps {
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function getSystemTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+function getStoredPreference(): ThemePreference {
+  try {
+    const stored = localStorage.getItem(PREFERENCE_KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'system';
+}
+
+function applyThemeClass(mode: ThemeMode): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.classList.toggle('dark', mode === 'dark');
+  root.setAttribute('data-theme', mode);
+  root.style.colorScheme = mode;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROVIDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface ThemeProviderProps {
   children: ReactNode;
+  /** Thème par défaut si rien dans localStorage */
+  defaultPreference?: ThemePreference;
 }
 
-export function ToastProvider({ children }: ToastProviderProps) {
-  const success = useCallback((message: string, options?: any) => {
-    toast.success(message, {
-      duration: 3000,
-      icon: '✅',
-      ...options,
+export function ThemeProvider({
+  children,
+  defaultPreference = 'system',
+}: ThemeProviderProps) {
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => {
+    const stored = getStoredPreference();
+    return stored ?? defaultPreference;
+  });
+
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    const stored = getStoredPreference();
+    if (stored === 'system') return getSystemTheme();
+    if (stored === 'light' || stored === 'dark') return stored;
+    return defaultPreference === 'system'
+      ? getSystemTheme()
+      : defaultPreference;
+  });
+
+  /* ─── Applique la classe CSS + persiste ─────────────────────────────── */
+  useEffect(() => {
+    applyThemeClass(mode);
+    try {
+      localStorage.setItem(STORAGE_KEY, mode);
+      localStorage.setItem(PREFERENCE_KEY, preference);
+    } catch {
+      /* ignore */
+    }
+  }, [mode, preference]);
+
+  /* ─── Écoute `prefers-color-scheme` (uniquement si pref = system) ──── */
+  useEffect(() => {
+    if (preference !== 'system') return;
+    if (typeof window === 'undefined') return;
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      setMode(e.matches ? 'dark' : 'light');
+    };
+
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [preference]);
+
+  /* ─── Actions ───────────────────────────────────────────────────────── */
+  const setPreference = useCallback((pref: ThemePreference) => {
+    setPreferenceState(pref);
+    if (pref === 'system') {
+      setMode(getSystemTheme());
+    } else {
+      setMode(pref);
+    }
+  }, []);
+
+  const setTheme = useCallback((newMode: ThemeMode) => {
+    setMode(newMode);
+    setPreferenceState(newMode);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setMode((current) => {
+      const next: ThemeMode = current === 'light' ? 'dark' : 'light';
+      setPreferenceState(next);
+      return next;
     });
   }, []);
 
-  const error = useCallback((message: string, options?: any) => {
-    toast.error(message, {
-      duration: 4000,
-      icon: '❌',
-      ...options,
-    });
-  }, []);
-
-  const info = useCallback((message: string, options?: any) => {
-    toast(message, {
-      duration: 3500,
-      icon: 'ℹ️',
-      ...options,
-    });
-  }, []);
-
-  const warning = useCallback((message: string, options?: any) => {
-    toast(message, {
-      duration: 4000,
-      icon: '⚠️',
-      style: {
-        background: '#FFF3E0',
-        color: '#F57C00',
-        border: '1px solid #F57C00',
-      },
-      ...options,
-    });
-  }, []);
-
-  const loading = useCallback((message: string, options?: any): string => {
-    return toast.loading(message, options);
-  }, []);
-
-  const dismiss = useCallback((id?: string) => {
-    toast.dismiss(id);
-  }, []);
-
-  const dismissAll = useCallback(() => {
-    toast.dismiss();
-  }, []);
-
-  const promise = useCallback(
-    async <T,>(
-      promiseToRun: Promise<T>,
-      messages: { loading: string; success: string; error: string }
-    ): Promise<T> => {
-      return toast.promise(promiseToRun, messages);
-    },
-    []
-  );
-
-  const value = useMemo<ToastContextValue>(
+  /* ─── Valeur mémorisée ──────────────────────────────────────────────── */
+  const value = useMemo<ThemeContextValue>(
     () => ({
-      success,
-      error,
-      info,
-      warning,
-      loading,
-      dismiss,
-      dismissAll,
-      promise,
+      mode,
+      preference,
+      setPreference,
+      toggleTheme,
+      setTheme,
     }),
-    [success, error, info, warning, loading, dismiss, dismissAll, promise]
+    [mode, preference, setPreference, toggleTheme, setTheme],
   );
 
   return (
-    <ToastContext.Provider value={value}>
-      {children}
-      <Toaster
-        position="top-right"
-        reverseOrder={false}
-        gutter={8}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: 'var(--odc-surface)',
-            color: 'var(--odc-text-primary)',
-            border: '1px solid var(--odc-border)',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            fontSize: '14px',
-            boxShadow: '0 10px 25px rgba(255, 121, 0, 0.12)',
-            maxWidth: '400px',
-          },
-        }}
-      />
-    </ToastContext.Provider>
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
   );
 }
 
-// ============================================================================
-//  HOOK
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOOK
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
+export function useTheme(): ThemeContextValue {
+  const ctx = useContext(ThemeContext);
   if (!ctx) {
-    throw new Error('useToast must be used within ToastProvider');
+    throw new Error('useTheme must be used within ThemeProvider');
   }
   return ctx;
 }
 
-export default ToastContext;
+export default ThemeContext;

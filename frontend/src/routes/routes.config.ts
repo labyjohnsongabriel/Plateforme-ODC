@@ -1,3 +1,4 @@
+// src/config/routes.config.tsx
 import { lazy } from 'react';
 import type { ComponentType } from 'react';
 import { PERMISSIONS } from '@/config/permissions.config';
@@ -65,7 +66,7 @@ const ForbiddenPage = lazy(() => import('@/pages/errors/ForbiddenPage'));
 const ServerErrorPage = lazy(() => import('@/pages/errors/ServerErrorPage'));
 
 // ============================================================================
-//  🌍 ROUTES PUBLIQUES (accessibles à TOUS, connecté ou non)
+//  🌍 ROUTES PUBLIQUES
 // ============================================================================
 
 export const PUBLIC_ROUTES: RouteConfig[] = [
@@ -77,7 +78,7 @@ export const PUBLIC_ROUTES: RouteConfig[] = [
 ];
 
 // ============================================================================
-//  🔓 ROUTES AUTH (redirige vers /dashboard si DÉJÀ CONNECTÉ)
+//  🔓 ROUTES AUTH
 // ============================================================================
 
 export const AUTH_ROUTES: RouteConfig[] = [
@@ -88,7 +89,7 @@ export const AUTH_ROUTES: RouteConfig[] = [
 ];
 
 // ============================================================================
-//  🔒 ROUTES PROTÉGÉES (nécessitent auth + permission)
+//  🔒 ROUTES PROTÉGÉES
 // ============================================================================
 
 export const DASHBOARD_ROUTES: RouteConfig[] = [
@@ -173,12 +174,36 @@ export const ATTESTATION_ROUTES: RouteConfig[] = [
   },
 ];
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ MESSAGERIE — accessible à TOUS les utilisateurs authentifiés
+   (plus de permission stricte : évite les 403 pour participants/formateurs)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export const MESSAGERIE_ROUTES: RouteConfig[] = [
-  { path: '/messagerie', component: MessageriePage, protected: true, permission: PERMISSIONS.MESSAGERIE_USE },
+  {
+    path: '/messagerie',
+    component: MessageriePage,
+    protected: true,
+    // ⚠️ Pas de `permission` → accessible à TOUS les utilisateurs connectés
+  },
+  {
+    path: '/messagerie/:conversationId',
+    component: MessageriePage,
+    protected: true,
+    // ⭐ Permet d'ouvrir une conversation via URL directe
+  },
 ];
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ RÉSEAUTAGE — accessible à TOUS les utilisateurs authentifiés
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export const RESEAUTAGE_ROUTES: RouteConfig[] = [
-  { path: '/reseautage', component: ReseautagePage, protected: true, permission: PERMISSIONS.RESEAUTAGE_USE },
+  {
+    path: '/reseautage',
+    component: ReseautagePage,
+    protected: true,
+  },
 ];
 
 export const PROFILE_ROUTES: RouteConfig[] = [

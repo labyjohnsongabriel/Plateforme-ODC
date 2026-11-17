@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
+import { cn } from '@/lib/utils';
 
 interface ExportOption {
   label: string;
@@ -35,6 +36,16 @@ const FORMAT_ICONS: Record<string, React.ElementType> = {
   xlsx: FileSpreadsheet,
   pdf: FileText,
 };
+
+/* Classes neutres réutilisables */
+const NEUTRAL_BUTTON_CLASS = cn(
+  'h-9 rounded-lg font-medium',
+  'border-slate-200 bg-white text-slate-700',
+  'hover:bg-slate-50 hover:text-slate-900',
+  'dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300',
+  'dark:hover:bg-slate-900 dark:hover:text-slate-50',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-600',
+);
 
 export function ExportButton({
   options,
@@ -69,6 +80,7 @@ export function ExportButton({
     }
   };
 
+  /* ── Cas 1 : un seul format → bouton simple ─────────────── */
   if (options.length === 1) {
     const opt = options[0];
     const Icon = opt.icon ?? FORMAT_ICONS[opt.format] ?? Download;
@@ -77,45 +89,69 @@ export function ExportButton({
         variant={variant}
         onClick={() => handleExport(opt)}
         disabled={!!loading}
-        className={className}
+        className={cn(NEUTRAL_BUTTON_CLASS, className)}
       >
         {loading ? (
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
         ) : (
-          <Icon className="h-4 w-4 mr-2" />
+          <Icon className="mr-2 h-4 w-4" aria-hidden />
         )}
         Exporter
       </Button>
     );
   }
 
+  /* ── Cas 2 : plusieurs formats → dropdown ───────────────── */
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} disabled={!!loading} className={className}>
+        <Button
+          variant={variant}
+          disabled={!!loading}
+          className={cn(NEUTRAL_BUTTON_CLASS, className)}
+        >
           {loading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
           ) : (
-            <Download className="h-4 w-4 mr-2" />
+            <Download className="mr-2 h-4 w-4" aria-hidden />
           )}
           Exporter
-        </DropdownMenuTrigger>
+        </Button>
+      </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Format d&apos;export</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      <DropdownMenuContent
+        align="end"
+        className="w-56 border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+      >
+        <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Format d&apos;export
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-slate-200 dark:bg-slate-800" />
+
         {options.map((opt) => {
           const Icon = opt.icon ?? FORMAT_ICONS[opt.format] ?? Download;
+          const isLoading = loading === opt.format;
           return (
             <DropdownMenuItem
               key={opt.format}
               onClick={() => handleExport(opt)}
-              disabled={loading === opt.format}
+              disabled={isLoading}
+              className={cn(
+                'cursor-pointer rounded-md px-2 py-2 text-sm font-medium',
+                'text-slate-700 focus:bg-slate-100 focus:text-slate-900',
+                'dark:text-slate-300 dark:focus:bg-slate-800 dark:focus:text-slate-50',
+              )}
             >
-              <Icon className="h-4 w-4 mr-2" />
+              <Icon
+                className="mr-2 h-4 w-4 text-slate-400 dark:text-slate-500"
+                aria-hidden
+              />
               {opt.label}
-              {loading === opt.format && (
-                <Loader2 className="h-3 w-3 ml-auto animate-spin" />
+              {isLoading && (
+                <Loader2
+                  className="ml-auto h-3 w-3 animate-spin text-slate-500 dark:text-slate-400"
+                  aria-hidden
+                />
               )}
             </DropdownMenuItem>
           );

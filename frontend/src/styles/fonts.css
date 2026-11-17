@@ -1,0 +1,22 @@
+@media (prefers-reduced-motion: reduce) {
+  .animate-ripple,
+  .animate-pulse-soft,
+  .animate-float,
+  .animate-spin,
+  .animate-spin-slow,
+  .animate-spin-reverse,
+  .animate-progress-indeterminate,
+  .animate-scale-in,
+  .animate-shimmer-text {
+    animation: none !important;
+  }
+
+  /* Indiquer visuellement qu'il y a un chargement sans animation */
+  [role="status"]::after {
+    content: '⏳';
+    display: block;
+    font-size: 2rem;
+    text-align: center;
+    margin-top: 1rem;
+  }
+}

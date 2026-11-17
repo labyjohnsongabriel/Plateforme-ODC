@@ -1,38 +1,9 @@
-<<<<<<< HEAD
 // src/controllers/messagerie.controller.ts
-=======
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { successResponse } from '../utils/response.util';
-
-export class MessagerieController {
-  static async mesConversations(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, []); } catch (e) { next(e); }
-  }
-  static async createPrivate(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, {}, 'Conversation creee', 201); } catch (e) { next(e); }
-  }
-  static async createGroupe(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, {}, 'Groupe cree', 201); } catch (e) { next(e); }
-  }
-  static async getMessages(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, { data: [], total: 0 }); } catch (e) { next(e); }
-  }
-  static async envoyer(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, {}, 'Message envoye', 201); } catch (e) { next(e); }
-  }
-  static async marquerLus(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, null, 'Messages lus'); } catch (e) { next(e); }
-  }
-  static async countNonLus(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, { count: 0 }); } catch (e) { next(e); }
-=======
-// src/controllers/MessagerieController.ts
->>>>>>> origin/main
 import { Request, Response, NextFunction } from 'express';
 import { MessagerieService } from '../services/messagerie.service';
 import { successResponse, paginatedResponse } from '../utils/response.util';
 import { BadRequestError, NotFoundError } from '../errors/AppError';
+import { emitToConversation } from '../sockets';
 
 /* ============================================================================
    HELPERS
@@ -49,6 +20,22 @@ function getUserId(req: Request): string {
    ============================================================================ */
 
 export class MessagerieController {
+  static async chercherUtilisateurs(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const users = await MessagerieService.chercherUtilisateurs(
+        getUserId(req),
+        typeof req.query.q === 'string' ? req.query.q : '',
+      );
+      successResponse(res, users);
+    } catch (e) {
+      next(e);
+    }
+  }
+
   /* ==========================================================================
      GET /api/messagerie/conversations
      ⭐ Liste des conversations de l'utilisateur connecté
@@ -61,7 +48,7 @@ export class MessagerieController {
     try {
       const userId = getUserId(req);
       const conversations = await MessagerieService.mesConversations(userId);
-      return successResponse(res, conversations);
+      successResponse(res, conversations);
     } catch (e) {
       next(e);
     }
@@ -89,7 +76,7 @@ export class MessagerieController {
         destinataireId,
       );
 
-      return successResponse(res, conversation, 'Conversation créée', 201);
+      successResponse(res, conversation, 'Conversation créée', 201);
     } catch (e) {
       next(e);
     }
@@ -119,7 +106,7 @@ export class MessagerieController {
         photoUrl,
       );
 
-      return successResponse(res, conversation, 'Groupe créé', 201);
+      successResponse(res, conversation, 'Groupe créé', 201);
     } catch (e) {
       next(e);
     }
@@ -145,7 +132,7 @@ export class MessagerieController {
         throw new NotFoundError('Conversation introuvable');
       }
 
-      return successResponse(res, conversation);
+      successResponse(res, conversation);
     } catch (e) {
       next(e);
     }
@@ -162,7 +149,11 @@ export class MessagerieController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-      const limit = Number(req.query.limit) || 100;
+      const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 100));
+      const conversation = await MessagerieService.getConversation(
+        req.params.id,
+        userId,
+      );
 
       const messages = await MessagerieService.getMessages(
         req.params.id,
@@ -170,7 +161,7 @@ export class MessagerieController {
         limit,
       );
 
-      return successResponse(res, messages);
+      successResponse(res, { conversation, messages });
     } catch (e) {
       next(e);
     }
@@ -208,7 +199,8 @@ export class MessagerieController {
         },
       );
 
-      return successResponse(res, message, 'Message envoyé', 201);
+      emitToConversation(req.params.id, 'message:new', message);
+      successResponse(res, message, 'Message envoyé', 201);
     } catch (e) {
       next(e);
     }
@@ -229,7 +221,7 @@ export class MessagerieController {
         req.params.id,
         userId,
       );
-      return successResponse(res, result, 'Messages marqués comme lus');
+      successResponse(res, result, 'Messages marqués comme lus');
     } catch (e) {
       next(e);
     }
@@ -247,10 +239,9 @@ export class MessagerieController {
     try {
       const userId = getUserId(req);
       const result = await MessagerieService.countNonLus(userId);
-      return successResponse(res, result);
+      successResponse(res, result);
     } catch (e) {
       next(e);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

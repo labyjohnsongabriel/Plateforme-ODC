@@ -37,11 +37,7 @@ export class DomaineController {
      🌐 PUBLIC — Liste des domaines publiés
      GET /api/public/domaines
      ========================================================================== */
-  static async listPublic(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async listPublic(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const domaines = await domaineRepo()
         .createQueryBuilder('d')
@@ -64,11 +60,7 @@ export class DomaineController {
      🌐 PUBLIC — Détail par slug
      GET /api/public/domaines/:slug
      ========================================================================== */
-  static async detailPublic(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async detailPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { slug } = req.params;
 
@@ -100,16 +92,9 @@ export class DomaineController {
      🔒 ADMIN — Liste paginée avec compteurs
      GET /api/admin/domaines
      ========================================================================== */
-  static async findAll(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { page, limit, skip } = getPagination(
-        req.query.page,
-        req.query.limit,
-      );
+      const { page, limit, skip } = getPagination(req.query.page, req.query.limit);
 
       const { q, actif, estPubliee } = req.query as DomaineQuery;
 
@@ -121,10 +106,9 @@ export class DomaineController {
 
       /* -------------------- Recherche -------------------- */
       if (q && String(q).trim()) {
-        qb.andWhere(
-          '(d.nom ILIKE :q OR d.slug ILIKE :q OR d.description ILIKE :q)',
-          { q: `%${q}%` },
-        );
+        qb.andWhere('(d.nom ILIKE :q OR d.slug ILIKE :q OR d.description ILIKE :q)', {
+          q: `%${q}%`,
+        });
       }
 
       /* -------------------- Filtre actif -------------------- */
@@ -153,19 +137,10 @@ export class DomaineController {
       /* -------------------- Normalisation -------------------- */
       const normalized = data.map((d) => ({
         ...d,
-        formationsCount: Number(
-          (d as any).formationsCount ?? 0,
-        ),
+        formationsCount: Number((d as any).formationsCount ?? 0),
       }));
 
-      return paginatedResponse(
-        res,
-        normalized,
-        total,
-        page,
-        limit,
-        'Liste des domaines',
-      );
+      return paginatedResponse(res, normalized, total, page, limit, 'Liste des domaines');
     } catch (e) {
       next(e);
     }
@@ -176,11 +151,7 @@ export class DomaineController {
      GET /api/admin/domaines/stats
      ⚠️ Route spécifique AVANT /:id
      ========================================================================== */
-  static async stats(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async stats(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const [total, published, draft, actifs] = await Promise.all([
         domaineRepo().count(),
@@ -209,11 +180,7 @@ export class DomaineController {
      GET /api/admin/domaines/stats/formations
      ⚠️ Route spécifique AVANT /:id
      ========================================================================== */
-  static async statsByDomaine(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async statsByDomaine(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const stats = await domaineRepo()
         .createQueryBuilder('d')
@@ -249,11 +216,7 @@ export class DomaineController {
      🔒 ADMIN — Détail par ID
      GET /api/admin/domaines/:id
      ========================================================================== */
-  static async findOne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async findOne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const domaine = await domaineRepo()
         .createQueryBuilder('d')
@@ -269,9 +232,7 @@ export class DomaineController {
 
       return successResponse(res, {
         ...domaine,
-        formationsCount: Number(
-          (domaine as any).formationsCount ?? 0,
-        ),
+        formationsCount: Number((domaine as any).formationsCount ?? 0),
       });
     } catch (e) {
       next(e);
@@ -282,21 +243,9 @@ export class DomaineController {
      🔒 ADMIN — Créer un domaine
      POST /api/admin/domaines
      ========================================================================== */
-  static async create(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const {
-        nom,
-        description,
-        couleur,
-        icone,
-        ordreAffichage,
-        actif,
-        estPubliee,
-      } = req.body;
+      const { nom, description, couleur, icone, ordreAffichage, actif, estPubliee } = req.body;
 
       /* -------------------- Validation -------------------- */
       if (!nom || typeof nom !== 'string') {
@@ -304,9 +253,7 @@ export class DomaineController {
       }
 
       if (nom.trim().length < 2) {
-        throw new BadRequestError(
-          'Le nom doit contenir au moins 2 caractères',
-        );
+        throw new BadRequestError('Le nom doit contenir au moins 2 caractères');
       }
 
       /* -------------------- Slug auto -------------------- */
@@ -321,7 +268,7 @@ export class DomaineController {
         throw new BadRequestError(
           existing.nom === nom.trim()
             ? 'Un domaine avec ce nom existe déjà'
-            : 'Un domaine avec ce slug existe déjà',
+            : 'Un domaine avec ce slug existe déjà'
         );
       }
 
@@ -351,11 +298,7 @@ export class DomaineController {
      🔒 ADMIN — Mettre à jour un domaine
      PUT /api/admin/domaines/:id
      ========================================================================== */
-  static async update(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const domaine = await domaineRepo().findOne({
         where: { id: req.params.id },
@@ -386,9 +329,7 @@ export class DomaineController {
         });
 
         if (existing && existing.id !== domaine.id) {
-          throw new BadRequestError(
-            'Un domaine avec ce nom existe déjà',
-          );
+          throw new BadRequestError('Un domaine avec ce nom existe déjà');
         }
 
         domaine.nom = trimmedNom;
@@ -406,9 +347,7 @@ export class DomaineController {
         });
 
         if (existingSlug && existingSlug.id !== domaine.id) {
-          throw new BadRequestError(
-            'Un domaine avec ce slug existe déjà',
-          );
+          throw new BadRequestError('Un domaine avec ce slug existe déjà');
         }
 
         domaine.slug = newSlug;
@@ -438,11 +377,7 @@ export class DomaineController {
      🔒 ADMIN — Publier / Dépublier
      PUT /api/admin/domaines/:id/publier
      ========================================================================== */
-  static async publier(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async publier(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const domaine = await domaineRepo().findOne({
         where: { id: req.params.id },
@@ -453,24 +388,16 @@ export class DomaineController {
       }
 
       const estPubliee =
-        typeof req.body.estPubliee === 'boolean'
-          ? req.body.estPubliee
-          : !domaine.estPubliee;
+        typeof req.body.estPubliee === 'boolean' ? req.body.estPubliee : !domaine.estPubliee;
 
       domaine.estPubliee = estPubliee;
       await domaineRepo().save(domaine);
 
       logger.info(
-        `${estPubliee ? '📢' : '📴'} Domaine ${
-          estPubliee ? 'publié' : 'dépublié'
-        } : ${domaine.nom}`,
+        `${estPubliee ? '📢' : '📴'} Domaine ${estPubliee ? 'publié' : 'dépublié'} : ${domaine.nom}`
       );
 
-      return successResponse(
-        res,
-        domaine,
-        estPubliee ? 'Domaine publié' : 'Domaine dépublié',
-      );
+      return successResponse(res, domaine, estPubliee ? 'Domaine publié' : 'Domaine dépublié');
     } catch (e) {
       next(e);
     }
@@ -480,11 +407,7 @@ export class DomaineController {
      🔒 ADMIN — Toggle actif/inactif
      PUT /api/admin/domaines/:id/actif
      ========================================================================== */
-  static async toggleActif(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async toggleActif(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const domaine = await domaineRepo().findOne({
         where: { id: req.params.id },
@@ -494,19 +417,12 @@ export class DomaineController {
         throw new NotFoundError('Domaine introuvable');
       }
 
-      const actif =
-        typeof req.body.actif === 'boolean'
-          ? req.body.actif
-          : !domaine.actif;
+      const actif = typeof req.body.actif === 'boolean' ? req.body.actif : !domaine.actif;
 
       domaine.actif = actif;
       await domaineRepo().save(domaine);
 
-      return successResponse(
-        res,
-        domaine,
-        actif ? 'Domaine activé' : 'Domaine désactivé',
-      );
+      return successResponse(res, domaine, actif ? 'Domaine activé' : 'Domaine désactivé');
     } catch (e) {
       next(e);
     }
@@ -516,11 +432,7 @@ export class DomaineController {
      🔒 ADMIN — Upload image
      POST /api/admin/domaines/:id/image
      ========================================================================== */
-  static async uploadImage(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async uploadImage(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.file) {
         throw new BadRequestError('Aucun fichier fourni');
@@ -534,9 +446,7 @@ export class DomaineController {
         throw new NotFoundError('Domaine introuvable');
       }
 
-      const filename =
-        (req.file as any).filename ?? req.file.originalname ?? 'image';
-      const imageUrl = `/uploads/domaines/${Date.now()}-${filename}`;
+      const imageUrl = `/uploads/domaines/${req.file.filename}`;
 
       domaine.imageUrl = imageUrl;
       await domaineRepo().save(domaine);
@@ -553,11 +463,7 @@ export class DomaineController {
      🔒 ADMIN — Supprimer un domaine
      DELETE /api/admin/domaines/:id
      ========================================================================== */
-  static async delete(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const domaine = await domaineRepo()
         .createQueryBuilder('d')
@@ -570,13 +476,11 @@ export class DomaineController {
         throw new NotFoundError('Domaine introuvable');
       }
 
-      const formationsCount = Number(
-        (domaine as any).formationsCount ?? 0,
-      );
+      const formationsCount = Number((domaine as any).formationsCount ?? 0);
 
       if (formationsCount > 0) {
         throw new BadRequestError(
-          `Impossible de supprimer ce domaine : ${formationsCount} formation(s) y sont rattachées`,
+          `Impossible de supprimer ce domaine : ${formationsCount} formation(s) y sont rattachées`
         );
       }
 
@@ -595,11 +499,7 @@ export class DomaineController {
      PUT /api/admin/domaines/reorder
      ⚠️ Route spécifique AVANT /:id
      ========================================================================== */
-  static async reorder(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async reorder(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { orderedIds }: { orderedIds: string[] } = req.body;
 
@@ -608,18 +508,12 @@ export class DomaineController {
       }
 
       await Promise.all(
-        orderedIds.map((id, index) =>
-          domaineRepo().update(id, { ordreAffichage: index }),
-        ),
+        orderedIds.map((id, index) => domaineRepo().update(id, { ordreAffichage: index }))
       );
 
       logger.info(`🔀 ${orderedIds.length} domaines réordonnés`);
 
-      return successResponse(
-        res,
-        { count: orderedIds.length },
-        'Ordre mis à jour',
-      );
+      return successResponse(res, { count: orderedIds.length }, 'Ordre mis à jour');
     } catch (e) {
       next(e);
     }

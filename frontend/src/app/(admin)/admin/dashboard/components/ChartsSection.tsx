@@ -1,236 +1,332 @@
 // src/app/(admin)/admin/dashboard/components/ChartsSection.tsx
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import {
-  LineChart as ReLineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  AreaChart as ReAreaChart,
-  Area,
-  defs,
-} from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CalendarClock, Layers, PieChart, TrendingUp, Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
+import { PanelCard } from '@/components/dashboard/PanelCard';
+import { AreaChartODC } from '@/components/charts/AreaChartODC';
 import { BarChartODC } from '@/components/charts/BarChartODC';
+import { ChartEmpty } from '@/components/charts/ChartEmpty';
 import { DonutChartODC } from '@/components/charts/DonutChartODC';
-import { ChartTooltip } from '@/components/charts/ChartTooltip';
-import { ChartLegend } from '@/components/charts/ChartLegend';
-import { api } from '@/lib/api';
-import { getRoleColor } from '@/lib/chart-theme';
+import {
+  buildChartSummary,
+  formatNumber,
+  formatPercent,
+  getRoleColor,
+  getStatutMeta,
+  resolveColor,
+} from '@/lib/chart-theme';
+import { useAdminDashboard } from '@/hooks/useAdminDashboard';
+import { cn } from '@/lib/utils';
+
+/* ============================================================================
+   HELPERS — mois « 2025-11 » → « nov. 25 » / « novembre 2025 »
+   ============================================================================ */
+
+const MONTH_PATTERN = /^(\d{4})-(\d{2})/;
+const shortMonth = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: '2-digit' });
+const longMonth = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' });
+
+function parseMonth(value: string): Date | null {
+  const match = MONTH_PATTERN.exec(value);
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, 1) : null;
+}
+
+const formatMonthShort = (value: string): string => {
+  const date = parseMonth(value);
+  return date ? shortMonth.format(date) : value;
+};
+
+const formatMonthLong = (value: string): string => {
+  const date = parseMonth(value);
+  return date ? longMonth.format(date) : value;
+};
+
+/* ============================================================================
+   SESSIONS PAR STATUT — barre proportionnelle empilée + légende détaillée
+   Design : segment hover, séparateurs nets, pourcentages alignés.
+   ============================================================================ */
+
+function SessionsStatusBreakdown({
+  items,
+}: {
+  items: Array<{ statut: string; count: number }>;
+}) {
+  const rows = items
+    .map((item) => ({ ...getStatutMeta(item.statut), value: Number(item.count) }))
+    .sort((a, b) => b.value - a.value);
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+
+  if (total === 0) return <ChartEmpty height={240} />;
+
+  return (
+    <div>
+      {/* Total — chiffre principal proéminent */}
+      <div className="flex items-baseline gap-2">
+        <p className="font-display text-4xl font-bold tabular-nums text-foreground">
+          {formatNumber(total)}
+        </p>
+        <span className="text-sm font-normal text-muted-foreground">
+          {total > 1 ? 'sessions' : 'session'}
+        </span>
+      </div>
+
+      {/* Barre proportionnelle empilée (segments avec séparateur) */}
+      <div
+        role="img"
+        aria-label={buildChartSummary(
+          'Répartition des sessions par statut',
+          rows.map((row) => ({ name: row.label, value: row.value })),
+        )}
+        className="mt-5 flex h-3.5 w-full gap-1 overflow-hidden rounded-full bg-muted"
+      >
+        {rows
+          .filter((row) => row.value > 0)
+          .map((row) => (
+            <div
+              key={row.label}
+              title={`${row.label} : ${formatNumber(row.value)} (${formatPercent(row.value / total)})`}
+              className="h-full cursor-default transition-opacity hover:opacity-80 first:rounded-l-full last:rounded-r-full"
+              style={{
+                width: `${(row.value / total) * 100}%`,
+                backgroundColor: row.color,
+              }}
+            />
+          ))}
+      </div>
+
+      {/* Légende détaillée — puces avec ring pour séparation */}
+      <ul className="mt-5 space-y-0 divide-y divide-border/60">
+        {rows.map((row) => (
+          <li
+            key={row.label}
+            className="flex items-center gap-3 py-3 text-sm transition-colors hover:bg-muted/30 -mx-2 px-2 rounded-md"
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
+              style={{ backgroundColor: row.color }}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate text-foreground/90">{row.label}</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatNumber(row.value)}
+            </span>
+            <span className="w-14 text-right text-xs tabular-nums text-muted-foreground">
+              {formatPercent(row.value / total)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ============================================================================
+   SKELETON — mêmes proportions que le contenu final
+   ============================================================================ */
+
+function ChartsSkeleton() {
+  return (
+    <div
+      className="grid gap-6 lg:grid-cols-2"
+      aria-busy="true"
+      aria-label="Chargement des graphiques"
+    >
+      {/* Carte large */}
+      <Skeleton className="h-[460px] rounded-xl lg:col-span-2" />
+      {/* Cartes standard */}
+      <Skeleton className="h-[420px] rounded-xl" />
+      <Skeleton className="h-[420px] rounded-xl" />
+      <Skeleton className="h-[420px] rounded-xl" />
+      <Skeleton className="h-[420px] rounded-xl" />
+    </div>
+  );
+}
+
+/* ============================================================================
+   KPI INLINE — affichage compact dans l'en-tête de la carte
+   ============================================================================ */
+
+function InlineKpi({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="text-right">
+      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="font-display text-lg font-bold tabular-nums text-foreground">
+        {formatNumber(value)}
+      </dd>
+    </div>
+  );
+}
 
 /* ============================================================================
    COMPOSANT
    ============================================================================ */
 
 export function ChartsSection() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'dashboard', 'charts'],
-    queryFn: async () => {
-      const { data } = await api.get('/admin/dashboard');
-      return data.data;
-    },
-  });
+  const { data, isLoading, isError, isFetching, refetch } = useAdminDashboard();
 
-  if (isLoading) {
+  if (isLoading) return <ChartsSkeleton />;
+
+  if (isError || !data) {
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Skeleton className="h-80 lg:col-span-2" />
-        <Skeleton className="h-80" />
-        <Skeleton className="h-80" />
-      </div>
+      <QueryErrorState
+        onRetry={() => {
+          void refetch();
+        }}
+        isRetrying={isFetching}
+      />
     );
   }
 
   /* -------------------- Données -------------------- */
-  const usersByRole = (data?.usersByRole ?? []).map((r: any) => ({
+  const monthly = data.inscriptionsParMois.map((m) => ({
+    mois: m.mois,
+    count: Number(m.count),
+  }));
+  const monthlyTotal = monthly.reduce((sum, m) => sum + m.count, 0);
+  const monthlyAverage = monthly.length > 0 ? Math.round(monthlyTotal / monthly.length) : 0;
+
+  const usersByRole = data.usersByRole.map((r) => ({
     name: r.role,
     value: Number(r.count),
     color: getRoleColor(r.role),
   }));
 
-  const formationsByDomaine = (data?.formationsByDomaine ?? []).map(
-    (d: any) => ({
+  const formationsByDomaine = data.formationsByDomaine
+    .map((d, index) => ({
       name: d.domaine,
       value: Number(d.count),
-      color: d.couleur ?? '#FF7900',
-    }),
-  );
+      color: resolveColor(d.couleur, index),
+    }))
+    .sort((a, b) => b.value - a.value);
 
-  const topFormations = (data?.topFormations ?? []).map((f: any) => ({
-    name: f.titre?.length > 30 ? `${f.titre.slice(0, 30)}…` : f.titre,
-    value: Number(f.inscriptions),
-  }));
+  const topFormations = data.topFormations
+    .map((f) => ({ name: f.titre, value: Number(f.inscriptions) }))
+    .sort((a, b) => b.value - a.value);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* ================================================================ */}
-      {/* 1. Évolution mensuelle (LineChart)                                 */}
-      {/* ================================================================ */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-base">
-            Évolution des inscriptions
-          </CardTitle>
-          <p className="text-sm text-odc-muted">
-            12 derniers mois — inscriptions vs sessions
-          </p>
-        </CardHeader>
+    <section
+      aria-label="Graphiques"
+      className={cn(
+        'grid gap-6 lg:grid-cols-2',
+        // Cohérence verticale : toutes les cartes ont une hauteur similaire
+        '[&>div]:min-h-[420px]',
+      )}
+    >
+      {/* 1. Évolution mensuelle — carte promue -------------------------- */}
+      <PanelCard
+        className="lg:col-span-2"
+        title="Évolution des inscriptions"
+        description="Nombre d’inscriptions au cours des 12 derniers mois"
+        icon={TrendingUp}
+        action={
+          monthly.length > 0 ? (
+            <dl className="flex items-start gap-6">
+              <InlineKpi label="Total" value={monthlyTotal} />
+              <div className="h-8 w-px bg-border/60" aria-hidden="true" />
+              <InlineKpi label="Moy. / mois" value={monthlyAverage} />
+            </dl>
+          ) : undefined
+        }
+      >
+        {monthly.length > 0 ? (
+          <AreaChartODC
+            data={monthly}
+            xKey="mois"
+            series={[{ dataKey: 'count', name: 'Inscriptions' }]}
+            height={320}
+            ariaLabel="Évolution mensuelle des inscriptions"
+            xTickFormatter={formatMonthShort}
+            tooltipLabelFormatter={formatMonthLong}
+          />
+        ) : (
+          <ChartEmpty height={320} />
+        )}
+      </PanelCard>
 
-        <CardContent>
-          <div className="h-[320px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <ReLineChart
-                data={data?.inscriptionsParMois ?? []}
-                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--odc-border)"
-                  strokeOpacity={0.4}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="mois"
-                  tick={{ fill: 'var(--odc-text-muted)', fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tick={{ fill: 'var(--odc-text-muted)', fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend content={<ChartLegend />} />
+      {/* 2. Répartition par rôle — carte 1/2 ---------------------------- */}
+      <PanelCard
+        title="Répartition par rôle"
+        description="Utilisateurs actifs"
+        icon={PieChart}
+      >
+        {usersByRole.length > 0 ? (
+          <DonutChartODC
+            data={usersByRole}
+            height={280}
+            centerLabel="Utilisateurs"
+            ariaLabel="Répartition des utilisateurs par rôle"
+          />
+        ) : (
+          <ChartEmpty />
+        )}
+      </PanelCard>
 
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  name="Inscriptions"
-                  stroke="#FF7900"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: '#FF7900', strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                  animationDuration={1000}
-                />
+      {/* 3. Sessions par statut — carte 1/2 ---------------------------- */}
+      <PanelCard
+        title="Sessions par statut"
+        description="Nombre de sessions pour chaque statut"
+        icon={CalendarClock}
+      >
+        {data.sessionsParStatut.length > 0 ? (
+          <SessionsStatusBreakdown items={data.sessionsParStatut} />
+        ) : (
+          <ChartEmpty />
+        )}
+      </PanelCard>
 
-                <Line
-                  type="monotone"
-                  dataKey="sessions"
-                  name="Sessions"
-                  stroke="#2563EB"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: '#2563EB', strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                  animationDuration={1200}
-                />
-              </ReLineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 4. Formations par domaine — carte 1/2 ------------------------- */}
+      <PanelCard
+        title="Formations par domaine"
+        description="Catalogue complet"
+        icon={Layers}
+      >
+        {formationsByDomaine.length > 0 ? (
+          <BarChartODC
+            data={formationsByDomaine}
+            series={[
+              {
+                dataKey: 'value',
+                name: 'Formations',
+                color: 'hsl(var(--chart-1))',
+              },
+            ]}
+            layout="vertical"
+            height={280}
+            ariaLabel="Nombre de formations par domaine"
+          />
+        ) : (
+          <ChartEmpty />
+        )}
+      </PanelCard>
 
-      {/* ================================================================ */}
-      {/* 2. Répartition par rôle (DonutChart)                              */}
-      {/* ================================================================ */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Répartition par rôle</CardTitle>
-          <p className="text-sm text-odc-muted">Utilisateurs actifs</p>
-        </CardHeader>
-
-        <CardContent>
-          {usersByRole.length > 0 ? (
-            <DonutChartODC
-              data={usersByRole}
-              height={280}
-              centerLabel="Utilisateurs"
-            />
-          ) : (
-            <EmptyChart />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ================================================================ */}
-      {/* 3. Formations par domaine (BarChart horizontal)                   */}
-      {/* ================================================================ */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Formations par domaine</CardTitle>
-          <p className="text-sm text-odc-muted">Catalogue complet</p>
-        </CardHeader>
-
-        <CardContent>
-          {formationsByDomaine.length > 0 ? (
-            <BarChartODC
-              data={formationsByDomaine}
-              series={[
-                {
-                  dataKey: 'value',
-                  name: 'Formations',
-                  color: '#FF7900',
-                },
-              ]}
-              layout="vertical"
-              height={280}
-              barRadius={4}
-            />
-          ) : (
-            <EmptyChart />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ================================================================ */}
-      {/* 4. Top formations (BarChart horizontal)                           */}
-      {/* ================================================================ */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-base">Top 5 formations</CardTitle>
-          <p className="text-sm text-odc-muted">
-            Par nombre d&apos;inscriptions
-          </p>
-        </CardHeader>
-
-        <CardContent>
-          {topFormations.length > 0 ? (
-            <BarChartODC
-              data={topFormations}
-              series={[
-                {
-                  dataKey: 'value',
-                  name: 'Inscriptions',
-                  color: '#2563EB',
-                },
-              ]}
-              layout="vertical"
-              height={280}
-              barRadius={4}
-            />
-          ) : (
-            <EmptyChart />
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-/* ============================================================================
-   EMPTY STATE
-   ============================================================================ */
-
-function EmptyChart() {
-  return (
-    <div className="h-[280px] flex items-center justify-center text-sm text-odc-muted">
-      Aucune donnée disponible
-    </div>
+      {/* 5. Top 5 formations — carte 1/2 ------------------------------- */}
+      <PanelCard
+        title="Top 5 formations"
+        description="Par nombre d’inscriptions"
+        icon={Trophy}
+      >
+        {topFormations.length > 0 ? (
+          <BarChartODC
+            data={topFormations}
+            series={[
+              {
+                dataKey: 'value',
+                name: 'Inscriptions',
+                color: 'hsl(var(--chart-2))',
+              },
+            ]}
+            layout="vertical"
+            height={280}
+            ariaLabel="Top des formations par nombre d’inscriptions"
+          />
+        ) : (
+          <ChartEmpty />
+        )}
+      </PanelCard>
+    </section>
   );
 }

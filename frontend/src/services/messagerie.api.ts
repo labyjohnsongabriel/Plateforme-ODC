@@ -25,7 +25,7 @@ export const messagerieApi = {
     ),
 
   getMessages: (conversationId: ID) =>
-    api.get<unknown, ApiResponse<Message[]>>(
+    api.get<unknown, ApiResponse<{ conversation: Conversation; messages: Message[] }>>(
       `/messagerie/conversations/${conversationId}/messages`
     ),
 
@@ -36,7 +36,7 @@ export const messagerieApi = {
     ),
 
   getUnreadCount: () =>
-    api.get<unknown, ApiResponse<{ count: number }>>('/messagerie/unread-count'),
+    api.get<unknown, ApiResponse<{ count: number }>>('/messagerie/non-lus/count'),
 
   deleteConversation: (id: ID) =>
     api.delete<unknown, ApiResponse<void>>(`/messagerie/conversations/${id}`),

@@ -30,6 +30,71 @@ import { formatDate, formatDuration } from '@/lib/formatters';
 import type { Session } from '@/types/session.types';
 
 /* ============================================================================
+   ⭐ HELPERS — Normalisation robuste
+   ============================================================================ */
+
+/**
+ * Normalise `objectifs` en tableau de strings.
+ * Supporte :
+ *   - ['a', 'b']          → array direct
+ *   - 'a\nb' ou 'a, b'    → string à split
+ *   - '["a","b"]'         → string JSON
+ *   - {0:'a',1:'b'}       → objet
+ *   - null/undefined      → []
+ */
+function normalizeObjectifs(input: unknown): string[] {
+  if (!input) return [];
+
+  // Déjà un array
+  if (Array.isArray(input)) {
+    return input
+      .map((x) => {
+        if (typeof x === 'string') return x.trim();
+        if (x && typeof x === 'object') {
+          const obj = x as Record<string, unknown>;
+          if (typeof obj.label === 'string') return obj.label.trim();
+          if (typeof obj.titre === 'string') return obj.titre.trim();
+          if (typeof obj.text === 'string') return obj.text.trim();
+          return '';
+        }
+        return String(x ?? '').trim();
+      })
+      .filter((s) => s.length > 0);
+  }
+
+  // String
+  if (typeof input === 'string') {
+    const s = input.trim();
+    if (!s) return [];
+
+    // Tenter JSON
+    if (s.startsWith('[') || s.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(s);
+        return normalizeObjectifs(parsed);
+      } catch {
+        /* pas du JSON valide, continuer */
+      }
+    }
+
+    // Split par newline ou ; ou ,
+    return s
+      .split(/\r?\n|;|,(?![^(]*\))/g)
+      .map((x) => x.trim())
+      .filter((x) => x.length > 0);
+  }
+
+  // Objet {0:'a',1:'b'}
+  if (typeof input === 'object') {
+    return Object.values(input as Record<string, unknown>)
+      .map((x) => (typeof x === 'string' ? x.trim() : ''))
+      .filter((s) => s.length > 0);
+  }
+
+  return [];
+}
+
+/* ============================================================================
    CONFIGURATION
    ============================================================================ */
 
@@ -79,11 +144,12 @@ export function SessionDetail({ session }: Props) {
 
   const formation = session.formation as any;
 
+  /* ⭐ Normalisation unique, calculée une seule fois */
+  const objectifs = normalizeObjectifs(formation?.objectifs);
+
   return (
     <>
-      {/* ================================================================
-          HERO
-          ================================================================ */}
+      {/* HERO */}
       <section className="border-b border-odc-border bg-gradient-to-br from-odc-surface to-odc-surface-alt">
         <div className="container-page py-8 md:py-12">
           {/* Breadcrumb */}
@@ -113,7 +179,6 @@ export function SessionDetail({ session }: Props) {
           {/* Contenu hero */}
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0 flex-1">
-              {/* Badges */}
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <span className="rounded-md bg-odc-surface-alt px-2.5 py-1 font-mono text-xs font-semibold text-odc-text-secondary">
                   {session.codeSession}
@@ -134,7 +199,6 @@ export function SessionDetail({ session }: Props) {
                 )}
               </div>
 
-              {/* Titre */}
               <h1 className="font-display text-3xl font-bold leading-tight tracking-tight text-odc-text-primary md:text-4xl">
                 {formation?.titre ?? 'Session de formation'}
               </h1>
@@ -149,13 +213,10 @@ export function SessionDetail({ session }: Props) {
               )}
             </div>
 
-            {/* CTA Hero */}
             <div className="shrink-0">
               {canRegister ? (
                 <Button variant="odc" size="lg" asChild>
-                  <Link
-                    href={`/inscription-en-ligne?session=${session.id}`}
-                  >
+                  <Link href={`/inscription-en-ligne?session=${session.id}`}>
                     S&apos;inscrire à cette session
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -177,9 +238,7 @@ export function SessionDetail({ session }: Props) {
         </div>
       </section>
 
-      {/* ================================================================
-          CONTENU
-          ================================================================ */}
+      {/* CONTENU */}
       <section className="container-page py-8 md:py-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
           {/* -------------------- COLONNE GAUCHE -------------------- */}
@@ -207,10 +266,7 @@ export function SessionDetail({ session }: Props) {
                   <InfoCard
                     icon={Clock}
                     label="Durée"
-                    value={formatDuration(
-                      session.dateDebut,
-                      session.dateFin,
-                    )}
+                    value={formatDuration(session.dateDebut, session.dateFin)}
                   />
                   <InfoCard
                     icon={MapPin}
@@ -281,30 +337,28 @@ export function SessionDetail({ session }: Props) {
                     </p>
                   )}
 
-                  {formation.objectifs &&
-                    formation.objectifs.length > 0 && (
-                      <>
-                        <Separator />
-                        <div>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
-                            Objectifs
-                          </p>
-                          <ul className="space-y-1.5">
-                            {formation.objectifs
-                              .slice(0, 5)
-                              .map((o: string, i: number) => (
-                                <li
-                                  key={i}
-                                  className="flex items-start gap-2 text-sm text-odc-text-secondary"
-                                >
-                                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-odc-success" />
-                                  <span>{o}</span>
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                      </>
-                    )}
+                  {/* ⭐ Objectifs — avec normalisation */}
+                  {objectifs.length > 0 && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
+                          Objectifs
+                        </p>
+                        <ul className="space-y-1.5">
+                          {objectifs.slice(0, 5).map((o, i) => (
+                            <li
+                              key={i}
+                              className="flex items-start gap-2 text-sm text-odc-text-secondary"
+                            >
+                              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-odc-success" />
+                              <span>{o}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  )}
 
                   {formation.slug && (
                     <Button variant="outline" asChild className="w-full">
@@ -321,7 +375,6 @@ export function SessionDetail({ session }: Props) {
 
           {/* -------------------- COLONNE DROITE -------------------- */}
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            {/* CTA principal */}
             <Card className="border-odc-primary/20 shadow-odc-md">
               <CardContent className="p-5">
                 {canRegister ? (
@@ -337,9 +390,7 @@ export function SessionDetail({ session }: Props) {
                       </p>
                     </div>
                     <Button variant="odc" size="lg" className="w-full" asChild>
-                      <Link
-                        href={`/inscription-en-ligne?session=${session.id}`}
-                      >
+                      <Link href={`/inscription-en-ligne?session=${session.id}`}>
                         S&apos;inscrire maintenant
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -372,7 +423,6 @@ export function SessionDetail({ session }: Props) {
               </CardContent>
             </Card>
 
-            {/* Formateur */}
             {session.formateur && (
               <Card>
                 <CardHeader>
@@ -400,34 +450,21 @@ export function SessionDetail({ session }: Props) {
               </Card>
             )}
 
-            {/* Récapitulatif */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Récapitulatif</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2.5 text-sm">
-                <SummaryRow
-                  label="Code"
-                  value={session.codeSession}
-                  mono
-                />
+                <SummaryRow label="Code" value={session.codeSession} mono />
                 <SummaryRow
                   label="Dates"
                   value={`${formatDate(session.dateDebut)} → ${formatDate(session.dateFin)}`}
                 />
-                <SummaryRow
-                  label="Lieu"
-                  value={session.lieu || 'En ligne'}
-                />
-                <SummaryRow
-                  label="Places"
-                  value={`${session.capacite}`}
-                />
+                <SummaryRow label="Lieu" value={session.lieu || 'En ligne'} />
+                <SummaryRow label="Places" value={`${session.capacite}`} />
                 <SummaryRow
                   label="Disponibles"
-                  value={
-                    isFull ? 'Complet' : `${placesRestantes}`
-                  }
+                  value={isFull ? 'Complet' : `${placesRestantes}`}
                   tone={isFull ? 'error' : 'success'}
                 />
               </CardContent>
@@ -473,9 +510,7 @@ function InfoCard({
       </div>
       <div className="min-w-0">
         <p className="text-xs text-odc-text-muted">{label}</p>
-        <p className="truncate font-medium text-odc-text-primary">
-          {value}
-        </p>
+        <p className="truncate font-medium text-odc-text-primary">{value}</p>
       </div>
     </div>
   );

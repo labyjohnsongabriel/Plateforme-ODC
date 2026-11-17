@@ -1,219 +1,300 @@
-<<<<<<< HEAD
+// src/services/formation.service.ts
+import slugifyLib from 'slugify';
+import { formationRepository } from '../repositories/formation.repository';
 import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
-import { Role, RoleName } from '../models/Role.entity';
-import { hashPassword } from '../utils/password.util';
-import { NotFoundError, ConflictError } from '../errors/AppError';
-import { getPagination } from '../utils/pagination.util';
-import { MESSAGES } from '../constants/messages';
+import {
+  NotFoundError,
+  ConflictError,
+  BadRequestError,
+} from '../errors/AppError';
+import { logger } from '../config/logger';
+import { NiveauFormation } from '../entities/enums';
 
-export class UserService {
-  static async create(data: any) {
-    const userRepo = AppDataSource.getRepository(User);
-    const roleRepo = AppDataSource.getRepository(Role);
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-    const existing = await userRepo.findOne({ where: { email: data.email } });
-    if (existing) throw new ConflictError(MESSAGES.AUTH.EMAIL_EXISTS);
+function slugify(text: string): string {
+  return slugifyLib(text, {
+    lower: true,
+    strict: true,
+    locale: 'fr',
+    trim: true,
+  });
+}
 
-    const role = await roleRepo.findOne({ where: { nom: data.roleNom as RoleName } });
-    if (!role) throw new NotFoundError('Rôle introuvable');
+function parseBoolean(value: any): boolean | undefined {
+  if (value === 'true' || value === true) return true;
+  if (value === 'false' || value === false) return false;
+  return undefined;
+}
 
-    const user = userRepo.create({
-      nom: data.nom,
-      prenom: data.prenom,
-      email: data.email,
-      motDePasse: await hashPassword(data.motDePasse),
-      telephone: data.telephone,
-      ville: data.ville,
-      roleId: role.id,
-      actif: true,
+/* ═══════════════════════════════════════════════════════════════════════════
+   SERVICE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export class FormationService {
+  /* ══════════════════════════════════════════════════════════════════════════
+     🌐 PUBLIC
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  static async findAllPublic(filters: any) {
+    return formationRepository.findPublic({
+      q: filters.q,
+      domaineId: filters.domaineId,
+      niveau: filters.niveau as NiveauFormation | undefined,
+      page: Number(filters.page) || 1,
+      limit: Number(filters.limit) || 12,
     });
-
-    await userRepo.save(user);
-    return this.findOne(user.id);
   }
 
-  static async findAll(page?: string, limit?: string, filters?: any) {
-    const { page: p, limit: l, skip } = getPagination(page, limit);
-    const repo = AppDataSource.getRepository(User);
+  static async findBySlugPublic(slug: string) {
+    const formation = await formationRepository.findBySlug(slug, [
+      'domaineRelation',
+      'sessions',
+    ]);
 
-    const qb = repo.createQueryBuilder('u')
-      .leftJoinAndSelect('u.role', 'r');
+    if (!formation || !formation.estPubliee) {
+      throw new NotFoundError('Formation introuvable ou non publiée');
+    }
 
-    if (filters?.role) qb.andWhere('r.nom = :role', { role: filters.role });
-    if (filters?.actif !== undefined) qb.andWhere('u.actif = :actif', { actif: filters.actif });
-    if (filters?.search) {
-      qb.andWhere(
-        '(u.nom ILIKE :q OR u.prenom ILIKE :q OR u.email ILIKE :q)',
-        { q: `%${filters.search}%` }
+    try {
+      await formationRepository.incrementVues(formation.id);
+      formation.nbVues = (formation.nbVues ?? 0) + 1;
+    } catch (err) {
+      logger.warn(
+        `Impossible d'incrémenter les vues pour ${formation.id}: ${err}`,
       );
     }
 
-    qb.orderBy('u.createdAt', 'DESC').skip(skip).take(l);
-
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page: p, limit: l };
+    return formation;
   }
 
-  static async findOne(id: string) {
-    const repo = AppDataSource.getRepository(User);
-    const user = await repo.findOne({
-      where: { id },
-      relations: ['role'],
-    });
-    if (!user) throw new NotFoundError(MESSAGES.USER.NOT_FOUND);
-    return user;
+  static async getTopPublic(limit = 6) {
+    return formationRepository.findTopPublic(limit);
   }
 
-  static async update(id: string, data: any) {
-    const user = await this.findOne(id);
-    Object.assign(user, data);
-    await AppDataSource.getRepository(User).save(user);
-    return this.findOne(id);
-  }
+  /* ══════════════════════════════════════════════════════════════════════════
+     🔒 ADMIN / STAFF
+     ══════════════════════════════════════════════════════════════════════════ */
 
-  static async changeRole(id: string, roleNom: string) {
-    const user = await this.findOne(id);
-    const roleRepo = AppDataSource.getRepository(Role);
-    const role = await roleRepo.findOne({ where: { nom: roleNom as RoleName } });
-    if (!role) throw new NotFoundError('Rôle introuvable');
-
-    user.roleId = role.id;
-    await AppDataSource.getRepository(User).save(user);
-    return this.findOne(id);
-  }
-
-  static async toggleActif(id: string, actif: boolean) {
-    const user = await this.findOne(id);
-    user.actif = actif;
-    await AppDataSource.getRepository(User).save(user);
-    return user;
-  }
-
-  static async delete(id: string) {
-    const user = await this.findOne(id);
-    await AppDataSource.getRepository(User).softDelete(id);
-=======
-// src/services/user.service.ts
-import bcrypt from 'bcrypt';
-import { userRepository } from '../repositories/user.repository'; // ✅ chemin corrigé
-import { roleRepository } from '../repositories/RoleRepository';
-import { RoleName } from '../entities/enums';
-import {
-  ConflictError,
-  NotFoundError,
-  BadRequestError,
-  ForbiddenError,
-} from '../errors/AppError';
-import { logger } from '../config/logger';
-
-export class UserService {
-  static async create(data: any) {
-    const { email, motDePasse, nom, prenom, roleNom } = data;
-    if (!email || !motDePasse || !nom || !prenom) {
-      throw new BadRequestError('Email, mot de passe, nom et prénom requis');
-    }
-    if (motDePasse.length < 8) {
-      throw new BadRequestError('Le mot de passe doit contenir au moins 8 caractères');
-    }
-    if (await userRepository.exists({ email: email.toLowerCase() } as any)) {
-      throw new ConflictError('Email déjà utilisé');
-    }
-
-    const role = await roleRepository.findByName(
-      (roleNom as RoleName) || RoleName.PARTICIPANT,
-    );
-    if (!role) throw new NotFoundError('Rôle introuvable');
-
-    const user = await userRepository.create({
-      nom,
-      prenom,
-      email: email.toLowerCase(),
-      telephone: data.telephone,
-      photoUrl: data.photoUrl,
-      bio: data.bio,
-      ville: data.ville,
-      entreprise: data.entreprise,
-      poste: data.poste,
-      competences: data.competences,
-      actif: data.actif ?? true,
-      motDePasse: await bcrypt.hash(motDePasse, 12),
-      roleId: role.id,
+  static async findAll(filters: any) {
+    const result = await formationRepository.search({
+      q: filters.q,
+      domaineId: filters.domaineId,
+      niveau:
+        filters.niveau && filters.niveau !== 'all'
+          ? (filters.niveau as NiveauFormation)
+          : undefined,
+      estPubliee: parseBoolean(filters.estPubliee),
+      actif: parseBoolean(filters.actif),
+      miseEnAvant: parseBoolean(filters.miseEnAvant),
+      formateurId: filters.formateurId,
+      page: Number(filters.page) || 1,
+      limit: Number(filters.limit) || 20,
     });
 
-    logger.info(`👤 Utilisateur créé par admin : ${user.email} (${roleNom ?? RoleName.PARTICIPANT})`);
-    return user;
-  }
-
-  static async findAll(filters: any, page: number, limit: number) {
-    return userRepository.search(
-      {
-        roleId: filters.roleId,
-        actif:
-          filters.actif === 'true' ? true :
-          filters.actif === 'false' ? false :
-          undefined,
-        q: filters.q,
-      },
-      page,
-      limit,
-    );
+    return {
+      data: result.data.map(this.serialize),
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages,
+    };
   }
 
   static async findById(id: string) {
-    return userRepository.findByIdOrFail(id, ['role']);
+    const formation = await formationRepository.findByIdWithRelations(id, [
+      'domaineRelation',
+      'sessions',
+    ]);
+
+    if (!formation) {
+      throw new NotFoundError('Formation introuvable');
+    }
+
+    return this.serialize(formation);
+  }
+
+  static async create(data: any) {
+    if (!data.titre) {
+      throw new BadRequestError('Le titre est requis');
+    }
+    if (!data.description || data.description.length < 20) {
+      throw new BadRequestError(
+        'La description doit contenir au moins 20 caractères',
+      );
+    }
+    if (!data.domaineId) {
+      throw new BadRequestError('Le domaine est requis');
+    }
+    if (!data.dureeHeures || data.dureeHeures < 1) {
+      throw new BadRequestError('La durée doit être supérieure à 0');
+    }
+
+    const slug = data.slug || slugify(data.titre);
+
+    const existing = await formationRepository.findOne({ slug } as any);
+    if (existing) {
+      throw new ConflictError('Une formation avec ce slug existe déjà');
+    }
+
+    const formation = await formationRepository.create({
+      ...data,
+      slug,
+      estPubliee: data.estPubliee ?? false,
+      miseEnAvant: data.miseEnAvant ?? false,
+      nbVues: 0,
+    });
+
+    logger.info(
+      `📚 Formation créée : ${formation.titre} (${formation.slug})`,
+    );
+
+    return this.serialize(formation);
   }
 
   static async update(id: string, data: any) {
-    // Protéger les champs sensibles
-    delete data.motDePasse;
-    delete data.roleId;
-    delete data.email; // l'email ne change pas par cette route
-    delete data.id;
-    delete data.createdAt;
-    delete data.updatedAt;
-    delete data.deletedAt;
+    const formation = await formationRepository.findByIdOrFail(id);
 
-    return userRepository.update(id, data);
+    if (data.titre && data.titre !== formation.titre) {
+      const newSlug = data.slug || slugify(data.titre);
+      if (newSlug !== formation.slug) {
+        const existing = await formationRepository.findOne({
+          slug: newSlug,
+        } as any);
+        if (existing) {
+          throw new ConflictError(
+            'Une formation avec ce slug existe déjà',
+          );
+        }
+        data.slug = newSlug;
+      }
+    }
+
+    const updated = await formationRepository.update(id, data);
+    logger.info(`📝 Formation mise à jour : ${updated.titre}`);
+    return this.serialize(updated);
   }
 
-  static async changeRole(id: string, roleNom: RoleName, requestedByRole: RoleName) {
-    // Seul un ADMINISTRATEUR peut nommer ADMINISTRATEUR
-    if (roleNom === RoleName.ADMINISTRATEUR && requestedByRole !== RoleName.ADMINISTRATEUR) {
-      throw new ForbiddenError('Seul un administrateur peut attribuer ce rôle');
-    }
-    const role = await roleRepository.findByName(roleNom);
-    if (!role) throw new NotFoundError('Rôle introuvable');
-
-    const user = await userRepository.findByIdOrFail(id);
-    user.roleId = role.id;
-    await userRepository.save(user);
-
-    logger.info(`🔄 Rôle modifié : ${user.email} → ${roleNom}`);
-    return user;
-  }
-
-  static async toggleActif(id: string, actif: boolean, currentUserId: string) {
-    if (id === currentUserId && !actif) {
-      throw new ForbiddenError('Vous ne pouvez pas désactiver votre propre compte');
-    }
-    const user = await userRepository.update(id, { actif });
+  static async togglePublication(id: string, estPubliee: boolean) {
+    const formation = await formationRepository.setPublication(id, estPubliee);
     logger.info(
-      `${actif ? '✅' : '🚫'} Utilisateur ${actif ? 'activé' : 'désactivé'} : ${user.email}`,
+      `${estPubliee ? '📢' : '📴'} Formation ${
+        estPubliee ? 'publiée' : 'dépubliée'
+      } : ${formation.titre}`,
     );
-    return user;
+    return this.serialize(formation);
   }
 
-  static async delete(id: string, currentUserId: string) {
-    if (id === currentUserId) {
-      throw new ForbiddenError('Vous ne pouvez pas supprimer votre propre compte');
+  static async setImage(id: string, imageUrl: string) {
+    const updated = await formationRepository.update(id, { imageUrl });
+    return this.serialize(updated);
+  }
+
+  static async delete(id: string) {
+    const formation = await formationRepository.findByIdOrFail(id);
+    await formationRepository.softDelete(id);
+    logger.info(`🗑️ Formation supprimée : ${formation.titre}`);
+  }
+
+  static async countByDomaine() {
+    return formationRepository.countByDomaine();
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     ⭐⭐⭐ STATS DASHBOARD ADMIN
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  static async getStats(): Promise<{
+    total: number;
+    published: number;
+    draft: number;
+    totalSessions: number;
+    totalInscriptions: number;
+  }> {
+    try {
+      const rows = await AppDataSource.query(`
+        SELECT
+          (SELECT COUNT(*) FROM formations WHERE deleted_at IS NULL) AS total,
+          (SELECT COUNT(*) FROM formations WHERE est_publiee = true AND deleted_at IS NULL) AS published,
+          (SELECT COUNT(*) FROM formations WHERE est_publiee = false AND deleted_at IS NULL) AS draft,
+          (SELECT COUNT(*) FROM sessions WHERE deleted_at IS NULL) AS total_sessions,
+          (SELECT COUNT(*) FROM inscriptions) AS total_inscriptions
+      `);
+
+      const row = rows[0] ?? {};
+      const stats = {
+        total: Number(row.total) || 0,
+        published: Number(row.published) || 0,
+        draft: Number(row.draft) || 0,
+        totalSessions: Number(row.total_sessions) || 0,
+        totalInscriptions: Number(row.total_inscriptions) || 0,
+      };
+
+      logger.info('[FormationService.getStats] Stats:', stats);
+      return stats;
+    } catch (err: any) {
+      logger.error('[FormationService.getStats] Erreur SQL', {
+        message: err.message,
+      });
+      return {
+        total: 0,
+        published: 0,
+        draft: 0,
+        totalSessions: 0,
+        totalInscriptions: 0,
+      };
     }
-    await userRepository.softDelete(id);
-    logger.info(`🗑️ Utilisateur supprimé : ${id}`);
   }
 
-  static async stats() {
-    return userRepository.statsByRole();
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+  /* ══════════════════════════════════════════════════════════════════════════
+     SÉRIALISATION
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  private static serialize(formation: any) {
+    return {
+      id: formation.id,
+      titre: formation.titre,
+      slug: formation.slug,
+      description: formation.description ?? '',
+      descriptionCourte: formation.descriptionCourte ?? '',
+
+      domaineId: formation.domaineId ?? null,
+      domaine: formation.domaineRelation
+        ? {
+            id: formation.domaineRelation.id,
+            nom: formation.domaineRelation.nom,
+            slug: formation.domaineRelation.slug,
+            couleur: formation.domaineRelation.couleur ?? '#FF7900',
+          }
+        : formation.domaine
+          ? {
+              id: formation.domaine.id,
+              nom: formation.domaine.nom,
+              slug: formation.domaine.slug,
+              couleur: formation.domaine.couleur ?? '#FF7900',
+            }
+          : null,
+
+      sessionsCount: Number(formation.sessionsCount ?? 0),
+      inscriptionsCount: Number(formation.inscriptionsCount ?? 0),
+
+      niveau: formation.niveau ?? 'DEBUTANT',
+      dureeHeures: Number(formation.dureeHeures ?? 0),
+      prix: formation.prix !== null ? Number(formation.prix) : 0,
+      nbParticipantsMax: Number(formation.nbParticipantsMax ?? 0),
+      certifiante: formation.certifiante ?? false,
+      miseEnAvant: formation.miseEnAvant ?? false,
+      actif: formation.actif ?? true,
+      estPubliee: formation.estPubliee ?? false,
+      imageUrl: formation.imageUrl ?? null,
+      objectifs: formation.objectifs ?? [],
+      prerequis: formation.prerequis ?? [],
+      programme: formation.programme ?? '',
+      nbVues: Number(formation.nbVues ?? 0),
+      createdAt: formation.createdAt,
+      updatedAt: formation.updatedAt,
+    };
   }
 }

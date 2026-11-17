@@ -12,23 +12,26 @@ export default function LoginPage() {
   return (
     <div className="animate-fade-in">
       {/* En-tête */}
-      <div className="text-center mb-8">
-        <h1 className="font-display text-3xl font-bold mb-2">Bon retour 👋</h1>
-        <p className="text-odc-muted">
+      <header className="mb-8 text-center">
+        <h1 className="mb-2 font-display text-3xl font-bold leading-tight tracking-tight text-odc-text-primary">
+          Bon retour 
+        </h1>
+        <p className="text-sm text-odc-text-secondary">
           Connectez-vous pour accéder à votre espace personnel
         </p>
-      </div>
+      </header>
 
-      {/* Séparateur social */}
+      {/* Social login */}
       <SocialLogin />
 
+      {/* Divider */}
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-odc-border" />
         </div>
         <div className="relative flex justify-center text-xs">
-          <span className="bg-background px-3 text-odc-muted">
-            OU par email
+          <span className="bg-odc-background px-3 font-medium uppercase tracking-wider text-odc-text-muted">
+            Ou par email
           </span>
         </div>
       </div>
@@ -40,23 +43,26 @@ export default function LoginPage() {
       <div className="mt-6 flex items-center justify-between text-sm">
         <Link
           href="/mot-de-passe-oublie"
-          className="text-odc-primary font-medium hover:underline"
+          className="font-medium text-odc-primary transition-colors hover:text-odc-primary-hover"
         >
           Mot de passe oublié ?
         </Link>
-        <Link href="/inscription" className="text-odc-muted hover:text-odc-primary">
+        <Link
+          href="/inscription"
+          className="text-odc-text-muted transition-colors hover:text-odc-primary"
+        >
           Créer un compte
         </Link>
       </div>
 
       {/* Footer */}
-      <p className="mt-8 text-center text-xs text-odc-muted">
+      <p className="mt-8 text-center text-xs leading-relaxed text-odc-text-muted">
         En vous connectant, vous acceptez nos{' '}
-        <Link href="/cgu" className="link-odc">
-          Conditions d&apos;utilisation
+        <Link href="/cgu" className="font-medium text-odc-primary hover:underline">
+          Conditions d'utilisation
         </Link>{' '}
         et notre{' '}
-        <Link href="/politique-confidentialite" className="link-odc">
+        <Link href="/politique-confidentialite" className="font-medium text-odc-primary hover:underline">
           Politique de confidentialité
         </Link>
         .

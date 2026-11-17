@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import {
-  Eye, EyeOff, Loader2, Check, X, User, Building2,
+  Eye, EyeOff, Loader2, Check, X, User, Building2, Mail, Phone, Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,19 +19,11 @@ import { useAuthStore } from '@/store/auth.store';
 import { getErrorMessage } from '@/lib/error-handler';
 import { cn } from '@/lib/utils';
 
-/* ============================================================================
-   SCHÉMA
-   ============================================================================ */
 const schema = z
   .object({
     nom: z.string().trim().min(2, 'Nom requis (2 caractères min.)').max(100),
     prenom: z.string().trim().min(2, 'Prénom requis (2 caractères min.)').max(100),
-    email: z
-      .string()
-      .trim()
-      .toLowerCase()
-      .min(1, 'Email requis')
-      .email('Adresse email invalide'),
+    email: z.string().trim().toLowerCase().email('Adresse email invalide'),
     telephone: z
       .string()
       .trim()
@@ -57,19 +49,13 @@ const schema = z
 
 type FormData = z.infer<typeof schema>;
 
-/* ============================================================================
-   RÈGLES DE MOT DE PASSE
-   ============================================================================ */
 const PASSWORD_RULES = [
-  { label: '8 caractères minimum', test: (p: string) => p.length >= 8 },
+  { label: '8 caractères min.', test: (p: string) => p.length >= 8 },
   { label: 'Une majuscule', test: (p: string) => /[A-Z]/.test(p) },
   { label: 'Une minuscule', test: (p: string) => /[a-z]/.test(p) },
   { label: 'Un chiffre', test: (p: string) => /[0-9]/.test(p) },
 ];
 
-/* ============================================================================
-   COMPOSANT PRINCIPAL
-   ============================================================================ */
 export function RegisterForm() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -88,9 +74,6 @@ export function RegisterForm() {
     defaultValues: { roleNom: 'PARTICIPANT', acceptTerms: false },
   });
 
-  /* -------------------------------------------------------------------- */
-  /* SOUMISSION                                                          */
-  /* -------------------------------------------------------------------- */
   const onSubmit = async (data: FormData) => {
     try {
       const { data: res } = await api.post('/auth/register', {
@@ -122,139 +105,140 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {/* ================================================================ */}
-      {/* TYPE DE COMPTE                                                    */}
-      {/* ================================================================ */}
+      {/* Type de compte */}
       <div>
-        <Label className="mb-2 block">Je m&apos;inscris en tant que</Label>
+        <Label className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-50">
+          Je m'inscris en tant que
+        </Label>
         <div className="grid grid-cols-2 gap-3">
           <RoleCard
             icon={User}
             title="Participant"
             description="Suivre des formations"
             active={role === 'PARTICIPANT'}
-            onClick={() => {
-              setRole('PARTICIPANT');
-              setValue('roleNom', 'PARTICIPANT');
-            }}
+            onClick={() => { setRole('PARTICIPANT'); setValue('roleNom', 'PARTICIPANT'); }}
           />
           <RoleCard
             icon={Building2}
             title="Partenaire"
             description="Collaborer avec l'ODC"
             active={role === 'PARTENAIRE'}
-            onClick={() => {
-              setRole('PARTENAIRE');
-              setValue('roleNom', 'PARTENAIRE');
-            }}
+            onClick={() => { setRole('PARTENAIRE'); setValue('roleNom', 'PARTENAIRE'); }}
           />
         </div>
         <input type="hidden" {...register('roleNom')} />
       </div>
 
-      {/* ================================================================ */}
-      {/* NOM / PRÉNOM                                                      */}
-      {/* ================================================================ */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      {/* Nom / Prénom */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="nom">Nom *</Label>
+          <Label htmlFor="nom" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+            Nom <span className="text-red-600">*</span>
+          </Label>
           <Input
             id="nom"
             autoComplete="family-name"
             disabled={isSubmitting}
             {...register('nom')}
-            className="mt-1.5"
+            className="mt-1.5 h-11"
             aria-invalid={!!errors.nom}
           />
           {errors.nom && (
-            <p className="text-odc-error text-xs mt-1.5" role="alert">
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.nom.message}
             </p>
           )}
         </div>
-
         <div>
-          <Label htmlFor="prenom">Prénom *</Label>
+          <Label htmlFor="prenom" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+            Prénom <span className="text-red-600">*</span>
+          </Label>
           <Input
             id="prenom"
             autoComplete="given-name"
             disabled={isSubmitting}
             {...register('prenom')}
-            className="mt-1.5"
+            className="mt-1.5 h-11"
             aria-invalid={!!errors.prenom}
           />
           {errors.prenom && (
-            <p className="text-odc-error text-xs mt-1.5" role="alert">
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.prenom.message}
             </p>
           )}
         </div>
       </div>
 
-      {/* ================================================================ */}
-      {/* EMAIL / TÉLÉPHONE                                                 */}
-      {/* ================================================================ */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      {/* Email / Téléphone */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="email">Email *</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            disabled={isSubmitting}
-            {...register('email')}
-            className="mt-1.5"
-            aria-invalid={!!errors.email}
-          />
+          <Label htmlFor="email" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+            Email <span className="text-red-600">*</span>
+          </Label>
+          <div className="relative mt-1.5">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              disabled={isSubmitting}
+              {...register('email')}
+              className="h-11 pl-10"
+              aria-invalid={!!errors.email}
+            />
+          </div>
           {errors.email && (
-            <p className="text-odc-error text-xs mt-1.5" role="alert">
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.email.message}
             </p>
           )}
         </div>
-
         <div>
-          <Label htmlFor="telephone">Téléphone</Label>
-          <Input
-            id="telephone"
-            type="tel"
-            placeholder="+261 34 12 345 67"
-            autoComplete="tel"
-            disabled={isSubmitting}
-            {...register('telephone')}
-            className="mt-1.5"
-            aria-invalid={!!errors.telephone}
-          />
+          <Label htmlFor="telephone" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+            Téléphone
+          </Label>
+          <div className="relative mt-1.5">
+            <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="telephone"
+              type="tel"
+              placeholder="+261 34 12 345 67"
+              autoComplete="tel"
+              disabled={isSubmitting}
+              {...register('telephone')}
+              className="h-11 pl-10"
+              aria-invalid={!!errors.telephone}
+            />
+          </div>
           {errors.telephone && (
-            <p className="text-odc-error text-xs mt-1.5" role="alert">
+            <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
               {errors.telephone.message}
             </p>
           )}
         </div>
       </div>
 
-      {/* ================================================================ */}
-      {/* MOT DE PASSE                                                      */}
-      {/* ================================================================ */}
+      {/* Mot de passe */}
       <div>
-        <Label htmlFor="motDePasse">Mot de passe *</Label>
+        <Label htmlFor="motDePasse" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Mot de passe <span className="text-red-600">*</span>
+        </Label>
         <div className="relative mt-1.5">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             id="motDePasse"
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             autoComplete="new-password"
             disabled={isSubmitting}
-            {...register('motDePasse', {
-              onChange: (e) => setPasswordValue(e.target.value),
-            })}
-            className="pr-10"
+            {...register('motDePasse', { onChange: (e) => setPasswordValue(e.target.value) })}
+            className="h-11 pl-10 pr-10"
             aria-invalid={!!errors.motDePasse}
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
             tabIndex={-1}
             aria-label={showPassword ? 'Masquer' : 'Afficher'}
           >
@@ -262,7 +246,6 @@ export function RegisterForm() {
           </button>
         </div>
 
-        {/* Indicateur de robustesse */}
         {passwordValue && (
           <ul className="mt-2 grid grid-cols-2 gap-1.5">
             {PASSWORD_RULES.map((rule) => {
@@ -272,14 +255,10 @@ export function RegisterForm() {
                   key={rule.label}
                   className={cn(
                     'flex items-center gap-1.5 text-xs',
-                    ok ? 'text-odc-success' : 'text-odc-muted',
+                    ok ? 'text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400',
                   )}
                 >
-                  {ok ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <X className="h-3 w-3" />
-                  )}
+                  {ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                   {rule.label}
                 </li>
               );
@@ -288,18 +267,19 @@ export function RegisterForm() {
         )}
 
         {errors.motDePasse && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.motDePasse.message}
           </p>
         )}
       </div>
 
-      {/* ================================================================ */}
-      {/* CONFIRMATION                                                      */}
-      {/* ================================================================ */}
+      {/* Confirmation */}
       <div>
-        <Label htmlFor="confirmation">Confirmer le mot de passe *</Label>
+        <Label htmlFor="confirmation" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Confirmer le mot de passe <span className="text-red-600">*</span>
+        </Label>
         <div className="relative mt-1.5">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             id="confirmation"
             type={showConfirm ? 'text' : 'password'}
@@ -307,13 +287,13 @@ export function RegisterForm() {
             autoComplete="new-password"
             disabled={isSubmitting}
             {...register('confirmation')}
-            className="pr-10"
+            className="h-11 pl-10 pr-10"
             aria-invalid={!!errors.confirmation}
           />
           <button
             type="button"
             onClick={() => setShowConfirm((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
             tabIndex={-1}
             aria-label={showConfirm ? 'Masquer' : 'Afficher'}
           >
@@ -321,56 +301,51 @@ export function RegisterForm() {
           </button>
         </div>
         {errors.confirmation && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.confirmation.message}
           </p>
         )}
       </div>
 
-      {/* ================================================================ */}
-      {/* CGU                                                               */}
-      {/* ================================================================ */}
+      {/* CGU */}
       <div className="flex items-start gap-2">
         <Checkbox
           id="acceptTerms"
           onCheckedChange={(v) => setValue('acceptTerms', !!v, { shouldValidate: true })}
           disabled={isSubmitting}
         />
-        <Label
-          htmlFor="acceptTerms"
-          className="text-sm text-odc-secondary leading-relaxed cursor-pointer"
-        >
-          J&apos;accepte les conditions d&apos;utilisation et la politique de
-          confidentialité de l&apos;ODC. *
+        <Label htmlFor="acceptTerms" className="cursor-pointer text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+          J'accepte les{' '}
+          <a href="/cgu" className="font-medium text-orange-600 hover:underline dark:text-orange-400">
+            conditions d'utilisation
+          </a>{' '}
+          et la{' '}
+          <a href="/politique-confidentialite" className="font-medium text-orange-600 hover:underline dark:text-orange-400">
+            politique de confidentialité
+          </a>{' '}
+          de l'ODC. <span className="text-red-600">*</span>
         </Label>
       </div>
       {errors.acceptTerms && (
-        <p className="text-odc-error text-xs -mt-3" role="alert">
+        <p className="-mt-3 text-xs text-red-600 dark:text-red-400" role="alert">
           {errors.acceptTerms.message}
         </p>
       )}
 
-      {/* ================================================================ */}
-      {/* BOUTON                                                            */}
-      {/* ================================================================ */}
+      {/* Bouton */}
       <Button
         type="submit"
-        variant="odc"
         size="lg"
         disabled={isSubmitting}
-        className="w-full"
+        className="h-11 w-full bg-slate-900 text-white shadow-md hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
       >
-        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Créer mon compte
       </Button>
     </form>
   );
 }
 
-/* ============================================================================
-   COMPOSANT : carte de rôle
-   ⚠️ CORRECTION : balise <button> fermée avec </button> (pas </Card>)
-   ============================================================================ */
 interface RoleCardProps {
   icon: React.ElementType;
   title: string;
@@ -379,38 +354,32 @@ interface RoleCardProps {
   onClick: () => void;
 }
 
-function RoleCard({
-  icon: Icon,
-  title,
-  description,
-  active,
-  onClick,
-}: RoleCardProps) {
+function RoleCard({ icon: Icon, title, description, active, onClick }: RoleCardProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all text-center',
+        'relative flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-center transition-all',
         active
-          ? 'border-odc-primary bg-odc-primary-soft/50 shadow-odc-sm'
-          : 'border-odc-border hover:border-odc-primary/50 hover:bg-odc-surface-alt',
+          ? 'border-slate-900 bg-slate-100 dark:border-slate-50 dark:bg-slate-800'
+          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:hover:border-slate-700 dark:hover:bg-slate-900',
       )}
       aria-pressed={active}
     >
       <div
         className={cn(
-          'w-10 h-10 rounded-lg flex items-center justify-center',
+          'flex h-10 w-10 items-center justify-center rounded-lg',
           active
-            ? 'bg-odc-primary text-white'
-            : 'bg-odc-surface-alt text-odc-muted',
+            ? 'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900'
+            : 'bg-slate-100 text-slate-400 dark:bg-slate-800',
         )}
       >
         <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="font-medium text-sm">{title}</p>
-        <p className="text-xs text-odc-muted">{description}</p>
+        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{title}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
       </div>
     </button>
   );

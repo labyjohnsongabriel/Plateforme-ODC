@@ -10,7 +10,7 @@ let socket: AppSocket | null = null;
 export function getSocket(token?: string): AppSocket {
   if (socket?.connected) return socket;
 
-  socket = io(SOCKET_URL, {
+  socket = io(`${SOCKET_URL}/chat`, {
     autoConnect: false,
     withCredentials: true,
     auth: token ? { token } : undefined,

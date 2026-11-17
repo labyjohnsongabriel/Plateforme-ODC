@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import { ReseautageService } from '../services/reseautage.service';
 import type {
   MemberUser,
@@ -30,12 +31,13 @@ export function useReseautage(initialFilters?: DirectoryFilters) {
       setLoading(true);
       setError(null);
 
-      const [annuaireRes, suggestionsRes, connectionsRes, demandesRes] = await Promise.all([
-        ReseautageService.getAnnuaire(filters),
-        ReseautageService.getSuggestions(8),
-        ReseautageService.getMesConnections().catch(() => []),
-        ReseautageService.getDemandes().catch(() => []),
-      ]);
+      const [annuaireRes, suggestionsRes, connectionsRes, demandesRes] =
+        await Promise.all([
+          ReseautageService.getAnnuaire(filters),
+          ReseautageService.getSuggestions(8),
+          ReseautageService.getMesConnections(),
+          ReseautageService.getDemandes(),
+        ]);
 
       setMembers(annuaireRes.data);
       setPagination({
@@ -46,8 +48,13 @@ export function useReseautage(initialFilters?: DirectoryFilters) {
       setSuggestions(suggestionsRes);
       setConnections(connectionsRes);
       setDemandes(demandesRes);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erreur de chargement');
+    } catch (err: unknown) {
+      const message = axios.isAxiosError<{ message?: string }>(err)
+        ? (err.response?.data?.message ?? err.message)
+        : err instanceof Error
+          ? err.message
+          : 'Erreur lors du chargement du réseautage';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -74,6 +81,7 @@ export function useReseautage(initialFilters?: DirectoryFilters) {
 
       return true;
     } catch {
+      toast.error("Impossible d'envoyer la demande de connexion");
       return false;
     }
   };
@@ -84,7 +92,7 @@ export function useReseautage(initialFilters?: DirectoryFilters) {
       toast.success('Connexion acceptée');
       load();
     } catch {
-      toast.error('Erreur');
+      toast.error("Impossible d'accepter cette demande");
     }
   };
 
@@ -94,7 +102,7 @@ export function useReseautage(initialFilters?: DirectoryFilters) {
       toast.success('Connexion refusée');
       load();
     } catch {
-      toast.error('Erreur');
+      toast.error('Impossible de refuser cette demande');
     }
   };
 

@@ -2,17 +2,18 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { getErrorMessage } from '@/lib/error-handler';
 
 /* ============================================================================
-   TYPES
+   TYPES — DOMAINE
    ============================================================================ */
 
 export interface Attestation {
   id: string;
   numero: string;
+  hash?: string;
   participantId: string;
   participant?: {
     id: string;
@@ -27,6 +28,7 @@ export interface Attestation {
     codeSession: string;
     dateDebut: string;
     dateFin: string;
+    statut?: string;
     formation?: {
       id: string;
       titre: string;
@@ -38,9 +40,12 @@ export interface Attestation {
   dateEmission: string;
   dateExpiration?: string;
   valide: boolean;
-  urlPdf?: string;
+  fichierUrl?: string;
+  qrCodeUrl?: string;
   hashVerification?: string;
   motifInvalidation?: string;
+  telechargee?: boolean;
+  dateTelechargement?: string;
 }
 
 export interface AttestationsStats {
@@ -67,11 +72,18 @@ export interface AttestationFilters {
    ============================================================================ */
 
 export interface EligibilityCriteria {
-  presenceMin: number;      // Ex: 75 (%)
-  noteMin: number;          // Ex: 10 (sur 20)
-  selectionValidee: boolean; // Doit être sélectionné
+  presenceMin: number;
+  noteMin: number;
+  selectionValidee: boolean;
   inscriptionValidee: boolean;
 }
+
+export const DEFAULT_CRITERIA: EligibilityCriteria = {
+  presenceMin: 75,
+  noteMin: 10,
+  selectionValidee: true,
+  inscriptionValidee: true,
+};
 
 export interface EligibleParticipant {
   participantId: string;
@@ -82,11 +94,18 @@ export interface EligibleParticipant {
     email: string;
     photoUrl?: string;
   };
+  estSelectionne: boolean;
+  dateSelection?: string | null;
   tauxPresence: number;
+  presencesPresentes: number;
+  presencesRetards: number;
+  presencesAbsentes: number;
+  presencesExcusees: number;
+  totalSeances: number;
   noteFinale?: number;
   eligible: boolean;
-  raisons: string[];        // Raisons d'inéligibilité
-  dejaGeneree: boolean;     // Une attestation existe déjà ?
+  raisons: string[];
+  dejaGeneree: boolean;
   attestationId?: string;
 }
 
@@ -123,23 +142,61 @@ export interface GenerationResult {
     participantId: string;
     participantNom: string;
   }>;
+  details?: {
+    participantsTotal: number;
+    participantsEligibles: number;
+    participantsIgnores: number;
+    dejaGenerees: number;
+  };
 }
 
 /* ============================================================================
-   HELPERS
+   HELPERS — ERREUR
+   ============================================================================ */
+
+function getErrorMessage(error: any): string {
+  if (!error) return 'Erreur inconnue';
+
+  if (error.response) {
+    const { status, data } = error.response;
+    const msg = data?.message ?? data?.error ?? '';
+    if (status === 401) return 'Session expirée, veuillez vous reconnecter';
+    if (status === 403) return msg || 'Accès refusé';
+    if (status === 404) return msg || 'Ressource introuvable';
+    if (status === 409) return msg || 'Conflit : donnée déjà existante';
+    if (status === 500) return msg || 'Erreur serveur';
+    return msg || `Erreur ${status}`;
+  }
+
+  if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+    return "❌ Le serveur backend n'est pas accessible. Vérifiez qu'il est démarré.";
+  }
+
+  if (error.code === 'ECONNABORTED') {
+    return '⏱️ Le serveur met trop de temps à répondre';
+  }
+
+  return error.message ?? 'Erreur inconnue';
+}
+
+/* ============================================================================
+   HELPERS — EXTRACTION
    ============================================================================ */
 
 function extractList<T>(response: any): T[] {
+  if (!response) return [];
   if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.data)) return response.data;
-  if (Array.isArray(response?.data?.data)) return response.data.data;
-  if (Array.isArray(response?.items)) return response.items;
+  if (Array.isArray(response.data)) return response.data;
+  if (Array.isArray(response.data?.data)) return response.data.data;
+  if (Array.isArray(response.items)) return response.items;
+  if (Array.isArray(response.data?.items)) return response.data.items;
   return [];
 }
 
 function extractItem<T>(response: any): T {
-  if (response?.data?.data) return response.data.data;
-  if (response?.data) return response.data;
+  if (!response) return response;
+  if (response.data?.data !== undefined) return response.data.data;
+  if (response.data !== undefined) return response.data;
   return response;
 }
 
@@ -155,10 +212,15 @@ function extractPagination(response: any) {
   );
 }
 
+/* ============================================================================
+   HELPERS — NORMALISATION
+   ============================================================================ */
+
 function normalizeAttestation(raw: any): Attestation {
   return {
     id: String(raw?.id ?? raw?._id ?? ''),
     numero: raw?.numero ?? '',
+    hash: raw?.hash ?? undefined,
     participantId: String(raw?.participantId ?? ''),
     participant: raw?.participant
       ? {
@@ -176,6 +238,7 @@ function normalizeAttestation(raw: any): Attestation {
           codeSession: raw.session.codeSession ?? '',
           dateDebut: raw.session.dateDebut ?? '',
           dateFin: raw.session.dateFin ?? '',
+          statut: raw.session.statut ?? undefined,
           formation: raw.session.formation
             ? {
                 id: String(raw.session.formation.id ?? ''),
@@ -186,15 +249,55 @@ function normalizeAttestation(raw: any): Attestation {
         }
       : undefined,
     noteFinale:
-      raw?.noteFinale !== undefined ? Number(raw.noteFinale) : undefined,
+      raw?.noteFinale !== undefined && raw?.noteFinale !== null
+        ? Number(raw.noteFinale)
+        : undefined,
     tauxPresence:
-      raw?.tauxPresence !== undefined ? Number(raw.tauxPresence) : undefined,
+      raw?.tauxPresence !== undefined && raw?.tauxPresence !== null
+        ? Number(raw.tauxPresence)
+        : undefined,
     dateEmission: raw?.dateEmission ?? new Date().toISOString(),
     dateExpiration: raw?.dateExpiration ?? undefined,
     valide: raw?.valide ?? true,
-    urlPdf: raw?.urlPdf ?? undefined,
-    hashVerification: raw?.hashVerification ?? undefined,
+    fichierUrl: raw?.fichierUrl ?? raw?.urlPdf ?? undefined,
+    qrCodeUrl: raw?.qrCodeUrl ?? undefined,
+    hashVerification: raw?.hashVerification ?? raw?.hash ?? undefined,
     motifInvalidation: raw?.motifInvalidation ?? undefined,
+    telechargee: raw?.telechargee ?? undefined,
+    dateTelechargement: raw?.dateTelechargement ?? undefined,
+  };
+}
+
+function normalizeParticipant(raw: any): EligibleParticipant {
+  const dateSelection = raw?.dateSelection ?? raw?.date_selection ?? null;
+
+  return {
+    participantId: String(raw?.participantId ?? raw?.participant?.id ?? ''),
+    participant: {
+      id: String(raw?.participant?.id ?? raw?.participantId ?? ''),
+      nom: raw?.participant?.nom ?? '',
+      prenom: raw?.participant?.prenom ?? '',
+      email: raw?.participant?.email ?? '',
+      photoUrl: raw?.participant?.photoUrl ?? undefined,
+    },
+    estSelectionne: Boolean(
+      raw?.estSelectionne ?? (dateSelection !== null && dateSelection !== undefined),
+    ),
+    dateSelection,
+    tauxPresence: Number(raw?.tauxPresence ?? 0),
+    presencesPresentes: Number(raw?.presencesPresentes ?? 0),
+    presencesRetards: Number(raw?.presencesRetards ?? 0),
+    presencesAbsentes: Number(raw?.presencesAbsentes ?? 0),
+    presencesExcusees: Number(raw?.presencesExcusees ?? 0),
+    totalSeances: Number(raw?.totalSeances ?? 0),
+    noteFinale:
+      raw?.noteFinale !== undefined && raw?.noteFinale !== null
+        ? Number(raw.noteFinale)
+        : undefined,
+    eligible: Boolean(raw?.eligible),
+    raisons: Array.isArray(raw?.raisons) ? raw.raisons.map(String) : [],
+    dejaGeneree: Boolean(raw?.dejaGeneree),
+    attestationId: raw?.attestationId ?? undefined,
   };
 }
 
@@ -202,12 +305,7 @@ function cleanFilters(filters?: AttestationFilters): Record<string, any> {
   if (!filters) return {};
   const cleaned: Record<string, any> = {};
   Object.entries(filters).forEach(([key, value]) => {
-    if (
-      value === 'all' ||
-      value === '' ||
-      value === undefined ||
-      value === null
-    ) {
+    if (value === 'all' || value === '' || value === undefined || value === null) {
       return;
     }
     cleaned[key] = value;
@@ -215,15 +313,33 @@ function cleanFilters(filters?: AttestationFilters): Record<string, any> {
   return cleaned;
 }
 
+function serializeCriteria(criteria: EligibilityCriteria): Record<string, string> {
+  return {
+    presenceMin: String(criteria.presenceMin),
+    noteMin: String(criteria.noteMin),
+    selectionValidee: criteria.selectionValidee ? 'true' : 'false',
+    inscriptionValidee: criteria.inscriptionValidee ? 'true' : 'false',
+  };
+}
+
+function isValidUuid(v: string | null | undefined): boolean {
+  if (!v) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
+
+function useAttestationApiPrefix(): '/admin' | '/staff' {
+  const pathname = usePathname();
+  return pathname.startsWith('/staff/') ? '/staff' : '/admin';
+}
+
 /* ============================================================================
-   CLÉS
+   CLÉS QUERY
    ============================================================================ */
 
 export const attestationKeys = {
   all: ['admin', 'attestations'] as const,
   lists: () => [...attestationKeys.all, 'list'] as const,
-  list: (filters?: AttestationFilters) =>
-    [...attestationKeys.lists(), filters] as const,
+  list: (filters?: AttestationFilters) => [...attestationKeys.lists(), filters] as const,
   detail: (id: string) => [...attestationKeys.all, 'detail', id] as const,
   stats: () => [...attestationKeys.all, 'stats'] as const,
   preview: (sessionId: string, criteria?: EligibilityCriteria) =>
@@ -235,11 +351,13 @@ export const attestationKeys = {
    ============================================================================ */
 
 export function useAttestations(filters?: AttestationFilters) {
+  const apiPrefix = useAttestationApiPrefix();
+
   return useQuery({
     queryKey: attestationKeys.list(filters),
     queryFn: async () => {
       const params = cleanFilters(filters);
-      const response = await api.get('/admin/attestations', { params });
+      const response = await api.get(`${apiPrefix}/attestations`, { params });
       return {
         data: extractList<any>(response).map(normalizeAttestation),
         pagination: extractPagination(response),
@@ -251,69 +369,102 @@ export function useAttestations(filters?: AttestationFilters) {
 }
 
 export function useAttestation(id: string | undefined) {
+  const apiPrefix = useAttestationApiPrefix();
+
   return useQuery({
     queryKey: attestationKeys.detail(id ?? ''),
     queryFn: async (): Promise<Attestation> => {
-      const response = await api.get(`/admin/attestations/${id}`);
+      const response = await api.get(`${apiPrefix}/attestations/${id}`);
       return normalizeAttestation(extractItem<any>(response));
     },
     enabled: !!id,
+    staleTime: 30_000,
   });
 }
 
 export function useAttestationsStats() {
+  const apiPrefix = useAttestationApiPrefix();
+
   return useQuery({
     queryKey: attestationKeys.stats(),
     queryFn: async (): Promise<AttestationsStats> => {
-      try {
-        const response = await api.get('/admin/attestations/stats');
-        const raw = extractItem<any>(response) ?? {};
-        return {
-          total: Number(raw?.total ?? 0),
-          valides: Number(raw?.valides ?? 0),
-          invalides: Number(raw?.invalides ?? 0),
-          ceMois: Number(raw?.ceMois ?? 0),
-        };
-      } catch {
-        return { total: 0, valides: 0, invalides: 0, ceMois: 0 };
-      }
+      const response = await api.get(`${apiPrefix}/attestations/stats`);
+      const raw = extractItem<any>(response) ?? {};
+      return {
+        total: Number(raw?.total ?? 0),
+        valides: Number(raw?.valides ?? 0),
+        invalides: Number(raw?.invalides ?? 0),
+        ceMois: Number(raw?.ceMois ?? 0),
+      };
     },
     staleTime: 60_000,
-    retry: 0,
+    retry: 1,
   });
 }
 
 /**
  * ⭐ Aperçu des participants éligibles AVANT génération
+ * GET /api/admin/attestations/preview-session/:sessionId
  */
 export function useSessionPreview(
   sessionId: string | undefined,
-  criteria?: EligibilityCriteria,
+  criteria: EligibilityCriteria = DEFAULT_CRITERIA,
   enabled = false,
 ) {
+  const apiPrefix = useAttestationApiPrefix();
+
   return useQuery({
     queryKey: attestationKeys.preview(sessionId ?? '', criteria),
     queryFn: async (): Promise<SessionPreview> => {
+      if (!isValidUuid(sessionId)) {
+        throw new Error('sessionId invalide');
+      }
+
       const response = await api.get(
-        `/admin/attestations/preview-session/${sessionId}`,
-        { params: criteria },
+        `${apiPrefix}/attestations/preview-session/${sessionId}`,
+        { params: serializeCriteria(criteria) },
       );
-      return extractItem<SessionPreview>(response);
+
+      const raw = extractItem<any>(response) ?? {};
+
+      return {
+        session: raw.session,
+        criteres: raw.criteres ?? criteria,
+        participants: Array.isArray(raw.participants)
+          ? raw.participants.map(normalizeParticipant)
+          : [],
+        stats: {
+          total: Number(raw.stats?.total ?? 0),
+          eligibles: Number(raw.stats?.eligibles ?? 0),
+          ineligibles: Number(raw.stats?.ineligibles ?? 0),
+          dejaGenerees: Number(raw.stats?.dejaGenerees ?? 0),
+        },
+      };
     },
-    enabled: enabled && !!sessionId,
+    enabled: enabled && !!sessionId && isValidUuid(sessionId),
     staleTime: 30_000,
+    retry: (failureCount, error: any) => {
+      if (error?.code === 'ERR_NETWORK') return false;
+      if (error?.response?.status === 404) return false;
+      return failureCount < 1;
+    },
+    placeholderData: (prev) => prev,
   });
 }
 
 /* ============================================================================
    MUTATIONS
+   ⚠️ URLs alignées sur le BACKEND réel (admin.routes.ts)
    ============================================================================ */
 
 /**
- * ⭐ Générer les attestations pour une session
+ * ⭐ Générer les attestations en batch pour une session
+ * ✅ BACKEND : POST /api/admin/attestations/generer-session/:sessionId
  */
 export function useGenerateAttestations() {
+  const apiPrefix = useAttestationApiPrefix();
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       sessionId,
@@ -322,10 +473,16 @@ export function useGenerateAttestations() {
       sessionId: string;
       criteria?: EligibilityCriteria;
     }): Promise<GenerationResult> => {
+      if (!isValidUuid(sessionId)) {
+        throw new Error('sessionId invalide : UUID requis');
+      }
+
       const response = await api.post(
-        `/admin/attestations/generer-session/${sessionId}`,
+        `${apiPrefix}/attestations/generer-session/${sessionId}`,
         criteria ?? {},
+        { timeout: 60_000 },
       );
+
       return extractItem<GenerationResult>(response);
     },
     onSuccess: (data) => {
@@ -344,18 +501,27 @@ export function useGenerateAttestations() {
           `${data.erreurs} erreur${data.erreurs > 1 ? 's' : ''} lors de la génération`,
         );
       }
+      if (data.generes === 0 && data.ignores === 0 && data.erreurs === 0) {
+        toast.info('Aucune attestation à générer');
+      }
       qc.invalidateQueries({ queryKey: attestationKeys.lists() });
       qc.invalidateQueries({ queryKey: attestationKeys.stats() });
+      qc.invalidateQueries({ queryKey: attestationKeys.all });
     },
-    onError: (e) => toast.error(getErrorMessage(e)),
+    onError: (e) => {
+      toast.error(getErrorMessage(e), { duration: 8000 });
+    },
   });
 }
 
 /**
- * ⭐ Générer une attestation pour un participant spécifique
+ * ⭐ Générer une seule attestation
+ * ✅ BACKEND : POST /api/admin/attestations/generer-une
  */
 export function useGenerateOneAttestation() {
+  const apiPrefix = useAttestationApiPrefix();
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       sessionId,
@@ -364,9 +530,16 @@ export function useGenerateOneAttestation() {
       sessionId: string;
       participantId: string;
     }): Promise<Attestation> => {
-      const response = await api.post(
-        `/admin/attestations/generer-une/${sessionId}/${participantId}`,
-      );
+      if (!isValidUuid(sessionId) || !isValidUuid(participantId)) {
+        throw new Error('sessionId ou participantId invalide');
+      }
+
+      const action = apiPrefix === '/staff' ? 'generer' : 'generer-une';
+      const response = await api.post(`${apiPrefix}/attestations/${action}`, {
+        sessionId,
+        participantId,
+      });
+
       return normalizeAttestation(extractItem<any>(response));
     },
     onSuccess: () => {
@@ -380,9 +553,12 @@ export function useGenerateOneAttestation() {
 
 /**
  * ⭐ Invalider une attestation
+ * ✅ BACKEND : PUT /api/admin/attestations/:id/invalider
  */
 export function useInvalidateAttestation() {
+  const apiPrefix = useAttestationApiPrefix();
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       id,
@@ -390,14 +566,17 @@ export function useInvalidateAttestation() {
     }: {
       id: string;
       motif: string;
-    }) => {
-      const response = await api.put(`/admin/attestations/${id}/invalider`, {
+    }): Promise<Attestation> => {
+      const response = await api.put(`${apiPrefix}/attestations/${id}/invalider`, {
         motif,
       });
       return normalizeAttestation(extractItem<any>(response));
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success('Attestation invalidée');
+      if (data?.id) {
+        qc.invalidateQueries({ queryKey: attestationKeys.detail(data.id) });
+      }
       qc.invalidateQueries({ queryKey: attestationKeys.lists() });
       qc.invalidateQueries({ queryKey: attestationKeys.stats() });
     },
@@ -407,16 +586,22 @@ export function useInvalidateAttestation() {
 
 /**
  * ⭐ Réactiver une attestation
+ * ✅ BACKEND : PUT /api/admin/attestations/:id/reactiver
  */
 export function useReactivateAttestation() {
+  const apiPrefix = useAttestationApiPrefix();
   const qc = useQueryClient();
+
   return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await api.put(`/admin/attestations/${id}/reactiver`);
+    mutationFn: async (id: string): Promise<Attestation> => {
+      const response = await api.put(`${apiPrefix}/attestations/${id}/reactiver`);
       return normalizeAttestation(extractItem<any>(response));
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success('Attestation réactivée');
+      if (data?.id) {
+        qc.invalidateQueries({ queryKey: attestationKeys.detail(data.id) });
+      }
       qc.invalidateQueries({ queryKey: attestationKeys.lists() });
       qc.invalidateQueries({ queryKey: attestationKeys.stats() });
     },
@@ -425,9 +610,12 @@ export function useReactivateAttestation() {
 }
 
 /**
- * ⭐ Télécharger une attestation PDF
+ * ⭐ Télécharger le PDF
+ * ✅ BACKEND : GET /api/admin/attestations/:id/telecharger
  */
 export function useDownloadAttestation() {
+  const apiPrefix = useAttestationApiPrefix();
+
   return useMutation({
     mutationFn: async ({
       id,
@@ -435,20 +623,37 @@ export function useDownloadAttestation() {
     }: {
       id: string;
       numero: string;
-    }) => {
-      const response = await api.get(
-        `/admin/attestations/${id}/telecharger`,
-        { responseType: 'blob' },
-      );
+    }): Promise<boolean> => {
+      const response = await api.get(`${apiPrefix}/attestations/${id}/telecharger`, {
+        responseType: 'blob',
+      });
 
-      const url = URL.createObjectURL(new Blob([response.data]));
+      const contentDisposition = response.headers?.['content-disposition'];
+      let filename = `attestation-${numero}.pdf`;
+      if (contentDisposition) {
+        const match = /filename\*?=(?:UTF-8'')?["']?([^;"']+)/i.exec(contentDisposition);
+        if (match?.[1]) {
+          try {
+            filename = decodeURIComponent(match[1]);
+          } catch {
+            filename = match[1];
+          }
+        }
+      }
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `attestation-${numero}.pdf`;
+      a.download = filename;
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
 
       return true;
     },

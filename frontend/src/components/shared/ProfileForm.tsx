@@ -35,6 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
+import { getMediaUrl } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { useAuthContext } from '@/contexts/AuthContext';
 
@@ -53,11 +54,7 @@ const profileSchema = z.object({
     .trim()
     .min(2, 'Minimum 2 caractères')
     .max(50, 'Maximum 50 caractères'),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email('Email invalide'),
+  email: z.string().trim().toLowerCase().email('Email invalide'),
   telephone: z
     .string()
     .trim()
@@ -68,18 +65,8 @@ const profileSchema = z.object({
   ville: z.string().max(100).optional(),
   entreprise: z.string().max(200).optional(),
   poste: z.string().max(200).optional(),
-  siteWeb: z
-    .string()
-    .trim()
-    .url('URL invalide')
-    .optional()
-    .or(z.literal('')),
-  linkedin: z
-    .string()
-    .trim()
-    .url('URL invalide')
-    .optional()
-    .or(z.literal('')),
+  siteWeb: z.string().trim().url('URL invalide').optional().or(z.literal('')),
+  linkedin: z.string().trim().url('URL invalide').optional().or(z.literal('')),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -104,6 +91,21 @@ interface UserProfile {
   role?: { nom: string; libelle?: string } | null;
   createdAt?: string;
 }
+
+/* ============================================================================
+   STYLES RÉUTILISABLES (neutres)
+   ============================================================================ */
+
+const CARD_CLASS = cn(
+  'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950',
+);
+
+const ICON_HEADER_CLASS = 'h-5 w-5 text-slate-500 dark:text-slate-400';
+
+const LABEL_CLASS =
+  'flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300';
+
+const ERROR_CLASS = 'mt-1.5 text-xs text-red-600 dark:text-red-400';
 
 /* ============================================================================
    COMPOSANT
@@ -225,7 +227,6 @@ export function ProfileForm() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validation
     if (!file.type.startsWith('image/')) {
       toast.error('Le fichier doit être une image');
       return;
@@ -245,6 +246,9 @@ export function ProfileForm() {
     return `${p}${n}`.toUpperCase() || '?';
   };
 
+  const avatarSrc =
+    profile?.photoUrl ? getMediaUrl(profile.photoUrl) : undefined;
+
   /* -------------------- Loading -------------------- */
   if (isLoading || !profile) {
     return <ProfileFormSkeleton />;
@@ -254,36 +258,36 @@ export function ProfileForm() {
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6 max-w-3xl"
+      className="mx-auto max-w-3xl space-y-6"
       noValidate
     >
       {/* ================================================================
           CARTE AVATAR
           ================================================================ */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-odc-primary" />
+          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
+            <User className={ICON_HEADER_CLASS} aria-hidden />
             Photo de profil
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-slate-500 dark:text-slate-400">
             Une photo aide la communauté à vous reconnaître
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <div className="flex items-center gap-5">
-            <div className="relative group">
-              <Avatar className="h-24 w-24 border-2 border-odc-border">
-                <AvatarImage src={profile.photoUrl ?? undefined} />
-                <AvatarFallback className="bg-odc-primary-soft text-odc-primary text-2xl font-bold">
+            <div className="group relative">
+              <Avatar className="h-24 w-24 border-2 border-slate-200 dark:border-slate-800">
+                <AvatarImage src={avatarSrc} alt="Photo de profil" />
+                <AvatarFallback className="bg-gradient-to-br from-slate-700 to-slate-900 text-2xl font-bold text-white">
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
 
               {uploadAvatarMutation.isPending && (
-                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 text-white animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-slate-900/50">
+                  <Loader2 className="h-6 w-6 animate-spin text-white" aria-hidden />
                 </div>
               )}
             </div>
@@ -302,11 +306,17 @@ export function ProfileForm() {
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadAvatarMutation.isPending}
+                className={cn(
+                  'h-9 rounded-lg border-slate-200 font-medium',
+                  'text-slate-700 hover:bg-slate-50 hover:text-slate-900',
+                  'dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-slate-50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-600',
+                )}
               >
-                <Camera className="h-4 w-4 mr-2" />
+                <Camera className="mr-2 h-4 w-4" aria-hidden />
                 Changer la photo
               </Button>
-              <p className="text-xs text-odc-muted">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 JPG, PNG ou WEBP · Max 5 Mo
               </p>
             </div>
@@ -317,19 +327,21 @@ export function ProfileForm() {
       {/* ================================================================
           CARTE IDENTITÉ
           ================================================================ */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-odc-primary" />
+          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
+            <User className={ICON_HEADER_CLASS} aria-hidden />
             Informations personnelles
           </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* -------------------- Nom / Prénom -------------------- */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          {/* Nom / Prénom */}
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="prenom">Prénom *</Label>
+              <Label htmlFor="prenom" className={LABEL_CLASS}>
+                Prénom *
+              </Label>
               <Input
                 id="prenom"
                 autoComplete="given-name"
@@ -339,14 +351,16 @@ export function ProfileForm() {
                 aria-invalid={!!errors.prenom}
               />
               {errors.prenom && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className={ERROR_CLASS} role="alert">
                   {errors.prenom.message}
                 </p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="nom">Nom *</Label>
+              <Label htmlFor="nom" className={LABEL_CLASS}>
+                Nom *
+              </Label>
               <Input
                 id="nom"
                 autoComplete="family-name"
@@ -356,16 +370,18 @@ export function ProfileForm() {
                 aria-invalid={!!errors.nom}
               />
               {errors.nom && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className={ERROR_CLASS} role="alert">
                   {errors.nom.message}
                 </p>
               )}
             </div>
           </div>
 
-          {/* -------------------- Bio -------------------- */}
+          {/* Bio */}
           <div>
-            <Label htmlFor="bio">Bio</Label>
+            <Label htmlFor="bio" className={LABEL_CLASS}>
+              Bio
+            </Label>
             <Textarea
               id="bio"
               rows={3}
@@ -375,16 +391,16 @@ export function ProfileForm() {
               className="mt-1.5 resize-none"
             />
             {errors.bio && (
-              <p className="text-odc-error text-xs mt-1.5" role="alert">
+              <p className={ERROR_CLASS} role="alert">
                 {errors.bio.message}
               </p>
             )}
           </div>
 
-          {/* -------------------- Ville -------------------- */}
+          {/* Ville */}
           <div>
-            <Label htmlFor="ville" className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />
+            <Label htmlFor="ville" className={LABEL_CLASS}>
+              <MapPin className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" aria-hidden />
               Ville
             </Label>
             <Input
@@ -401,19 +417,19 @@ export function ProfileForm() {
       {/* ================================================================
           CARTE CONTACT
           ================================================================ */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-odc-primary" />
+          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
+            <Mail className={ICON_HEADER_CLASS} aria-hidden />
             Contact
           </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="email" className="flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5" />
+              <Label htmlFor="email" className={LABEL_CLASS}>
+                <Mail className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" aria-hidden />
                 Email *
               </Label>
               <Input
@@ -424,14 +440,14 @@ export function ProfileForm() {
                 {...register('email')}
                 className="mt-1.5"
               />
-              <p className="text-xs text-odc-muted mt-1.5">
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                 L&apos;email ne peut pas être modifié
               </p>
             </div>
 
             <div>
-              <Label htmlFor="telephone" className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5" />
+              <Label htmlFor="telephone" className={LABEL_CLASS}>
+                <Phone className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" aria-hidden />
                 Téléphone
               </Label>
               <Input
@@ -445,7 +461,7 @@ export function ProfileForm() {
                 aria-invalid={!!errors.telephone}
               />
               {errors.telephone && (
-                <p className="text-odc-error text-xs mt-1.5" role="alert">
+                <p className={ERROR_CLASS} role="alert">
                   {errors.telephone.message}
                 </p>
               )}
@@ -457,19 +473,19 @@ export function ProfileForm() {
       {/* ================================================================
           CARTE PROFESSIONNEL
           ================================================================ */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Briefcase className="h-5 w-5 text-odc-primary" />
+          <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
+            <Briefcase className={ICON_HEADER_CLASS} aria-hidden />
             Informations professionnelles
           </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="entreprise" className="flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5" />
+              <Label htmlFor="entreprise" className={LABEL_CLASS}>
+                <Building2 className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" aria-hidden />
                 Entreprise
               </Label>
               <Input
@@ -482,7 +498,9 @@ export function ProfileForm() {
             </div>
 
             <div>
-              <Label htmlFor="poste">Poste</Label>
+              <Label htmlFor="poste" className={LABEL_CLASS}>
+                Poste
+              </Label>
               <Input
                 id="poste"
                 placeholder="Développeur Full-Stack"
@@ -494,8 +512,8 @@ export function ProfileForm() {
           </div>
 
           <div>
-            <Label htmlFor="siteWeb" className="flex items-center gap-1.5">
-              <Globe className="h-3.5 w-3.5" />
+            <Label htmlFor="siteWeb" className={LABEL_CLASS}>
+              <Globe className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" aria-hidden />
               Site web
             </Label>
             <Input
@@ -508,15 +526,15 @@ export function ProfileForm() {
               aria-invalid={!!errors.siteWeb}
             />
             {errors.siteWeb && (
-              <p className="text-odc-error text-xs mt-1.5" role="alert">
+              <p className={ERROR_CLASS} role="alert">
                 {errors.siteWeb.message}
               </p>
             )}
           </div>
 
           <div>
-            <Label htmlFor="linkedin" className="flex items-center gap-1.5">
-              <Linkedin className="h-3.5 w-3.5" />
+            <Label htmlFor="linkedin" className={LABEL_CLASS}>
+              <Linkedin className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" aria-hidden />
               LinkedIn
             </Label>
             <Input
@@ -529,7 +547,7 @@ export function ProfileForm() {
               aria-invalid={!!errors.linkedin}
             />
             {errors.linkedin && (
-              <p className="text-odc-error text-xs mt-1.5" role="alert">
+              <p className={ERROR_CLASS} role="alert">
                 {errors.linkedin.message}
               </p>
             )}
@@ -540,21 +558,28 @@ export function ProfileForm() {
       {/* ================================================================
           BOUTON SAUVEGARDER
           ================================================================ */}
-      <div className="flex items-center justify-end gap-3 sticky bottom-4 z-10">
+      <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3">
         <Button
           type="submit"
-          variant="odc"
           size="lg"
           disabled={isSubmitting || !isDirty}
+          className={cn(
+            'h-10 rounded-lg px-5 font-medium',
+            'bg-slate-900 text-white shadow-sm',
+            'hover:bg-slate-800',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200 dark:focus-visible:ring-slate-600',
+          )}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
               Enregistrement…
             </>
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" aria-hidden />
               Enregistrer les modifications
             </>
           )}
@@ -570,9 +595,9 @@ export function ProfileForm() {
 
 function ProfileFormSkeleton() {
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="mx-auto max-w-3xl space-y-6">
       {/* Avatar */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
           <Skeleton className="h-5 w-40" />
         </CardHeader>
@@ -588,12 +613,12 @@ function ProfileFormSkeleton() {
       </Card>
 
       {/* Identité */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
           <Skeleton className="h-5 w-40" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Skeleton className="h-16" />
             <Skeleton className="h-16" />
           </div>
@@ -603,12 +628,12 @@ function ProfileFormSkeleton() {
       </Card>
 
       {/* Contact */}
-      <Card>
+      <Card className={CARD_CLASS}>
         <CardHeader>
           <Skeleton className="h-5 w-24" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Skeleton className="h-16" />
             <Skeleton className="h-16" />
           </div>

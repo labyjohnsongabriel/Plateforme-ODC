@@ -4,40 +4,20 @@
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  MoreVertical,
-  Edit,
-  Trash2,
-  ShieldCheck,
-  UserX,
-  UserCheck,
-  Eye,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Shield,
-  Users as UsersIcon,
-  GraduationCap,
-  User as UserIcon,
-  Building2,
+  MoreVertical, Edit, Trash2, ShieldCheck, UserX, UserCheck, Shield,
+  ArrowUpDown, ArrowUp, ArrowDown, Users as UsersIcon,
+  GraduationCap, User as UserIcon, Building2, RefreshCw,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,9 +35,9 @@ import { UserFormModal } from './UserFormModal';
 import { RoleSelectorModal } from './RoleSelectorModal';
 import { DeleteUserDialog, BulkDeleteUsersDialog } from './DeleteUserDialog';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    CONFIGURATION DES RÔLES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const ROLE_CONFIG: Record<
   RoleNom,
@@ -66,36 +46,41 @@ const ROLE_CONFIG: Record<
   ADMINISTRATEUR: {
     label: 'Administrateur',
     icon: Shield,
-    badge: 'bg-red-50 text-red-700 ring-red-200',
+    badge:
+      'bg-red-50 text-red-700 ring-red-200 dark:bg-red-950/40 dark:text-red-300 dark:ring-red-900',
   },
   STAFF_ODC: {
     label: 'Staff ODC',
     icon: UsersIcon,
-    badge: 'bg-orange-50 text-orange-700 ring-orange-200',
+    badge:
+      'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:ring-orange-900',
   },
   FORMATEUR: {
     label: 'Formateur',
     icon: GraduationCap,
-    badge: 'bg-blue-50 text-blue-700 ring-blue-200',
+    badge:
+      'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:ring-blue-900',
   },
   PARTICIPANT: {
     label: 'Participant',
     icon: UserIcon,
-    badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    badge:
+      'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900',
   },
   PARTENAIRE: {
     label: 'Partenaire',
     icon: Building2,
-    badge: 'bg-purple-50 text-purple-700 ring-purple-200',
+    badge:
+      'bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:ring-purple-900',
   },
 };
 
 type SortField = 'nom' | 'email' | 'createdAt' | 'role';
 type SortOrder = 'asc' | 'desc';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    SQUELETTE
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function TableSkeleton() {
   return (
@@ -117,9 +102,9 @@ function TableSkeleton() {
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPOSANT
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function UsersTable() {
   const searchParams = useSearchParams();
@@ -151,7 +136,7 @@ export function UsersTable() {
   );
 
   /* -------------------- Queries & Mutations -------------------- */
-  const { data, isLoading, isError } = useUsers(filters);
+  const { data, isLoading, isError, refetch, isFetching } = useUsers(filters);
   const toggleActif = useToggleUserActif();
 
   /* -------------------- Tri -------------------- */
@@ -166,18 +151,19 @@ export function UsersTable() {
 
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) {
-      return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />;
+      return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" aria-hidden />;
     }
     return sortOrder === 'asc' ? (
-      <ArrowUp className="h-3.5 w-3.5 text-odc-primary" />
+      <ArrowUp className="h-3.5 w-3.5 text-odc-primary" aria-hidden />
     ) : (
-      <ArrowDown className="h-3.5 w-3.5 text-odc-primary" />
+      <ArrowDown className="h-3.5 w-3.5 text-odc-primary" aria-hidden />
     );
   };
 
   /* -------------------- Sélection -------------------- */
+  const users = data?.data ?? [];
+
   const toggleSelectAll = () => {
-    const users = data?.data ?? [];
     if (selectedIds.length === users.length) {
       setSelectedIds([]);
     } else {
@@ -205,8 +191,14 @@ export function UsersTable() {
           action={
             <Button
               variant="outline"
-              onClick={() => window.location.reload()}
+              onClick={() => void refetch()}
+              disabled={isFetching}
             >
+              {isFetching ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" aria-hidden />
+              )}
               Réessayer
             </Button>
           }
@@ -216,7 +208,7 @@ export function UsersTable() {
   }
 
   /* -------------------- Tri des données -------------------- */
-  const users = [...(data?.data ?? [])].sort((a, b) => {
+  const sortedUsers = [...users].sort((a, b) => {
     let comparison = 0;
     switch (sortField) {
       case 'nom':
@@ -239,7 +231,7 @@ export function UsersTable() {
   });
 
   /* -------------------- Vide -------------------- */
-  if (!users.length) {
+  if (!sortedUsers.length) {
     return (
       <>
         <Card>
@@ -249,7 +241,7 @@ export function UsersTable() {
             description="Aucun utilisateur ne correspond à vos filtres."
             action={
               <Button variant="odc" onClick={() => setIsCreateOpen(true)}>
-                <UserIcon className="mr-2 h-4 w-4" />
+                <UserIcon className="mr-2 h-4 w-4" aria-hidden />
                 Créer un utilisateur
               </Button>
             }
@@ -279,8 +271,8 @@ export function UsersTable() {
               variant="outline"
               size="sm"
               onClick={() => setIsBulkDeleteOpen(true)}
-              leftIcon={<Trash2 className="h-4 w-4" />}
             >
+              <Trash2 className="mr-2 h-4 w-4" aria-hidden />
               Supprimer
             </Button>
             <Button
@@ -301,7 +293,8 @@ export function UsersTable() {
               <TableHead className="w-12">
                 <Checkbox
                   checked={
-                    selectedIds.length === users.length && users.length > 0
+                    selectedIds.length === sortedUsers.length &&
+                    sortedUsers.length > 0
                   }
                   onCheckedChange={toggleSelectAll}
                   aria-label="Tout sélectionner"
@@ -345,7 +338,7 @@ export function UsersTable() {
           </TableHeader>
 
           <TableBody>
-            {users.map((user) => {
+            {sortedUsers.map((user) => {
               const roleConfig =
                 ROLE_CONFIG[user.role?.nom ?? 'PARTICIPANT'];
               const RoleIcon = roleConfig.icon;
@@ -392,7 +385,7 @@ export function UsersTable() {
                         roleConfig.badge,
                       )}
                     >
-                      <RoleIcon className="h-3 w-3" />
+                      <RoleIcon className="h-3 w-3" aria-hidden />
                       {roleConfig.label}
                     </Badge>
                   </TableCell>
@@ -427,7 +420,7 @@ export function UsersTable() {
                           className="opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
                           aria-label="Actions"
                         >
-                          <MoreVertical className="h-4 w-4" />
+                          <MoreVertical className="h-4 w-4" aria-hidden />
                         </Button>
                       </DropdownMenuTrigger>
 
@@ -435,14 +428,14 @@ export function UsersTable() {
                         <DropdownMenuItem
                           onClick={() => setEditingUser(user)}
                         >
-                          <Edit className="mr-2 h-4 w-4" />
+                          <Edit className="mr-2 h-4 w-4" aria-hidden />
                           Modifier
                         </DropdownMenuItem>
 
                         <DropdownMenuItem
                           onClick={() => setChangingRoleUser(user)}
                         >
-                          <ShieldCheck className="mr-2 h-4 w-4" />
+                          <ShieldCheck className="mr-2 h-4 w-4" aria-hidden />
                           Changer le rôle
                         </DropdownMenuItem>
 
@@ -459,12 +452,12 @@ export function UsersTable() {
                         >
                           {user.actif ? (
                             <>
-                              <UserX className="mr-2 h-4 w-4" />
+                              <UserX className="mr-2 h-4 w-4" aria-hidden />
                               Désactiver
                             </>
                           ) : (
                             <>
-                              <UserCheck className="mr-2 h-4 w-4" />
+                              <UserCheck className="mr-2 h-4 w-4" aria-hidden />
                               Activer
                             </>
                           )}
@@ -476,7 +469,7 @@ export function UsersTable() {
                           className="text-odc-error focus:bg-odc-error-soft focus:text-odc-error"
                           onClick={() => setDeletingUser(user)}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
+                          <Trash2 className="mr-2 h-4 w-4" aria-hidden />
                           Supprimer
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -489,9 +482,7 @@ export function UsersTable() {
         </Table>
       </Card>
 
-      {/* ================================================================
-          MODALES
-          ================================================================ */}
+      {/* ═══════════════ MODALES ═══════════════ */}
 
       {/* Création */}
       <UserFormModal
@@ -511,7 +502,14 @@ export function UsersTable() {
       {/* Changement de rôle */}
       <RoleSelectorModal
         userId={changingRoleUser?.id ?? ''}
-        currentRole={changingRoleUser?.role?.nom ?? 'PARTICIPANT'}
+        userName={
+          changingRoleUser
+            ? `${changingRoleUser.prenom} ${changingRoleUser.nom}`
+            : undefined
+        }
+        currentRole={
+          (changingRoleUser?.role?.nom as RoleNom) ?? 'PARTICIPANT'
+        }
         open={!!changingRoleUser}
         onOpenChange={(open) => !open && setChangingRoleUser(null)}
       />

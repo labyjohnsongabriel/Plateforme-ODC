@@ -1,4 +1,10 @@
-import { ClipboardList, Calendar, TrendingUp, CheckCircle, ArrowRight } from 'lucide-react';
+import {
+  ClipboardList,
+  Calendar,
+  TrendingUp,
+  CheckCircle,
+  ArrowRight,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StatCardGrid } from './StatCardGrid';
 import { Button } from '@/components/common/Button';
@@ -35,7 +41,7 @@ export function StaffDashboard({ data, loading }: StaffDashboardProps) {
     },
     {
       label: 'Taux de présence',
-      value: `${data.tauxPresenceMoyen || 0}%`,
+      value: data.tauxPresenceMoyen == null ? '—' : `${data.tauxPresenceMoyen}%`,
       icon: <CheckCircle size={22} />,
       variant: 'info',
     },
@@ -49,14 +55,14 @@ export function StaffDashboard({ data, loading }: StaffDashboardProps) {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="animate-fade-in space-y-6">
       <StatCardGrid kpis={statCards} columns={4} />
 
       <Card>
-        <h3 className="font-heading font-semibold text-lg mb-4 text-odc-text-light dark:text-odc-text-dark">
+        <h3 className="mb-4 font-heading text-lg font-semibold text-odc-text-light dark:text-odc-text-dark">
           Actions rapides
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => {
             const Icon = action.icon;
             return (

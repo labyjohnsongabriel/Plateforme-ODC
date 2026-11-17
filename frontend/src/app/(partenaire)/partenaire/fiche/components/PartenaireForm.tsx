@@ -4,7 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Loader2, Save, Building2, Upload, Globe, Mail, Phone, Camera,
+  Loader2,
+  Save,
+  Building2,
+  Upload,
+  Globe,
+  Mail,
+  Phone,
+  Camera,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
+import { getMediaUrl } from '@/lib/media';
 
 export function PartenaireForm() {
   const qc = useQueryClient();
@@ -79,7 +87,7 @@ export function PartenaireForm() {
   };
 
   if (isLoading) {
-    return <div className="h-96 bg-odc-surface-alt rounded-lg animate-pulse" />;
+    return <div className="bg-odc-surface-alt h-96 animate-pulse rounded-lg" />;
   }
 
   return (
@@ -88,7 +96,7 @@ export function PartenaireForm() {
         e.preventDefault();
         mutation.mutate();
       }}
-      className="space-y-6 max-w-3xl"
+      className="max-w-3xl space-y-6"
     >
       <Card>
         <CardHeader>
@@ -102,15 +110,15 @@ export function PartenaireForm() {
           <div>
             <Label>Logo de l&apos;organisation</Label>
             <div className="mt-1.5 flex items-center gap-4">
-              <div className="w-24 h-24 rounded-lg bg-odc-surface-alt flex items-center justify-center overflow-hidden shrink-0 border border-odc-border">
+              <div className="bg-odc-surface-alt border-odc-border flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
                 {form.logoUrl ? (
                   <img
-                    src={form.logoUrl}
+                    src={getMediaUrl(form.logoUrl)}
                     alt="Logo"
-                    className="w-full h-full object-contain"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
-                  <Building2 className="h-10 w-10 text-odc-muted" />
+                  <Building2 className="text-odc-muted h-10 w-10" />
                 )}
               </div>
               <div>
@@ -130,16 +138,16 @@ export function PartenaireForm() {
                   size="sm"
                   onClick={() => fileRef.current?.click()}
                 >
-                  <Camera className="h-4 w-4 mr-2" /> Changer le logo
+                  <Camera className="mr-2 h-4 w-4" /> Changer le logo
                 </Button>
-                <p className="text-xs text-odc-muted mt-1.5">
+                <p className="text-odc-muted mt-1.5 text-xs">
                   Format carré recommandé — PNG, JPG ou SVG
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="nom">Nom de l&apos;organisation *</Label>
               <Input
@@ -181,7 +189,7 @@ export function PartenaireForm() {
           <CardTitle>Contact</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="contactEmail" className="flex items-center gap-1.5">
                 <Mail className="h-3.5 w-3.5" /> Email
@@ -223,19 +231,19 @@ export function PartenaireForm() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Badge variant={fiche?.estPubliee ? 'default' : 'outline'}>
             {fiche?.estPubliee ? '📢 Publiée' : '📴 Non publiée'}
           </Badge>
-          <span className="text-xs text-odc-muted">
+          <span className="text-odc-muted text-xs">
             (publication gérée par l&apos;administrateur)
           </span>
         </div>
 
         <Button variant="odc" type="submit" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <Save className="h-4 w-4 mr-2" /> Enregistrer
+          {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Save className="mr-2 h-4 w-4" /> Enregistrer
         </Button>
       </div>
     </form>

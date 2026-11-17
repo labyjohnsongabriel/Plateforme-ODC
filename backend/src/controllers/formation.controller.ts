@@ -1,76 +1,12 @@
-<<<<<<< HEAD
 // src/controllers/formation.controller.ts
-=======
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { FormationService } from '../services/formation.service';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-
-export class FormationController {
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const f = await FormationService.create(req.body);
-      return successResponse(res, f, 'Formation creee', 201);
-    } catch (e) { next(e); }
-  }
-
-  static async findAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const r = await FormationService.findAll(req.query);
-      return paginatedResponse(res, r.data, r.total, r.page, r.limit, 'Liste des formations');
-    } catch (e) { next(e); }
-  }
-
-  static async findOne(req: Request, res: Response, next: NextFunction) {
-    try {
-      const f = await FormationService.findById(req.params.id);
-      return successResponse(res, f);
-    } catch (e) { next(e); }
-  }
-
-  static async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const f = await FormationService.update(req.params.id, req.body);
-      return successResponse(res, f, 'Formation mise a jour');
-    } catch (e) { next(e); }
-  }
-
-  static async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      await FormationService.delete(req.params.id);
-      return successResponse(res, null, 'Formation supprimee');
-    } catch (e) { next(e); }
-  }
-
-  static async top(req: Request, res: Response, next: NextFunction) {
-    try {
-      const r = await FormationService.getTop();
-      return successResponse(res, r);
-    } catch (e) { next(e); }
-  }
-
-  static async statsByDomaine(req: Request, res: Response, next: NextFunction) {
-    try {
-      const r = await FormationService.countByDomaine();
-      return successResponse(res, r);
-    } catch (e) { next(e); }
-=======
-// src/controllers/FormationController.ts
->>>>>>> origin/main
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
 import { Formation } from '../entities/Formation.entity';
 import { Session } from '../entities/Session.entity';
 import { Inscription } from '../entities/Inscription.entity';
 import { FormationService } from '../services/formation.service';
-import {
-  successResponse,
-  paginatedResponse,
-} from '../utils/response.util';
-import {
-  BadRequestError,
-  NotFoundError,
-} from '../errors/AppError';
+import { successResponse, paginatedResponse } from '../utils/response.util';
+import { BadRequestError, NotFoundError } from '../errors/AppError';
 import { slugify } from '../utils/string.util';
 import { logger } from '../config/logger';
 
@@ -90,11 +26,7 @@ export class FormationController {
   /* ==========================================================================
      🌐 PUBLIC — Liste des formations publiées
      ========================================================================== */
-  static async listPublic(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async listPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await FormationService.findAllPublic(req.query);
 
@@ -104,7 +36,7 @@ export class FormationController {
         result.total,
         result.page,
         result.limit,
-        'Catalogue public',
+        'Catalogue public'
       );
     } catch (e) {
       next(e);
@@ -114,15 +46,9 @@ export class FormationController {
   /* ==========================================================================
      🌐 PUBLIC — Détail par slug
      ========================================================================== */
-  static async detailPublic(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async detailPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const formation = await FormationService.findBySlugPublic(
-        req.params.slug,
-      );
+      const formation = await FormationService.findBySlugPublic(req.params.slug);
       return successResponse(res, formation);
     } catch (e) {
       next(e);
@@ -132,11 +58,7 @@ export class FormationController {
   /* ==========================================================================
      🌐 PUBLIC — Top formations
      ========================================================================== */
-  static async topPublic(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async topPublic(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const data = await FormationService.getTopPublic(6);
       return successResponse(res, data);
@@ -148,11 +70,7 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Créer une formation
      ========================================================================== */
-  static async create(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { titre } = req.body;
 
@@ -178,11 +96,7 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Liste paginée avec compteurs
      ========================================================================== */
-  static async findAll(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await FormationService.findAll(req.query);
 
@@ -192,7 +106,7 @@ export class FormationController {
         result.total,
         result.page,
         result.limit,
-        'Liste des formations',
+        'Liste des formations'
       );
     } catch (e) {
       next(e);
@@ -203,11 +117,7 @@ export class FormationController {
      ⭐⭐ ADMIN — Sessions liées à une formation
      GET /api/admin/formations/:id/sessions
      ========================================================================== */
-  static async getSessions(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async getSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const formationId = req.params.id;
 
@@ -222,10 +132,7 @@ export class FormationController {
       const sessions = await sessionRepo()
         .createQueryBuilder('s')
         .leftJoinAndSelect('s.formateur', 'u')
-        .loadRelationCountAndMap(
-          's.inscriptionsCount',
-          's.inscriptions',
-        )
+        .loadRelationCountAndMap('s.inscriptionsCount', 's.inscriptions')
         .where('s.formationId = :formationId', { formationId })
         .andWhere('s.deletedAt IS NULL')
         .orderBy('s.dateDebut', 'DESC')
@@ -243,9 +150,7 @@ export class FormationController {
         capacite: s.capacite,
         estPubliee: s.estPubliee,
         presenceOuverte: s.presenceOuverte,
-        inscriptionsCount: Number(
-          (s as any).inscriptionsCount ?? 0,
-        ),
+        inscriptionsCount: Number((s as any).inscriptionsCount ?? 0),
         formateur: s.formateur
           ? {
               id: s.formateur.id,
@@ -266,11 +171,7 @@ export class FormationController {
      ⭐⭐ ADMIN — Inscriptions liées à une formation
      GET /api/admin/formations/:id/inscriptions
      ========================================================================== */
-  static async getInscriptions(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async getInscriptions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const formationId = req.params.id;
 
@@ -318,11 +219,7 @@ export class FormationController {
           : null,
       }));
 
-      return successResponse(
-        res,
-        normalized,
-        'Inscriptions à cette formation',
-      );
+      return successResponse(res, normalized, 'Inscriptions à cette formation');
     } catch (e) {
       next(e);
     }
@@ -331,11 +228,7 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Détail par ID
      ========================================================================== */
-  static async findOne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async findOne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const formation = await FormationService.findById(req.params.id);
 
@@ -352,16 +245,9 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Mettre à jour
      ========================================================================== */
-  static async update(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const formation = await FormationService.update(
-        req.params.id,
-        req.body,
-      );
+      const formation = await FormationService.update(req.params.id, req.body);
       return successResponse(res, formation, 'Formation mise à jour');
     } catch (e) {
       next(e);
@@ -371,28 +257,16 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Publier / Dépublier
      ========================================================================== */
-  static async publier(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async publier(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const estPubliee =
-        typeof req.body.estPubliee === 'boolean'
-          ? req.body.estPubliee
-          : true;
+      const estPubliee = typeof req.body.estPubliee === 'boolean' ? req.body.estPubliee : true;
 
-      const formation = await FormationService.togglePublication(
-        req.params.id,
-        estPubliee,
-      );
+      const formation = await FormationService.togglePublication(req.params.id, estPubliee);
 
       return successResponse(
         res,
         formation,
-        formation.estPubliee
-          ? 'Formation publiée'
-          : 'Formation dépubliée',
+        formation.estPubliee ? 'Formation publiée' : 'Formation dépubliée'
       );
     } catch (e) {
       next(e);
@@ -402,26 +276,15 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Upload image
      ========================================================================== */
-  static async uploadImage(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async uploadImage(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.file) {
         throw new BadRequestError('Aucun fichier fourni');
       }
 
-      const filename =
-        (req.file as any).filename ??
-        req.file.originalname ??
-        'image';
-      const url = `/uploads/formations/${Date.now()}-${filename}`;
+      const url = `/uploads/formations/${req.file.filename}`;
 
-      const formation = await FormationService.setImage(
-        req.params.id,
-        url,
-      );
+      const formation = await FormationService.setImage(req.params.id, url);
 
       return successResponse(res, formation, 'Image mise à jour');
     } catch (e) {
@@ -432,11 +295,7 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Supprimer
      ========================================================================== */
-  static async delete(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       await FormationService.delete(req.params.id);
       return successResponse(res, null, 'Formation supprimée');
@@ -448,17 +307,12 @@ export class FormationController {
   /* ==========================================================================
      🔒 ADMIN — Statistiques par domaine
      ========================================================================== */
-  static async statsByDomaine(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async statsByDomaine(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const stats = await FormationService.countByDomaine();
       return successResponse(res, stats);
     } catch (e) {
       next(e);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

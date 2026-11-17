@@ -1,7 +1,6 @@
-<<<<<<< HEAD
-import { ID, Timestamp, PaginationParams } from './common.types';
-import { User } from './user.types';
-import { Session } from './session.types';
+import type { ID, PaginationParams, Timestamp } from './common.types';
+import type { User } from './user.types';
+import type { Session } from './session.types';
 
 export interface Attestation {
   id: ID;
@@ -12,6 +11,7 @@ export interface Attestation {
   participant: User;
   participantId: ID;
   fichierUrl?: string;
+  qrCodeUrl?: string;
   noteFinale?: number;
   tauxPresence?: number;
   telechargee: boolean;
@@ -72,27 +72,3 @@ export interface AttestationStats {
 }
 
 export const ATTESTATION_NUMBER_REGEX = /^ODC-\d{4}-[A-Z]{3}-[A-F0-9]{6}$/;
-=======
-import type { User } from './user.types';
-import type { Session } from './session.types';
-
-export interface Attestation {
-  id: string;
-  numero: string;
-  hash: string;
-  fichierUrl?: string;
-  qrCodeUrl?: string;
-  noteFinale?: number;
-  tauxPresence?: number;
-  telechargee: boolean;
-  dateTelechargement?: string;
-  dateEmission: string;
-  signatureNumerique?: string;
-  valide: boolean;
-  participant: User;
-  participantId: string;
-  session: Session;
-  sessionId: string;
-  createdAt: string;
-}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234

@@ -1,268 +1,154 @@
+{{! src/templates/attestation.hbs }}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <title>Attestation {{numero}}</title>
-  <link rel="stylesheet" href="attestation.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap');
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: A4 landscape; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    :root {
+      --odc-primary: #FF7900;
+      --odc-primary-dark: #E65100;
+      --odc-primary-soft: #FFE0B2;
+      --odc-bg: #FFF8F2;
+      --odc-ink: #1A1A1A;
+      --odc-muted: #6B6B6B;
+      --odc-hint: #8A8A8A;
+    }
 
     body {
-      font-family: 'Inter', sans-serif;
-      background: #FFF8F2;
-      width: 297mm;
-      height: 210mm;
-      padding: 10mm;
-      color: #1A1A1A;
-      position: relative;
+      font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+      background: var(--odc-bg);
+      width: 297mm; height: 210mm; padding: 8mm;
+      color: var(--odc-ink);
+      -webkit-font-smoothing: antialiased;
     }
 
     .attestation {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       background: #FFFFFF;
-      border: 4px solid #FF7900;
-      border-radius: 12px;
-      padding: 15mm;
+      border: 4px solid var(--odc-primary);
+      border-radius: 14px;
+      padding: 12mm 16mm 16mm;
       position: relative;
       overflow: hidden;
     }
+    .attestation::before {
+      content: '';
+      position: absolute; inset: 3mm;
+      border: 1px solid var(--odc-primary-soft);
+      border-radius: 10px;
+      pointer-events: none; z-index: 1;
+    }
 
-    .bande-top {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 8mm;
-      background: linear-gradient(90deg, #FF7900 0%, #E65100 100%);
+    .corner {
+      position: absolute; width: 14mm; height: 14mm;
+      border: 2px solid var(--odc-primary); z-index: 2;
     }
-    .bande-bottom {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 8mm;
-      background: linear-gradient(90deg, #E65100 0%, #FF7900 100%);
+    .corner--tl { top: 6mm; left: 6mm; border-right: none; border-bottom: none; border-top-left-radius: 8px; }
+    .corner--tr { top: 6mm; right: 6mm; border-left: none; border-bottom: none; border-top-right-radius: 8px; }
+    .corner--bl { bottom: 6mm; left: 6mm; border-right: none; border-top: none; border-bottom-left-radius: 8px; }
+    .corner--br { bottom: 6mm; right: 6mm; border-left: none; border-top: none; border-bottom-right-radius: 8px; }
+
+    .bande-top, .bande-bottom {
+      position: absolute; left: 0; right: 0; height: 5mm; z-index: 3;
     }
+    .bande-top { top: 0; background: linear-gradient(90deg, var(--odc-primary) 0%, #FFB74D 50%, var(--odc-primary-dark) 100%); }
+    .bande-bottom { bottom: 0; background: linear-gradient(90deg, var(--odc-primary-dark) 0%, #FFB74D 50%, var(--odc-primary) 100%); }
 
     .watermark {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%) rotate(-30deg);
-      font-size: 120px;
-      font-weight: 700;
-      color: rgba(255, 121, 0, 0.05);
-      font-family: 'Poppins', sans-serif;
-      white-space: nowrap;
-      pointer-events: none;
-      z-index: 0;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      font-family: 'Georgia', serif; font-size: 130px; font-weight: 800;
+      color: rgba(255, 121, 0, 0.035);
+      white-space: nowrap; pointer-events: none; z-index: 0; letter-spacing: 10px;
     }
 
+    /* ═══ HEADER ═══ */
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid #FFE0B2;
-      padding-bottom: 8mm;
-      margin-bottom: 10mm;
-      position: relative;
-      z-index: 1;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 2px solid var(--odc-primary-soft);
+      padding-bottom: 5mm; margin-bottom: 5mm;
+      position: relative; z-index: 4;
     }
-
     .logo-block { display: flex; align-items: center; gap: 5mm; }
+    .logo-image { width: 24mm; height: 24mm; object-fit: contain; display: block; flex-shrink: 0; }
 
-    .logo-odc {
-      width: 20mm; height: 20mm;
-      background: #FF7900;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      color: #FFF;
-      font-weight: 700;
-      font-size: 18px;
-      font-family: 'Poppins', sans-serif;
-    }
+    .org-block { display: flex; flex-direction: column; justify-content: center; }
+    .org-name { font-size: 17px; font-weight: 800; color: var(--odc-ink); letter-spacing: -0.3px; line-height: 1.15; }
+    .org-sub  { font-size: 10px; color: var(--odc-muted); margin-top: 4px; line-height: 1.4; }
 
-    .org-name {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 700;
-      font-size: 16px;
-    }
-    .org-sub { font-size: 11px; color: #6B6B6B; margin-top: 2px; }
+    .numero-block { text-align: right; padding: 2mm 4mm; background: var(--odc-bg); border-left: 3px solid var(--odc-primary); border-radius: 4px; }
+    .numero-label { font-size: 8px; color: var(--odc-hint); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+    .numero-value { font-family: 'Courier New', monospace; font-size: 14px; font-weight: 700; color: var(--odc-primary); margin-top: 3px; letter-spacing: 0.6px; }
 
-    .numero-block { text-align: right; }
-    .numero-label {
-      font-size: 10px;
-      color: #6B6B6B;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .numero-value {
-      font-family: monospace;
-      font-size: 14px;
-      font-weight: 600;
-      color: #FF7900;
-      margin-top: 2px;
-    }
-
-    .titre { text-align: center; margin: 8mm 0; position: relative; z-index: 1; }
+    /* ═══ TITRE ═══ */
+    .titre { text-align: center; margin: 3mm 0 4mm; position: relative; z-index: 4; }
     .titre-principal {
-      font-family: 'Poppins', sans-serif;
-      font-size: 36px;
-      font-weight: 700;
-      color: #FF7900;
-      letter-spacing: 3px;
-      text-transform: uppercase;
+      font-family: 'Georgia', serif; font-size: 42px; font-weight: 800;
+      color: var(--odc-primary); letter-spacing: 10px;
+      text-transform: uppercase; line-height: 1;
+      display: inline-block; padding: 0 6mm;
     }
-    .titre-sous {
-      font-size: 13px;
-      color: #6B6B6B;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      margin-top: 4px;
+    .titre-sous { font-size: 12px; color: var(--odc-muted); letter-spacing: 5px; text-transform: uppercase; margin-top: 6px; font-weight: 500; }
+    .titre::before, .titre::after {
+      content: ''; display: inline-block; width: 20mm; height: 1px;
+      background: var(--odc-primary-soft); vertical-align: middle; margin: 0 4mm;
     }
 
-    .corps {
-      text-align: center;
-      padding: 5mm 15mm;
-      position: relative;
-      z-index: 1;
-    }
-
-    .intro { font-size: 13px; color: #6B6B6B; margin-bottom: 6mm; }
+    /* ═══ CORPS ═══ */
+    .corps { text-align: center; padding: 0 8mm; position: relative; z-index: 4; }
+    .intro { font-size: 12px; color: var(--odc-muted); margin-bottom: 3mm; letter-spacing: 0.6px; }
 
     .nom-participant {
-      font-family: 'Poppins', sans-serif;
-      font-size: 32px;
-      font-weight: 700;
-      color: #1A1A1A;
-      padding: 4mm 0;
-      border-bottom: 2px dashed #FFE0B2;
-      border-top: 2px dashed #FFE0B2;
-      margin: 4mm 0;
-      display: inline-block;
-      min-width: 60%;
+      font-family: 'Georgia', serif; font-size: 34px; font-weight: 700;
+      color: var(--odc-ink); padding: 2.5mm 8mm;
+      border-top: 2px dashed var(--odc-primary-soft);
+      border-bottom: 2px dashed var(--odc-primary-soft);
+      margin: 2.5mm 0; display: inline-block; min-width: 65%; letter-spacing: 0.4px;
     }
+    .formation-titre { font-family: 'Georgia', serif; font-size: 22px; font-weight: 700; color: var(--odc-primary-dark); margin: 4mm 0 3mm; line-height: 1.25; }
 
-    .formation-titre {
-      font-family: 'Poppins', sans-serif;
-      font-size: 22px;
-      font-weight: 600;
-      color: #E65100;
-      margin: 6mm 0 3mm;
-    }
-
-    .details {
-      display: flex;
-      justify-content: center;
-      gap: 10mm;
-      margin: 6mm 0;
-      flex-wrap: wrap;
-    }
-
-    .detail-item {
-      background: #FFF8F2;
-      border-left: 3px solid #FF7900;
-      padding: 3mm 6mm;
-      border-radius: 4px;
-      text-align: left;
-    }
-    .detail-label {
-      font-size: 9px;
-      color: #6B6B6B;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .detail-value {
-      font-size: 13px;
-      font-weight: 600;
-      color: #1A1A1A;
-      margin-top: 2px;
-    }
+    .details { display: flex; justify-content: center; gap: 3mm; margin: 4mm 0; flex-wrap: wrap; }
+    .detail-item { background: var(--odc-bg); border-left: 3px solid var(--odc-primary); padding: 2mm 4mm; border-radius: 5px; text-align: left; min-width: 36mm; }
+    .detail-label { font-size: 8px; color: var(--odc-hint); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; }
+    .detail-value { font-size: 11px; font-weight: 700; color: var(--odc-ink); margin-top: 2px; }
 
     .note-badge {
       display: inline-block;
-      background: #FF7900;
-      color: #FFF;
-      font-family: 'Poppins', sans-serif;
-      font-weight: 700;
-      font-size: 16px;
-      padding: 3mm 8mm;
-      border-radius: 25px;
-      margin: 4mm 0;
+      background: linear-gradient(135deg, var(--odc-primary) 0%, var(--odc-primary-dark) 100%);
+      color: #FFFFFF; font-weight: 700; font-size: 15px;
+      padding: 2.5mm 8mm; border-radius: 30px; margin: 2mm 0;
+      box-shadow: 0 4px 14px rgba(255, 121, 0, 0.3);
     }
+    .mention { font-size: 10px; line-height: 1.65; margin-top: 3mm; padding: 0 12mm; color: #4A4A4A; }
+    .mention strong { color: var(--odc-ink); font-weight: 700; }
 
-    .mention {
-      font-size: 12px;
-      line-height: 1.6;
-      margin-top: 8mm;
-      padding: 0 10mm;
-    }
+    /* ═══ CACHET ═══ */
+    .cachet { position: absolute; bottom: 26mm; right: 38mm; width: 34mm; height: 34mm; z-index: 5; transform: rotate(-12deg); opacity: 0.92; }
+    .cachet svg { width: 100%; height: 100%; display: block; }
 
-    .cachet {
-      position: absolute;
-      bottom: 25mm;
-      right: 45mm;
-      width: 35mm;
-      height: 35mm;
-      border: 3px double #FF7900;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transform: rotate(-15deg);
-      opacity: 0.85;
-      z-index: 2;
-    }
-    .cachet-inner {
-      font-family: 'Poppins', sans-serif;
-      font-weight: 700;
-      font-size: 8px;
-      color: #FF7900;
-      text-align: center;
-      line-height: 1.4;
-    }
-
+    /* ═══ FOOTER ═══ */
     .footer {
-      position: absolute;
-      bottom: 20mm;
-      left: 15mm;
-      right: 15mm;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      z-index: 1;
+      position: absolute; bottom: 16mm; left: 16mm; right: 16mm;
+      display: flex; justify-content: space-between; align-items: flex-end; z-index: 4;
     }
-
     .signature-block { text-align: center; }
-    .signature-line {
-      width: 50mm;
-      border-top: 1px solid #1A1A1A;
-      margin-top: 15mm;
-      padding-top: 2mm;
-    }
-    .signature-nom {
-      font-family: 'Poppins', sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .signature-fonction { font-size: 9px; color: #6B6B6B; }
+    .signature-line { width: 55mm; border-top: 1.5px solid var(--odc-ink); margin-top: 16mm; padding-top: 2mm; }
+    .signature-nom { font-size: 10px; font-weight: 700; color: var(--odc-ink); }
+    .signature-fonction { font-size: 8px; color: var(--odc-muted); margin-top: 1px; }
 
     .qr-block { text-align: center; }
-    .qr-image {
-      width: 30mm;
-      height: 30mm;
-      border: 2px solid #FFE0B2;
-      border-radius: 6px;
-      padding: 2mm;
-    }
-    .qr-label { font-size: 8px; color: #6B6B6B; margin-top: 2mm; }
+    .qr-frame { display: inline-block; padding: 1.5mm; background: #FFFFFF; border: 2px solid var(--odc-primary-soft); border-radius: 6px; }
+    .qr-image { width: 26mm; height: 26mm; display: block; }
+    .qr-label { font-size: 7px; color: var(--odc-muted); margin-top: 1.5mm; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600; }
 
     .hash-footer {
-      position: absolute;
-      bottom: 10mm;
-      left: 15mm;
-      right: 15mm;
-      text-align: center;
-      font-family: monospace;
-      font-size: 7px;
-      color: #999;
+      position: absolute; bottom: 8mm; left: 16mm; right: 16mm;
+      text-align: center; font-family: 'Courier New', monospace; font-size: 6.5px;
+      color: #A0A0A0; word-break: break-all; z-index: 4;
     }
   </style>
 </head>
@@ -272,13 +158,38 @@
     <div class="bande-bottom"></div>
     <div class="watermark">ODC CERTIFIED</div>
 
-    <!-- HEADER -->
+    <div class="corner corner--tl"></div>
+    <div class="corner corner--tr"></div>
+    <div class="corner corner--bl"></div>
+    <div class="corner corner--br"></div>
+
+    <!-- ═══ HEADER ═══ -->
     <div class="header">
       <div class="logo-block">
-        <div class="logo-odc">ODC</div>
-        <div>
-          <div class="org-name">{{odcName}}</div>
-          <div class="org-sub">{{odcAdresse}} • {{odcWebsite}}</div>
+        {{#if logoDataUrl}}
+          <img src="{{logoDataUrl}}" alt="Logo ODC" class="logo-image" />
+        {{else}}
+          <svg class="logo-image" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FF7900"/>
+                <stop offset="100%" stop-color="#E65100"/>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="48" fill="url(#logoGrad)"/>
+            <text x="50" y="58" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
+                  font-size="30" font-weight="900" fill="#FFFFFF" letter-spacing="-1">ODC</text>
+            <text x="50" y="76" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
+                  font-size="8" font-weight="700" fill="#FFFFFF" letter-spacing="1">CERTIFIED</text>
+          </svg>
+        {{/if}}
+        <div class="org-block">
+          <div class="org-name">{{#if odcName}}{{odcName}}{{else}}Orange Digital Center{{/if}}</div>
+          <div class="org-sub">
+            {{#if odcAdresse}}{{odcAdresse}}{{else}}Fianarantsoa, Madagascar{{/if}}
+            •
+            {{#if odcWebsite}}{{odcWebsite}}{{else}}www.odc.mg{{/if}}
+          </div>
         </div>
       </div>
       <div class="numero-block">
@@ -287,44 +198,47 @@
       </div>
     </div>
 
-    <!-- TITRE -->
+    <!-- ═══ TITRE ═══ -->
     <div class="titre">
       <div class="titre-principal">Attestation</div>
       <div class="titre-sous">de réussite de formation</div>
     </div>
 
-    <!-- CORPS -->
+    <!-- ═══ CORPS ═══ -->
     <div class="corps">
       <div class="intro">Nous certifions que</div>
-
-      <div class="nom-participant">
-        {{participantPrenom}} {{uppercase participantNom}}
-      </div>
-
+      <div class="nom-participant">{{participantPrenom}} {{uppercase participantNom}}</div>
       <div class="intro">a suivi avec succès la formation</div>
-
       <div class="formation-titre">« {{formationTitre}} »</div>
 
       <div class="details">
-        <div class="detail-item">
-          <div class="detail-label">Domaine</div>
-          <div class="detail-value">{{formationDomaine}}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Durée</div>
-          <div class="detail-value">{{formationDuree}} heures</div>
-        </div>
+        {{#if formationDomaine}}
+          <div class="detail-item">
+            <div class="detail-label">Domaine</div>
+            <div class="detail-value">{{formationDomaine}}</div>
+          </div>
+        {{/if}}
+        {{#if formationDuree}}
+          <div class="detail-item">
+            <div class="detail-label">Durée</div>
+            <div class="detail-value">{{formationDuree}} heures</div>
+          </div>
+        {{/if}}
         <div class="detail-item">
           <div class="detail-label">Période</div>
           <div class="detail-value">{{formatDate sessionDateDebut}} → {{formatDate sessionDateFin}}</div>
         </div>
-        <div class="detail-item">
-          <div class="detail-label">Assiduité</div>
-          <div class="detail-value">{{tauxPresence}} %</div>
-        </div>
+        {{#if tauxPresence}}
+          <div class="detail-item">
+            <div class="detail-label">Assiduité</div>
+            <div class="detail-value">{{tauxPresence}} %</div>
+          </div>
+        {{/if}}
       </div>
 
-      <div class="note-badge">Note finale : {{note}} / 20</div>
+      {{#if note}}
+        <div class="note-badge">Note finale : {{formatNumber note 1}} / 20</div>
+      {{/if}}
 
       <div class="mention">
         Cette attestation est délivrée à l'issue de l'évaluation finale,
@@ -333,25 +247,43 @@
       </div>
     </div>
 
-    <!-- CACHET -->
+    <!-- ═══ CACHET ═══ -->
     <div class="cachet">
-      <div class="cachet-inner">
-        ORANGE<br>DIGITAL<br>CENTER<br>★<br>OFFICIEL
-      </div>
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <path id="arcTop" d="M 100,100 m -78,0 a 78,78 0 1,1 156,0" fill="none"/>
+          <path id="arcBottom" d="M 100,100 m 78,0 a 78,78 0 1,1 -156,0" fill="none"/>
+        </defs>
+        <circle cx="100" cy="100" r="94" fill="none" stroke="#FF7900" stroke-width="3"/>
+        <circle cx="100" cy="100" r="86" fill="none" stroke="#FF7900" stroke-width="1"/>
+        <circle cx="100" cy="100" r="62" fill="none" stroke="#FF7900" stroke-width="1"/>
+        <text fill="#E65100" font-family="Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="2">
+          <textPath href="#arcTop" startOffset="50%" text-anchor="middle">★ ORANGE DIGITAL CENTER ★</textPath>
+        </text>
+        <text fill="#E65100" font-family="Arial, sans-serif" font-size="9" font-weight="700" letter-spacing="2">
+          <textPath href="#arcBottom" startOffset="50%" text-anchor="middle">★ CERTIFICATION OFFICIELLE ★</textPath>
+        </text>
+        <text x="100" y="94" text-anchor="middle" font-family="Georgia, serif" font-size="20" font-weight="800" fill="#FF7900" letter-spacing="1">ODC</text>
+        <line x1="80" y1="102" x2="120" y2="102" stroke="#FF7900" stroke-width="1"/>
+        <text x="100" y="118" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="700" fill="#E65100" letter-spacing="1.5">CERTIFIÉ</text>
+      </svg>
     </div>
 
-    <!-- FOOTER -->
+    <!-- ═══ FOOTER ═══ -->
     <div class="footer">
       <div class="signature-block">
         <div class="signature-line"></div>
-        <div class="signature-nom">{{signataireNom}}</div>
-        <div class="signature-fonction">{{signataireFonction}}</div>
+        <div class="signature-nom">{{#if signataireNom}}{{signataireNom}}{{else}}Direction ODC{{/if}}</div>
+        <div class="signature-fonction">{{#if signataireFonction}}{{signataireFonction}}{{else}}Orange Digital Center{{/if}}</div>
       </div>
-
-      <div class="qr-block">
-        <img src="{{qrCodeDataUrl}}" alt="QR Code" class="qr-image"/>
-        <div class="qr-label">Vérifier l'authenticité</div>
-      </div>
+      {{#if qrCodeDataUrl}}
+        <div class="qr-block">
+          <div class="qr-frame">
+            <img src="{{qrCodeDataUrl}}" alt="QR Code" class="qr-image" />
+          </div>
+          <div class="qr-label">Vérifier l'authenticité</div>
+        </div>
+      {{/if}}
     </div>
 
     <div class="hash-footer">

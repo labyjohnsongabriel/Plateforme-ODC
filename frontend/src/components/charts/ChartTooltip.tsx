@@ -1,148 +1,117 @@
-// src/components/charts/ChartTooltip.tsx
 'use client';
 
-import * as React from 'react';
+import { formatNumber, formatPercent } from '@/lib/chart-theme';
 import { cn } from '@/lib/utils';
 
-/* ============================================================================
-   TYPES
-   ============================================================================ */
+interface ChartTooltipEntry {
+  name?: string | number;
+  value?: string | number;
+  color?: string;
+  dataKey?: string | number;
+  payload?: { color?: string } & Record<string, unknown>;
+}
 
 export interface ChartTooltipProps {
-  /** Props Recharts injectées automatiquement */
+  /** Injectés par Recharts */
   active?: boolean;
-  payload?: Array<{
-    name?: string;
-    value?: number;
-    color?: string;
-    dataKey?: string;
-    payload?: Record<string, any>;
-  }>;
+  payload?: ChartTooltipEntry[];
   label?: string | number;
-
   /** Format des valeurs */
-  valueFormatter?: (value: number) => string;
-  /** Type d'indicateur */
+  valueFormatter?: (value: number, name: string) => string;
+  /** Forme de la pastille de couleur */
   indicator?: 'dot' | 'square' | 'line' | 'none';
-  /** Afficher le pourcentage */
+  /** Afficher la part du total */
   showPercentage?: boolean;
-  /** Total (pour le calcul du %) */
+  /** Total servant au calcul de la part */
   total?: number;
-  /** Formatter du label */
-  labelFormatter?: (label: any) => string;
-  /** Classe CSS personnalisée */
+  labelFormatter?: (label: string) => string;
   className?: string;
 }
-
-/* ============================================================================
-   COMPOSANT
-   ============================================================================ */
-
-export function ChartTooltip({
-  active,
-  payload,
-  label,
-  valueFormatter,
-  indicator = 'dot',
-  showPercentage = false,
-  total,
-  labelFormatter,
-  className,
-}: ChartTooltipProps) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const formatValue =
-    valueFormatter ?? ((v: number) => v.toLocaleString('fr-FR'));
-
-  const displayLabel = labelFormatter ? labelFormatter(label) : label;
-
-  return (
-    <div
-      className={cn(
-        'rounded-lg border border-odc-border bg-odc-surface shadow-odc-lg px-3 py-2 text-xs',
-        'animate-in fade-in-0 zoom-in-95 duration-150',
-        className,
-      )}
-    >
-      {displayLabel !== undefined && displayLabel !== '' && (
-        <p className="font-medium text-odc-text-primary mb-1.5">
-          {displayLabel}
-        </p>
-      )}
-
-      <ul className="space-y-1">
-        {payload.map((entry, index) => {
-          const value = Number(entry.value ?? 0);
-          const percentage =
-            showPercentage && total && total > 0
-              ? ((value / total) * 100).toFixed(1)
-              : null;
-
-          return (
-            <li
-              key={`item-${index}`}
-              className="flex items-center gap-2 justify-between"
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                {indicator !== 'none' && (
-                  <Indicator type={indicator} color={entry.color} />
-                )}
-                <span className="text-odc-muted truncate">
-                  {entry.name ?? entry.dataKey}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 font-medium text-odc-text-primary shrink-0">
-                <span>{formatValue(value)}</span>
-                {percentage !== null && (
-                  <span className="text-odc-muted text-[10px]">
-                    ({percentage}%)
-                  </span>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-/* ============================================================================
-   INDICATEUR
-   ============================================================================ */
 
 function Indicator({
   type,
   color,
 }: {
   type: 'dot' | 'square' | 'line';
-  color?: string;
+  color: string;
 }) {
-  const baseColor = color ?? '#FF7900';
-
-  if (type === 'dot') {
-    return (
-      <span
-        className="inline-block w-2 h-2 rounded-full shrink-0"
-        style={{ backgroundColor: baseColor }}
-      />
-    );
-  }
-
-  if (type === 'square') {
-    return (
-      <span
-        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-        style={{ backgroundColor: baseColor }}
-      />
-    );
-  }
-
+  const shape =
+    type === 'dot'
+      ? 'h-2 w-2 rounded-full'
+      : type === 'square'
+        ? 'h-2.5 w-2.5 rounded-sm'
+        : 'h-0.5 w-3';
   return (
     <span
-      className="inline-block w-3 h-0.5 shrink-0"
-      style={{ backgroundColor: baseColor }}
+      className={cn('inline-block shrink-0', shape)}
+      style={{ backgroundColor: color }}
+      aria-hidden="true"
     />
+  );
+}
+
+export function ChartTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter = (value) => formatNumber(value),
+  indicator = 'square',
+  showPercentage = false,
+  total,
+  labelFormatter,
+  className,
+}: ChartTooltipProps) {
+  if (!active || !payload?.length) return null;
+
+  const rawLabel = label !== undefined && label !== '' ? String(label) : undefined;
+  const title =
+    rawLabel !== undefined
+      ? labelFormatter
+        ? labelFormatter(rawLabel)
+        : rawLabel
+      : undefined;
+
+  return (
+    <div
+      className={cn(
+        'pointer-events-none min-w-[160px] max-w-[280px] rounded-lg border border-border bg-popover px-3 py-2.5 text-sm text-popover-foreground shadow-lg',
+        className,
+      )}
+    >
+      {title && (
+        <p className="mb-1.5 border-b border-border pb-1.5 text-xs font-semibold text-foreground">
+          {title}
+        </p>
+      )}
+
+      <ul className="space-y-1">
+        {payload.map((entry, index) => {
+          const color = entry.payload?.color ?? entry.color ?? 'hsl(var(--chart-1))';
+          const name = String(entry.name ?? entry.dataKey ?? '');
+          const numeric = Number(entry.value);
+          const share =
+            showPercentage && total && total > 0 && Number.isFinite(numeric)
+              ? numeric / total
+              : null;
+
+          return (
+            <li key={`${name}-${index}`} className="flex items-center gap-2">
+              {indicator !== 'none' && <Indicator type={indicator} color={color} />}
+              <span className="truncate text-muted-foreground">{name}</span>
+              <span className="ml-auto flex shrink-0 items-baseline gap-1.5 pl-4 font-semibold tabular-nums text-foreground">
+                {Number.isFinite(numeric)
+                  ? valueFormatter(numeric, name)
+                  : String(entry.value)}
+                {share !== null && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    ({formatPercent(share)})
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

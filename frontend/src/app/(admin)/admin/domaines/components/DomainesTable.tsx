@@ -1,3 +1,4 @@
+// src/app/(admin)/admin/domaines/components/DomainesTable.tsx
 'use client';
 
 import * as React from 'react';
@@ -11,6 +12,8 @@ import {
   FolderTree,
   BookOpen,
   ExternalLink,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import {
@@ -39,36 +42,40 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getMediaUrl } from '@/lib/media';
 import {
   useDomaines,
   useTogglePublishDomaine,
   type Domaine,
-  type DomaineFilters,          // ✅ IMPORT CORRIGÉ
+  type DomaineFilters,
 } from '@/hooks/useDomaines';
 import { DomaineFormModal } from './DomaineFormModal';
 import { DeleteDomaineDialog } from './DeleteDomaineDialog';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TYPES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface DomainesTableProps {
   filters?: DomaineFilters;
 }
-
-/* ============================================================================
-   BADGE COMPTEUR DE FORMATIONS
-   ============================================================================ */
 
 interface FormationsBadgeProps {
   count: number;
   color?: string;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   BADGE COMPTEUR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 function FormationsBadge({ count, color }: FormationsBadgeProps) {
-  if (count === 0) {
+  // ⭐ Garde-fou : count null/undefined → 0
+  const safeCount = typeof count === 'number' && Number.isFinite(count) ? count : 0;
+
+  if (safeCount === 0) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-odc-text-muted">
+      <span className="text-odc-text-muted inline-flex items-center gap-1.5 text-xs">
         <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
         <span>Aucune formation</span>
       </span>
@@ -82,7 +89,7 @@ function FormationsBadge({ count, color }: FormationsBadgeProps) {
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1',
             'text-xs font-semibold',
-            'bg-odc-primary-soft text-odc-primary-active',
+            'text-odc-primary-active bg-odc-primary-soft',
             'ring-1 ring-odc-primary-light/40',
             'transition-transform hover:scale-105',
           )}
@@ -97,27 +104,27 @@ function FormationsBadge({ count, color }: FormationsBadgeProps) {
           }
         >
           <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="tabular-nums">{count}</span>
+          <span className="tabular-nums">{safeCount}</span>
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6}>
-        {count} formation{count > 1 ? 's' : ''}
+        {safeCount} formation{safeCount > 1 ? 's' : ''}
       </TooltipContent>
     </Tooltip>
   );
 }
 
-/* ============================================================================
-   SQUELETTE DE CHARGEMENT
-   ============================================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SQUELETTE
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function TableSkeleton() {
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-odc-border bg-odc-surface-alt/50 p-4">
+      <div className="border-odc-border bg-odc-surface-alt/50 border-b p-4">
         <Skeleton className="h-5 w-40" />
       </div>
-      <div className="divide-y divide-odc-border">
+      <div className="divide-odc-border divide-y">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 p-4">
             <Skeleton className="h-12 w-12 rounded-lg" />
@@ -134,16 +141,23 @@ function TableSkeleton() {
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPOSANT PRINCIPAL
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function DomainesTable({ filters }: DomainesTableProps) {
   const router = useRouter();
-  const { data: domaines = [], isLoading, isError } = useDomaines(filters);
+  const {
+    data: domaines = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useDomaines(filters);
   const togglePublish = useTogglePublishDomaine();
 
-  /* -------------------- États locaux (modales) -------------------- */
+  /* -------------------- États locaux -------------------- */
   const [editingDomaine, setEditingDomaine] = React.useState<Domaine | null>(null);
   const [deletingDomaine, setDeletingDomaine] = React.useState<Domaine | null>(null);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
@@ -164,28 +178,52 @@ export function DomainesTable({ filters }: DomainesTableProps) {
     [togglePublish],
   );
 
-  /* -------------------- État de chargement -------------------- */
+  /* -------------------- Loading -------------------- */
   if (isLoading) return <TableSkeleton />;
 
-  /* -------------------- État d'erreur -------------------- */
+  /* -------------------- Erreur -------------------- */
   if (isError) {
     return (
       <Card>
-        <EmptyState
-          icon={FolderTree}
-          title="Erreur de chargement"
-          description="Impossible de charger les domaines. Veuillez réessayer."
-          action={
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Réessayer
-            </Button>
-          }
-        />
+        <div className="p-6">
+          <div className="flex items-start gap-3">
+            <div className="bg-odc-error-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+              <AlertCircle className="text-odc-error h-5 w-5" aria-hidden />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-odc-text-primary text-base font-semibold">
+                Erreur de chargement
+              </h3>
+              <p className="text-odc-text-muted mt-1 text-sm">
+                Impossible de charger les domaines.
+              </p>
+              {error instanceof Error && (
+                <p className="text-odc-text-muted mt-1 text-xs font-mono">
+                  {error.message}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+                className="mt-3"
+              >
+                {isFetching ? (
+                  <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden />
+                )}
+                Réessayer
+              </Button>
+            </div>
+          </div>
+        </div>
       </Card>
     );
   }
 
-  /* -------------------- État vide -------------------- */
+  /* -------------------- Vide -------------------- */
   if (!domaines.length) {
     return (
       <>
@@ -196,7 +234,7 @@ export function DomainesTable({ filters }: DomainesTableProps) {
             description="Créez votre premier domaine de formation pour organiser votre catalogue."
             action={
               <Button variant="odc" onClick={() => setIsCreateOpen(true)}>
-                <FolderTree className="mr-2 h-4 w-4" />
+                <FolderTree className="mr-2 h-4 w-4" aria-hidden />
                 Créer un domaine
               </Button>
             }
@@ -231,17 +269,21 @@ export function DomainesTable({ filters }: DomainesTableProps) {
             {domaines.map((d) => (
               <TableRow
                 key={d.id}
-                className="group cursor-pointer transition-colors hover:bg-odc-surface-hover"
+                className="hover:bg-odc-surface-hover group cursor-pointer transition-colors"
                 onClick={() => router.push(`/admin/domaines/${d.id}`)}
               >
-                {/* Colonne Domaine */}
+                {/* Domaine */}
                 <TableCell>
                   <div className="flex items-center gap-3">
                     {d.imageUrl ? (
                       <img
-                        src={d.imageUrl}
+                        src={getMediaUrl(d.imageUrl)}
                         alt=""
-                        className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-odc-border"
+                        className="ring-odc-border h-11 w-11 shrink-0 rounded-lg object-cover ring-1"
+                        onError={(e) => {
+                          // ⭐ Fallback si l'image ne charge pas
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                     ) : (
                       <div
@@ -262,44 +304,47 @@ export function DomainesTable({ filters }: DomainesTableProps) {
                     )}
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-odc-text-primary">
+                      <p className="text-odc-text-primary truncate text-sm font-semibold">
                         {d.nom}
                       </p>
-                      <p className="truncate font-mono text-xs text-odc-text-muted">
+                      <p className="text-odc-text-muted truncate font-mono text-xs">
                         {d.slug}
                       </p>
                     </div>
                   </div>
                 </TableCell>
 
-                {/* Colonne Formations */}
+                {/* Formations */}
                 <TableCell className="hidden md:table-cell">
-                  <FormationsBadge count={d.formationsCount} color={d.couleur} />
+                  <FormationsBadge
+                    count={Number(d.formationsCount ?? 0)}
+                    color={d.couleur}
+                  />
                 </TableCell>
 
-                {/* Colonne Statut */}
+                {/* Statut */}
                 <TableCell>
                   {d.estPubliee ? (
                     <Badge className="bg-odc-success-soft text-odc-success-dark hover:bg-odc-success-soft">
-                      <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-odc-success" />
+                      <span className="bg-odc-success mr-1.5 h-1.5 w-1.5 rounded-full" />
                       Publié
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-odc-text-muted">
-                      <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-odc-text-muted" />
+                      <span className="bg-odc-text-muted mr-1.5 h-1.5 w-1.5 rounded-full" />
                       Brouillon
                     </Badge>
                   )}
                 </TableCell>
 
-                {/* Colonne Ordre */}
+                {/* Ordre */}
                 <TableCell className="hidden lg:table-cell">
-                  <span className="font-mono text-xs tabular-nums text-odc-text-muted">
-                    #{d.ordreAffichage.toString().padStart(3, '0')}
+                  <span className="text-odc-text-muted font-mono text-xs tabular-nums">
+                    #{String(d.ordreAffichage ?? 0).padStart(3, '0')}
                   </span>
                 </TableCell>
 
-                {/* Colonne Actions */}
+                {/* Actions */}
                 <TableCell
                   className="text-right"
                   onClick={(e) => e.stopPropagation()}
@@ -312,13 +357,13 @@ export function DomainesTable({ filters }: DomainesTableProps) {
                         className="opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
                         aria-label="Actions du domaine"
                       >
-                        <MoreVertical className="h-4 w-4" />
+                        <MoreVertical className="h-4 w-4" aria-hidden />
                       </Button>
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem onClick={() => handleEdit(d)}>
-                        <Edit className="mr-2 h-4 w-4" />
+                        <Edit className="mr-2 h-4 w-4" aria-hidden />
                         Modifier
                       </DropdownMenuItem>
 
@@ -328,12 +373,12 @@ export function DomainesTable({ filters }: DomainesTableProps) {
                       >
                         {d.estPubliee ? (
                           <>
-                            <EyeOff className="mr-2 h-4 w-4" />
+                            <EyeOff className="mr-2 h-4 w-4" aria-hidden />
                             Dépublier
                           </>
                         ) : (
                           <>
-                            <Eye className="mr-2 h-4 w-4" />
+                            <Eye className="mr-2 h-4 w-4" aria-hidden />
                             Publier
                           </>
                         )}
@@ -341,20 +386,20 @@ export function DomainesTable({ filters }: DomainesTableProps) {
 
                       <DropdownMenuItem
                         onClick={() =>
-                          window.open(`/domaines/${d.slug}`, '_blank')
+                          window.open(`/domaines/${d.slug}`, '_blank', 'noopener,noreferrer')
                         }
                       >
-                        <ExternalLink className="mr-2 h-4 w-4" />
+                        <ExternalLink className="mr-2 h-4 w-4" aria-hidden />
                         Voir la page
                       </DropdownMenuItem>
 
                       <DropdownMenuSeparator />
 
                       <DropdownMenuItem
-                        className="text-odc-error focus:bg-odc-error-soft focus:text-odc-error"
+                        className="focus:bg-odc-error-soft text-odc-error focus:text-odc-error"
                         onClick={() => handleDelete(d)}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
+                        <Trash2 className="mr-2 h-4 w-4" aria-hidden />
                         Supprimer
                       </DropdownMenuItem>
                     </DropdownMenuContent>

@@ -5,6 +5,8 @@ import { z } from 'zod';
 // ============================================================================
 
 export enum TypeEvaluation {
+  PRE_TEST = 'PRE_TEST',
+  POST_TEST = 'POST_TEST',
   QUIZ = 'QUIZ',
   EXAMEN = 'EXAMEN',
   PROJET = 'PROJET',
@@ -79,6 +81,11 @@ export interface Evaluation {
   moyenneClasse?: number;
   createdAt: string;
   updatedAt: string;
+  dejaSoumise?: boolean;
+  maSoumission?: {
+    reponses: Record<string, unknown>;
+    soumisAt: string;
+  } | null;
 }
 
 export interface Note {

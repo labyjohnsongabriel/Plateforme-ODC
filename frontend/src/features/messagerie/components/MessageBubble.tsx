@@ -1,3 +1,6 @@
+// src/components/messagerie/MessageBubble.tsx
+'use client';
+
 import { Check, CheckCheck } from 'lucide-react';
 import { Message } from '../types/messagerie.types';
 import { Avatar } from '@/components/common/Avatar';
@@ -18,10 +21,10 @@ export function MessageBubble({
   showName = false,
 }: MessageBubbleProps) {
   return (
-    <div className={cn('flex gap-2 group', isMine ? 'justify-end' : 'justify-start')}>
+    <div className={cn('group flex gap-2', isMine ? 'justify-end' : 'justify-start')}>
       {/* Avatar */}
       {!isMine && showAvatar && (
-        <div className="flex-shrink-0 w-8">
+        <div className="w-8 flex-shrink-0">
           <Avatar
             src={message.expediteur?.photoUrl}
             name={`${message.expediteur?.prenom} ${message.expediteur?.nom}`}
@@ -30,36 +33,36 @@ export function MessageBubble({
         </div>
       )}
 
-      <div className={cn('max-w-[70%] flex flex-col', isMine ? 'items-end' : 'items-start')}>
-        {/* Name */}
+      <div className={cn('flex max-w-[70%] flex-col', isMine ? 'items-end' : 'items-start')}>
+        {/* Nom */}
         {showName && !isMine && (
-          <span className="text-[10px] font-semibold text-odc-primary mb-1 px-1">
+          <span className="mb-1 px-1 text-[10px] font-semibold text-orange-600 dark:text-orange-400">
             {message.expediteur?.prenom}
           </span>
         )}
 
-        {/* Bubble */}
+        {/* Bulle */}
         <div
           className={cn(
-            'rounded-2xl px-4 py-2 break-words',
+            'break-words rounded-2xl px-4 py-2',
             isMine
-              ? 'bg-gradient-to-br from-odc-primary to-odc-primary-dark text-white rounded-br-sm'
-              : 'bg-white dark:bg-odc-surface-alt-dark text-odc-text-light dark:text-odc-text-dark rounded-bl-sm shadow-sm'
+              ? 'rounded-br-sm bg-gradient-to-br from-orange-500 to-orange-700 text-white'
+              : 'rounded-bl-sm bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-50',
           )}
         >
-          <p className="text-sm whitespace-pre-wrap">{message.contenu}</p>
+          <p className="whitespace-pre-wrap text-sm">{message.contenu}</p>
 
-          {/* Time + status */}
+          {/* Heure + statut */}
           <div
             className={cn(
-              'flex items-center gap-1 mt-1',
-              isMine ? 'justify-end' : 'justify-start'
+              'mt-1 flex items-center gap-1',
+              isMine ? 'justify-end' : 'justify-start',
             )}
           >
             <span
               className={cn(
                 'text-[10px]',
-                isMine ? 'text-white/70' : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
+                isMine ? 'text-white/70' : 'text-slate-500 dark:text-slate-400',
               )}
             >
               {timeAgo(message.createdAt)}

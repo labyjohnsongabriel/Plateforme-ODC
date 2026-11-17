@@ -1,3 +1,4 @@
+// src/app/(public)/components/TestimonialCarousel.tsx
 'use client';
 
 import { useState } from 'react';
@@ -18,8 +19,7 @@ const TESTIMONIALS: Testimonial[] = [
     id: '1',
     name: 'Rakoto Andry',
     role: 'Développeur Web — Freelance',
-    content:
-      'Grâce à l\'ODC, j\'ai suivi une formation complète en développement web. Aujourd\'hui, je travaille en freelance et j\'ai déjà plusieurs clients satisfaits.',
+    content: "Grâce à l'ODC, j'ai suivi une formation complète en développement web. Aujourd'hui, je travaille en freelance avec plusieurs clients satisfaits.",
     rating: 5,
     initials: 'RA',
   },
@@ -27,8 +27,7 @@ const TESTIMONIALS: Testimonial[] = [
     id: '2',
     name: 'Randria Marie',
     role: 'Data Analyst Junior',
-    content:
-      'La qualité des formations et l\'accompagnement personnalisé m\'ont permis de décrocher mon premier emploi dans la data. Un immense merci à toute l\'équipe !',
+    content: "La qualité des formations et l'accompagnement personnalisé m'ont permis de décrocher mon premier emploi dans la data.",
     rating: 5,
     initials: 'RM',
   },
@@ -36,8 +35,7 @@ const TESTIMONIALS: Testimonial[] = [
     id: '3',
     name: 'Jean Baptiste',
     role: 'Designer UX/UI',
-    content:
-      'Les formateurs sont passionnés et à l\'écoute. J\'ai pu créer mon portfolio et intégrer une agence de design à Antananarivo dès la fin de ma formation.',
+    content: "Les formateurs sont passionnés et à l'écoute. J'ai intégré une agence de design à Antananarivo dès la fin de ma formation.",
     rating: 5,
     initials: 'JB',
   },
@@ -45,57 +43,40 @@ const TESTIMONIALS: Testimonial[] = [
 
 export function TestimonialCarousel() {
   const [current, setCurrent] = useState(0);
-
   const next = () => setCurrent((c) => (c + 1) % TESTIMONIALS.length);
-  const prev = () =>
-    setCurrent((c) => (c - 1 + TESTIMONIALS.length) % TESTIMONIALS.length);
-
+  const prev = () => setCurrent((c) => (c - 1 + TESTIMONIALS.length) % TESTIMONIALS.length);
   const t = TESTIMONIALS[current];
 
   return (
-    <section
-      className="container-page py-20 md:py-28"
-      aria-labelledby="testimonials-title"
-    >
-      <div className="text-center mb-12">
-        <span className="inline-block rounded-full bg-odc-primary-soft text-odc-primary px-4 py-1.5 text-sm font-medium mb-4">
+    <section className="container-page py-20 md:py-28" aria-labelledby="testimonials-title">
+      <div className="mb-12 text-center">
+        <span className="mb-4 inline-block rounded-full bg-odc-primary-soft px-4 py-1.5 text-sm font-medium text-odc-primary">
           💬 Témoignages
         </span>
-        <h2
-          id="testimonials-title"
-          className="font-display text-3xl md:text-5xl font-bold mb-4"
-        >
+        <h2 id="testimonials-title" className="mb-4 font-display text-3xl font-bold md:text-5xl">
           Ils nous font confiance
         </h2>
-        <p className="text-odc-muted text-lg max-w-2xl mx-auto">
+        <p className="mx-auto max-w-2xl text-lg text-odc-muted">
           Découvrez les parcours inspirants de nos anciens apprenants.
         </p>
       </div>
 
-      <div className="max-w-4xl mx-auto relative">
-        {/* Quote icon */}
-        <Quote className="absolute -top-6 -left-6 h-20 w-20 text-odc-primary/15 rotate-180" />
+      <div className="relative mx-auto max-w-4xl">
+        <Quote className="absolute -left-6 -top-6 h-20 w-20 rotate-180 text-odc-primary/15" />
 
-        {/* Card */}
-        <div className="relative rounded-3xl border border-odc-border bg-odc-surface p-8 md:p-12 shadow-odc-lg animate-fade-in">
-          {/* Étoiles */}
-          <div className="flex gap-1 mb-6">
+        <div className="relative animate-fade-in rounded-3xl border border-odc-border bg-odc-surface p-8 shadow-odc-lg md:p-12">
+          <div className="mb-6 flex gap-1">
             {Array.from({ length: t.rating }).map((_, i) => (
-              <Star
-                key={i}
-                className="h-5 w-5 fill-odc-primary text-odc-primary"
-              />
+              <Star key={i} className="h-5 w-5 fill-odc-primary text-odc-primary" />
             ))}
           </div>
 
-          {/* Contenu */}
-          <blockquote className="font-display text-xl md:text-2xl leading-relaxed mb-8 italic">
+          <blockquote className="mb-8 font-display text-xl italic leading-relaxed md:text-2xl">
             « {t.content} »
           </blockquote>
 
-          {/* Auteur */}
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-odc-500 to-odc-700 flex items-center justify-center text-white font-display font-bold">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-odc-500 to-odc-700 font-display font-bold text-white">
               {t.initials}
             </div>
             <div>
@@ -104,25 +85,23 @@ export function TestimonialCarousel() {
             </div>
           </div>
 
-          {/* Flèches internes */}
           <button
             onClick={prev}
             aria-label="Témoignage précédent"
-            className="hidden md:flex absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-odc-surface border border-odc-border shadow-odc-md hover:bg-odc-primary hover:text-white hover:border-odc-primary transition-colors items-center justify-center"
+            className="absolute left-0 top-1/2 hidden h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-odc-border bg-odc-surface shadow-odc-md transition-colors hover:border-odc-primary hover:bg-odc-primary hover:text-white md:flex"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
             onClick={next}
             aria-label="Témoignage suivant"
-            className="hidden md:flex absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-odc-surface border border-odc-border shadow-odc-md hover:bg-odc-primary hover:text-white hover:border-odc-primary transition-colors items-center justify-center"
+            className="absolute right-0 top-1/2 hidden h-11 w-11 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-odc-border bg-odc-surface shadow-odc-md transition-colors hover:border-odc-primary hover:bg-odc-primary hover:text-white md:flex"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Points */}
-        <div className="flex justify-center gap-2 mt-8">
+        <div className="mt-8 flex justify-center gap-2">
           {TESTIMONIALS.map((_, index) => (
             <button
               key={index}
@@ -131,9 +110,7 @@ export function TestimonialCarousel() {
               aria-current={index === current}
               className={cn(
                 'h-2 rounded-full transition-all duration-300',
-                index === current
-                  ? 'w-8 bg-odc-primary'
-                  : 'w-2 bg-odc-border hover:bg-odc-border-strong',
+                index === current ? 'w-8 bg-odc-primary' : 'w-2 bg-odc-border hover:bg-odc-muted',
               )}
             />
           ))}

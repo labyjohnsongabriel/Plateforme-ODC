@@ -1,15 +1,3 @@
-<<<<<<< HEAD
-import fs from 'fs/promises';
-import path from 'path';
-import { env } from '../config/env';
-import { logger } from '../config/logger';
-import { ValidationError } from '../errors/AppError';
-
-export class UploadService {
-  /**
-   * Chemin absolu du dossier d'upload
-   */
-=======
 // src/services/upload.service.ts
 import fs from 'fs/promises';
 import path from 'path';
@@ -38,6 +26,9 @@ export interface ListedFile {
 export class UploadService {
   private static readonly SAFE_SUBFOLDERS = [
     'avatars',
+    'couvertures',
+    'documents',
+    'logos',
     'formations',
     'attestations',
     'ressources',
@@ -49,28 +40,10 @@ export class UploadService {
   // ==========================================================================
   // 🔒 SÉCURITÉ
   // ==========================================================================
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   private static getUploadDir(): string {
     return path.resolve(process.cwd(), env.UPLOAD_DIR);
   }
 
-<<<<<<< HEAD
-  /**
-   * Supprime un fichier
-   */
-  static async deleteFile(relativePath: string): Promise<boolean> {
-    try {
-      // Sécurité : éviter path traversal
-      const safe = relativePath.replace(/^\/+/, '').replace(/\.\./g, '');
-      const fullPath = path.join(this.getUploadDir(), safe);
-
-      await fs.unlink(fullPath);
-      logger.info(`🗑️  Fichier supprimé : ${relativePath}`);
-      return true;
-    } catch (err: any) {
-      if (err.code === 'ENOENT') {
-        logger.warn(`⚠️  Fichier introuvable : ${relativePath}`);
-=======
   /** Empêche le path traversal */
   private static sanitize(relativePath: string): string {
     const cleaned = relativePath
@@ -104,7 +77,6 @@ export class UploadService {
     } catch (err: any) {
       if (err.code === 'ENOENT') {
         logger.warn(`⚠️ Fichier introuvable : ${relativePath}`);
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         return false;
       }
       logger.error(`❌ Erreur suppression : ${err.message}`);
@@ -112,22 +84,12 @@ export class UploadService {
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Vérifie si un fichier existe
-   */
-  static async fileExists(relativePath: string): Promise<boolean> {
-    try {
-      const safe = relativePath.replace(/^\/+/, '').replace(/\.\./g, '');
-      const fullPath = path.join(this.getUploadDir(), safe);
-=======
   // ==========================================================================
   // ℹ️ INFOS FICHIER
   // ==========================================================================
   static async fileExists(relativePath: string): Promise<boolean> {
     try {
       const fullPath = this.resolveSafe(relativePath);
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       await fs.access(fullPath);
       return true;
     } catch {
@@ -135,19 +97,9 @@ export class UploadService {
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Obtient les informations d'un fichier
-   */
-  static async getFileInfo(relativePath: string) {
-    try {
-      const safe = relativePath.replace(/^\/+/, '').replace(/\.\./g, '');
-      const fullPath = path.join(this.getUploadDir(), safe);
-=======
   static async getFileInfo(relativePath: string): Promise<FileInfo> {
     try {
       const fullPath = this.resolveSafe(relativePath);
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       const stats = await fs.stat(fullPath);
 
       return {
@@ -164,28 +116,6 @@ export class UploadService {
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Liste les fichiers d'un sous-dossier
-   */
-  static async listFiles(subfolder: string) {
-    try {
-      const dir = path.join(this.getUploadDir(), subfolder);
-      const files = await fs.readdir(dir);
-
-      const details = await Promise.all(
-        files.map(async (f) => {
-          const fullPath = path.join(dir, f);
-          const stats = await fs.stat(fullPath);
-          return {
-            name: f,
-            url: `/uploads/${subfolder}/${f}`,
-            size: stats.size,
-            sizeReadable: this.formatSize(stats.size),
-            createdAt: stats.birthtime,
-          };
-        })
-=======
   // ==========================================================================
   // 📂 LISTE / NETTOYAGE / RENOMMAGE
   // ==========================================================================
@@ -208,7 +138,6 @@ export class UploadService {
               createdAt: stats.birthtime,
             };
           }),
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       );
 
       return details;
@@ -217,18 +146,9 @@ export class UploadService {
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Supprime tous les fichiers d'un dossier (sauf .gitkeep)
-   */
-  static async cleanFolder(subfolder: string): Promise<number> {
-    try {
-      const dir = path.join(this.getUploadDir(), subfolder);
-=======
   static async cleanFolder(subfolder: string): Promise<number> {
     try {
       const dir = path.join(this.getUploadDir(), this.sanitize(subfolder));
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       const files = await fs.readdir(dir);
       let deleted = 0;
 
@@ -245,19 +165,6 @@ export class UploadService {
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Renomme un fichier
-   */
-  static async renameFile(
-    subfolder: string,
-    oldName: string,
-    newName: string
-  ): Promise<string> {
-    const dir = path.join(this.getUploadDir(), subfolder);
-    const oldPath = path.join(dir, oldName);
-    const newPath = path.join(dir, newName);
-=======
   static async renameFile(
     subfolder: string,
     oldName: string,
@@ -266,26 +173,16 @@ export class UploadService {
     const dir = path.join(this.getUploadDir(), this.sanitize(subfolder));
     const oldPath = path.join(dir, path.basename(oldName));
     const newPath = path.join(dir, path.basename(newName));
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
     await fs.rename(oldPath, newPath);
 
     logger.info(`📝 Fichier renommé : ${oldName} → ${newName}`);
-<<<<<<< HEAD
-    return `/uploads/${subfolder}/${newName}`;
-  }
-
-  /**
-   * Formate une taille en octets
-   */
-=======
     return `/uploads/${subfolder}/${path.basename(newName)}`;
   }
 
   // ==========================================================================
   // 📏 UTILITAIRES
   // ==========================================================================
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   static formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
@@ -294,52 +191,20 @@ export class UploadService {
     return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   }
 
-<<<<<<< HEAD
-  /**
-   * Vérifie le type MIME
-   */
-  static validateMimeType(
-    mimetype: string,
-    allowed: string[]
-  ): void {
-=======
   static validateMimeType(mimetype: string, allowed: string[]): void {
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     if (!allowed.includes(mimetype)) {
       throw new ValidationError(`Type de fichier non autorisé : ${mimetype}`);
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Vérifie la taille
-   */
-  static validateSize(size: number, maxSize: number): void {
-    if (size > maxSize) {
-      throw new ValidationError(
-        `Fichier trop volumineux. Max : ${this.formatSize(maxSize)}`
-=======
   static validateSize(size: number, maxSize: number): void {
     if (size > maxSize) {
       throw new ValidationError(
         `Fichier trop volumineux. Max : ${this.formatSize(maxSize)}`,
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       );
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * Statistiques globales d'utilisation
-   */
-  static async getStats() {
-    const subfolders = ['avatars', 'formations', 'attestations', 'ressources', 'temp'];
-    const stats: any = { total: 0, totalSize: 0, folders: {} };
-
-    for (const sub of subfolders) {
-      const files = await this.listFiles(sub);
-      const size = files.reduce((s, f) => s + f.size, 0);
-=======
   // ==========================================================================
   // 📊 STATISTIQUES D'UTILISATION
   // ==========================================================================
@@ -350,7 +215,6 @@ export class UploadService {
       const files = await this.listFiles(sub);
       const size = files.reduce((s, f) => s + f.size, 0);
 
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       stats.folders[sub] = {
         count: files.length,
         size,

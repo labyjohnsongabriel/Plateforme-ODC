@@ -1,3 +1,4 @@
+// src/entities/Note.entity.ts
 import { Entity, Column, ManyToOne, JoinColumn, Unique, Index } from 'typeorm';
 import { BaseEntity } from './BaseEntity';
 import { Evaluation } from './Evaluation.entity';
@@ -6,6 +7,7 @@ import { User } from './User.entity';
 @Entity('notes')
 @Unique(['evaluationId', 'participantId'])
 @Index(['participantId'])
+@Index(['evaluationId'])
 export class Note extends BaseEntity {
   @Column({ type: 'decimal', precision: 5, scale: 2 })
   note: number;

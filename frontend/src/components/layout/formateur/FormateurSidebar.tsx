@@ -1,146 +1,239 @@
+// src/components/layout/formateur/FormateurSidebar.tsx
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Calendar, QrCode, ClipboardCheck, FileText,
-  FolderOpen, User, ChevronLeft, ChevronRight, LogOut, GraduationCap,
+  LayoutDashboard,
+  Calendar,
+  QrCode,
+  ClipboardCheck,
+  FileText,
+  FolderOpen,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/ui.store';
-import { useAuth } from '@/hooks/useAuth';
+import { useMessagerieStore } from '@/store/messagerie.store';
+import { useMessagerieModalStore } from '@/store/messagerie-modal.store';
+import { SidebarLogo } from '@/components/shared/SidebarLogo';
+import { SidebarLink } from '@/components/shared/SidebarLink';
+import { ROUTES } from '@/lib/routes';
 
-const SECTIONS = [
+interface SectionItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  badgeKey?: 'messages';
+  modalTrigger?: 'messagerie';
+}
+
+interface Section {
+  label: string;
+  items: SectionItem[];
+}
+
+const SECTIONS: Section[] = [
   {
     label: 'Général',
     items: [
-      { href: '/formateur/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+      { href: ROUTES.formateur.dashboard, label: 'Tableau de bord', icon: LayoutDashboard },
     ],
   },
   {
     label: 'Mes sessions',
     items: [
-      { href: '/formateur/sessions', label: 'Mes sessions', icon: Calendar },
-      { href: '/formateur/presences', label: 'Présences QR', icon: QrCode },
+      { href: ROUTES.formateur.sessions, label: 'Mes sessions', icon: Calendar },
+      { href: ROUTES.formateur.presences, label: 'Présences QR', icon: QrCode },
     ],
   },
   {
     label: 'Pédagogie',
     items: [
-      { href: '/formateur/evaluations', label: 'Évaluations', icon: ClipboardCheck },
-      { href: '/formateur/notes', label: 'Saisie des notes', icon: FileText },
-      { href: '/formateur/ressources', label: 'Ressources', icon: FolderOpen },
+      { href: ROUTES.formateur.evaluations, label: 'Évaluations', icon: ClipboardCheck },
+      { href: ROUTES.formateur.notes, label: 'Saisie des notes', icon: FileText },
+      { href: ROUTES.formateur.ressources, label: 'Ressources', icon: FolderOpen },
     ],
   },
   {
-    label: 'Compte',
+    label: 'Communication',
     items: [
-      { href: '/formateur/profil', label: 'Mon profil', icon: User },
+      {
+        href: ROUTES.common.messagerie,
+        label: 'Messagerie',
+        icon: MessageSquare,
+        badgeKey: 'messages',
+        modalTrigger: 'messagerie',
+      },
     ],
   },
 ];
 
 export function FormateurSidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebarCollapse } = useUIStore();
-  const { user, logout } = useAuth();
+  const {
+    sidebarCollapsed,
+    sidebarMobileOpen,
+    setSidebarMobileOpen,
+    toggleSidebarCollapse,
+  } = useUIStore();
+  const unreadMessages = useMessagerieStore((s) => s.unreadCount);
+  const openMessagerie = useMessagerieModalStore((s) => s.open);
+  const asideRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (sidebarMobileOpen && asideRef.current) {
+      const firstLink = asideRef.current.querySelector<HTMLElement>('a, button');
+      firstLink?.focus();
+    }
+  }, [sidebarMobileOpen]);
+
+  useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarMobileOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [sidebarMobileOpen, setSidebarMobileOpen]);
+
+  useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [sidebarMobileOpen]);
+
+  const closeMobile = () => setSidebarMobileOpen(false);
 
   return (
-    <aside
-      className={cn(
-        'h-screen flex flex-col bg-odc-surface border-r border-odc-border transition-all duration-300',
-        sidebarCollapsed ? 'w-[72px]' : 'w-64',
+    <>
+      {sidebarMobileOpen && (
+        <button
+          type="button"
+          onClick={closeMobile}
+          aria-label="Fermer le menu"
+          className="fixed inset-0 z-40 animate-in fade-in bg-black/40 backdrop-blur-sm duration-200 lg:hidden"
+        />
       )}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 h-16 px-4 border-b border-odc-border shrink-0">
-        <Link href="/formateur/dashboard" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white shrink-0">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          {!sidebarCollapsed && (
-            <div className="flex flex-col leading-tight">
-              <span className="font-display font-bold text-sm">Espace Formateur</span>
-              <span className="text-xs text-odc-muted">Orange Digital Center</span>
-            </div>
-          )}
-        </Link>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-thin">
-        {SECTIONS.map((section) => (
-          <div key={section.label}>
-            {!sidebarCollapsed && (
-              <p className="text-[10px] uppercase tracking-wider text-odc-muted font-semibold px-3 mb-2">
-                {section.label}
-              </p>
-            )}
-            <ul className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const active =
-                  pathname === item.href || pathname.startsWith(item.href + '/');
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        'sidebar-link',
-                        active && 'sidebar-link-active',
-                        sidebarCollapsed && 'justify-center',
-                      )}
-                      title={sidebarCollapsed ? item.label : undefined}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      {/* User + Actions */}
-      <div className="border-t border-odc-border p-3 space-y-1 shrink-0">
-        {!sidebarCollapsed && user && (
-          <div className="flex items-center gap-3 px-3 py-2 mb-1">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-medium">
-              {user.prenom?.charAt(0)}{user.nom?.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium truncate">
-                {user.prenom} {user.nom}
-              </p>
-              <p className="text-[10px] text-odc-muted truncate">Formateur</p>
-            </div>
-          </div>
+      <aside
+        ref={asideRef}
+        aria-label="Navigation formateur"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col',
+          'border-r border-odc-border bg-odc-surface',
+          'transition-[transform,width] duration-300 ease-out',
+          'lg:sticky lg:top-0 lg:z-auto lg:translate-x-0',
+          sidebarMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:shadow-none',
+          sidebarCollapsed ? 'lg:w-[72px]' : 'lg:w-64',
         )}
-
-        <button
-          onClick={toggleSidebarCollapse}
-          className={cn('sidebar-link w-full', sidebarCollapsed && 'justify-center')}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <><ChevronLeft className="h-4 w-4" /><span>Replier</span></>
-          )}
-        </button>
-
-        <button
-          onClick={logout}
+      >
+        <div
           className={cn(
-            'sidebar-link w-full text-odc-error hover:bg-odc-error-bg',
-            sidebarCollapsed && 'justify-center',
+            'flex h-16 shrink-0 items-center border-b border-odc-border',
+            sidebarCollapsed ? 'justify-center px-2' : 'px-4',
           )}
         >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!sidebarCollapsed && <span>Déconnexion</span>}
-        </button>
-      </div>
-    </aside>
+          <SidebarLogo
+            href={ROUTES.formateur.dashboard}
+            collapsed={sidebarCollapsed}
+            title="Espace Formateur"
+            subtitle="Orange Digital Center"
+            onNavigate={closeMobile}
+          />
+        </div>
+
+        <nav
+          className="scrollbar-thin flex-1 overflow-y-auto px-3 py-4"
+          aria-label="Menu principal"
+        >
+          {SECTIONS.map((section, index) => (
+            <div key={section.label} className={cn(index > 0 && 'mt-6')}>
+              {!sidebarCollapsed && (
+                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-odc-text-secondary">
+                  {section.label}
+                </p>
+              )}
+              {sidebarCollapsed && index > 0 && (
+                <div className="mx-auto mb-3 h-px w-8 bg-odc-border" aria-hidden />
+              )}
+              <ul className="space-y-0.5">
+                {section.items.map((item) => {
+                  const badge =
+                    item.badgeKey === 'messages' ? unreadMessages : undefined;
+
+                  if (item.modalTrigger === 'messagerie') {
+                    return (
+                      <li key={item.href}>
+                        <SidebarLink
+                          href={item.href}
+                          label={item.label}
+                          icon={item.icon}
+                          active={false}
+                          collapsed={sidebarCollapsed}
+                          badge={badge}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            closeMobile();
+                            openMessagerie();
+                          }}
+                        />
+                      </li>
+                    );
+                  }
+
+                  const active =
+                    pathname === item.href || pathname?.startsWith(item.href + '/');
+                  return (
+                    <li key={item.href}>
+                      <SidebarLink
+                        href={item.href}
+                        label={item.label}
+                        icon={item.icon}
+                        active={active}
+                        collapsed={sidebarCollapsed}
+                        badge={badge}
+                        onClick={closeMobile}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        <div className="shrink-0 border-t border-odc-border p-3">
+          <button
+            type="button"
+            onClick={toggleSidebarCollapse}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-odc-text-primary transition-colors',
+              'hover:bg-odc-surface-alt hover:text-odc-primary',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-odc-primary focus-visible:ring-offset-2',
+              sidebarCollapsed && 'justify-center',
+            )}
+            aria-label={sidebarCollapsed ? 'Déplier la sidebar' : 'Replier la sidebar'}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <>
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Replier</span>
+              </>
+            )}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

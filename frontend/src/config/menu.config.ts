@@ -1,3 +1,4 @@
+// src/config/menu.config.ts
 import {
   LayoutDashboard,
   BookOpen,
@@ -14,17 +15,25 @@ import {
   Settings,
   HelpCircle,
   Shield,
+  Network,
 } from 'lucide-react';
-import { RoleName } from '@/types/user.types';
+import type { LucideIcon } from 'lucide-react';
 
-// ============================================================================
-//  TYPES
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export type RoleName =
+  | 'ADMINISTRATEUR'
+  | 'STAFF_ODC'
+  | 'FORMATEUR'
+  | 'PARTICIPANT'
+  | 'PARTENAIRE';
 
 export interface MenuItem {
   to: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   roles?: RoleName[];
   badge?: 'notifications' | 'messages' | 'inscriptions';
   exact?: boolean;
@@ -35,9 +44,9 @@ export interface MenuSection {
   items: MenuItem[];
 }
 
-// ============================================================================
-//  MENU PRINCIPAL
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   MENU PRINCIPAL
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const MENU_SECTIONS: MenuSection[] = [
   {
@@ -45,7 +54,7 @@ export const MENU_SECTIONS: MenuSection[] = [
     items: [
       {
         to: '/dashboard',
-        label: 'Dashboard',
+        label: 'Tableau de bord',
         icon: LayoutDashboard,
         exact: true,
       },
@@ -66,13 +75,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         to: '/presences',
         label: 'Présences',
         icon: GraduationCap,
-        roles: [RoleName.ADMIN, RoleName.STAFF, RoleName.FORMATEUR],
+        roles: ['ADMINISTRATEUR', 'STAFF_ODC', 'FORMATEUR'],
       },
       {
         to: '/evaluations',
         label: 'Évaluations',
         icon: FileText,
-        roles: [RoleName.ADMIN, RoleName.FORMATEUR],
+        roles: ['ADMINISTRATEUR', 'FORMATEUR'],
       },
       { to: '/attestations', label: 'Attestations', icon: Award },
     ],
@@ -92,7 +101,12 @@ export const MENU_SECTIONS: MenuSection[] = [
         icon: Bell,
         badge: 'notifications',
       },
-      { to: '/reseautage', label: 'Réseautage', icon: Handshake },
+      {
+        to: '/reseautage',
+        label: 'Réseautage',
+        icon: Network,
+        roles: ['ADMINISTRATEUR', 'STAFF_ODC', 'PARTICIPANT', 'PARTENAIRE'],
+      },
     ],
   },
   {
@@ -102,19 +116,19 @@ export const MENU_SECTIONS: MenuSection[] = [
         to: '/users',
         label: 'Utilisateurs',
         icon: Users,
-        roles: [RoleName.ADMIN, RoleName.STAFF],
+        roles: ['ADMINISTRATEUR', 'STAFF_ODC'],
       },
       {
         to: '/partenaires',
         label: 'Partenaires',
         icon: Handshake,
-        roles: [RoleName.ADMIN, RoleName.STAFF, RoleName.PARTENAIRE],
+        roles: ['ADMINISTRATEUR', 'STAFF_ODC', 'PARTENAIRE'],
       },
       {
         to: '/admin/audit',
         label: 'Audit',
         icon: Shield,
-        roles: [RoleName.ADMIN],
+        roles: ['ADMINISTRATEUR'],
       },
     ],
   },
@@ -128,16 +142,23 @@ export const MENU_SECTIONS: MenuSection[] = [
   },
 ];
 
-// ============================================================================
-//  HELPERS
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Filtre le menu selon le rôle de l'utilisateur.
+ */
 export function getMenuForRole(role?: RoleName | null): MenuSection[] {
   if (!role) return [];
 
+  const normalized = String(role).toUpperCase() as RoleName;
+
   return MENU_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => !item.roles || item.roles.includes(role)),
+    items: section.items.filter(
+      (item) => !item.roles || item.roles.includes(normalized),
+    ),
   })).filter((section) => section.items.length > 0);
 }
 

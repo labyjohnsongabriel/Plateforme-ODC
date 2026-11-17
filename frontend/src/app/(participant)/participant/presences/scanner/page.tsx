@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: { session?: string };
+  searchParams: { session?: string; token?: string };
 }
 
 export default function ScannerPage({ searchParams }: PageProps) {
@@ -27,7 +27,10 @@ export default function ScannerPage({ searchParams }: PageProps) {
       </header>
 
       {/* Scanner */}
-      <QrScanner defaultSessionId={searchParams.session} />
+      <QrScanner
+        defaultSessionId={searchParams.session}
+        defaultQrToken={searchParams.token}
+      />
     </div>
   );
 }

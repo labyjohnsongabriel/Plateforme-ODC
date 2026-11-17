@@ -2,22 +2,32 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
-    interactive?: boolean;
-  }
->(({ className, interactive, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'rounded-lg border border-odc-border bg-odc-surface text-odc-text-primary shadow-odc-sm transition-all',
-      interactive && 'cursor-pointer hover:shadow-odc-md hover:-translate-y-1',
-      className,
-    )}
-    {...props}
-  />
-));
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  interactive?: boolean;
+  elevated?: boolean;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, interactive, elevated, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        'rounded-xl border border-slate-200 bg-white text-slate-900',
+        'dark:border-slate-800 dark:bg-slate-950 dark:text-slate-50',
+        'transition-all duration-200',
+        elevated ? 'shadow-md' : 'shadow-sm',
+        interactive && [
+          'cursor-pointer',
+          'hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg',
+          'dark:hover:border-orange-500/40',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2',
+        ],
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
 Card.displayName = 'Card';
 
 const CardHeader = React.forwardRef<
@@ -39,7 +49,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'font-display text-xl font-semibold leading-tight tracking-tight',
+      'font-display text-lg font-semibold leading-tight tracking-tight text-slate-900 dark:text-slate-50',
       className,
     )}
     {...props}
@@ -53,7 +63,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm text-odc-muted', className)}
+    className={cn('text-sm text-slate-500 dark:text-slate-400', className)}
     {...props}
   />
 ));
@@ -79,4 +89,11 @@ const CardFooter = React.forwardRef<
 ));
 CardFooter.displayName = 'CardFooter';
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+};

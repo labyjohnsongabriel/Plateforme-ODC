@@ -1,56 +1,87 @@
-import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
-import { BaseEntity } from './BaseEntity';
+// src/entities/Evaluation.entity.ts
+import {
+  Column, CreateDateColumn, DeleteDateColumn, Entity, JoinColumn,
+  ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn,
+} from 'typeorm';
 import { Session } from './Session.entity';
-import { Note } from './Note.entity';
-
-export enum TypeEvaluation {
-  QUIZ = 'QUIZ',
-  PROJET = 'PROJET',
-  EXAMEN = 'EXAMEN',
-  TP = 'TP',
-  ORAL = 'ORAL',
-}
+import { User } from './User.entity';
+import { Question } from './Question.entity';              // ⚠️ './' pas '../models/'
+import { RubricCriterion } from './RubricCriterion.entity';
+import { Soumission } from './Soumission.entity';
 
 @Entity('evaluations')
-export class Evaluation extends BaseEntity {
+export class Evaluation {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt!: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt!: Date | null;
+
   @Column({ type: 'varchar', length: 200 })
-  titre: string;
+  titre!: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  type: TypeEvaluation;
+  @Column({ type: 'varchar', length: 50, default: 'QUIZ' })
+  type!: string;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 20, name: 'note_max' })
-  noteMax: number;
+  @Column({ name: 'note_max', type: 'numeric', precision: 5, scale: 2, default: 20 })
+  noteMax!: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 10, name: 'note_min' })
-  noteMin: number;
+  @Column({ name: 'note_min_passage', type: 'numeric', precision: 5, scale: 2, default: 10 })
+  noteMinPassage!: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 1, name: 'coefficient' })
-  coefficient: number;
+  @Column({ type: 'numeric', precision: 5, scale: 2, default: 1 })
+  coefficient!: number;
 
-  @Column({ type: 'date', nullable: true, name: 'date_evaluation' })
-  dateEvaluation: Date;
+  @Column({ name: 'date_evaluation', type: 'date', nullable: true })
+  dateEvaluation!: Date | null;
 
-  @Column({ type: 'int', nullable: true, name: 'duree_minutes' })
-  dureeMinutes: number;
-
-  @Column({ type: 'text', nullable: true })
-  description: string;
+  @Column({ name: 'duree_minutes', type: 'integer', nullable: true })
+  dureeMinutes!: number | null;
 
   @Column({ type: 'text', nullable: true })
-  consignes: string;
+  description!: string | null;
 
-  @Column({ type: 'boolean', default: true })
-  publiee: boolean;
+  @Column({ type: 'text', nullable: true })
+  consignes!: string | null;
 
-  // Relations
-  @ManyToOne(() => Session, (s) => s.evaluations, { onDelete: 'CASCADE' })
+  @Column({ type: 'boolean', default: false })
+  publiee!: boolean;
+
+  @Column({ name: 'session_id', type: 'uuid' })
+  sessionId!: string;
+
+  @Column({ name: 'createur_id', type: 'uuid', nullable: true })
+  createurId!: string | null;
+
+  @ManyToOne(() => Session, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'session_id' })
-  session: Session;
+  session!: Session;
 
-  @Column({ name: 'session_id' })
-  sessionId: string;
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'createur_id' })
+  createur!: User | null;
 
-  @OneToMany(() => Note, (n) => n.evaluation)
-  notes: Note[];
+  @OneToMany(() => Question, (q) => q.evaluation, {
+    cascade: true,
+    eager: false,
+  })
+  questions!: Question[];
+
+  @OneToMany(() => RubricCriterion, (r) => r.evaluation, {
+    cascade: true,
+    eager: false,
+  })
+  rubric!: RubricCriterion[];
+
+  @OneToMany(() => Soumission, (s) => s.evaluation, {
+    cascade: true,
+    eager: false,
+  })
+  soumissions!: Soumission[];
 }

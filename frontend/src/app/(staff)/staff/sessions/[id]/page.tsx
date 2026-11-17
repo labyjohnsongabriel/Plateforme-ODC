@@ -1,16 +1,17 @@
-// [id]/page.tsx
+// src/app/(staff)/staff/sessions/[id]/page.tsx
 import type { Metadata } from 'next';
-import { SessionForm } from '../components/SessionForm';
+import { SessionDetail } from './components/SessionDetail';
 
-interface Props { params: { id: string } }
+interface Props {
+  params: { id: string };
+}
 
-export const metadata: Metadata = { title: 'Modifier session' };
+export const metadata: Metadata = { title: 'Détail de la session' };
 
-export default function EditSessionPage({ params }: Props) {
+export default function SessionDetailPage({ params }: Props) {
   return (
     <div className="space-y-6 animate-fade-in">
-      <h1 className="font-display text-2xl md:text-3xl font-bold">Modifier la session</h1>
-      <SessionForm mode="edit" id={params.id} />
+      <SessionDetail sessionId={params.id} />
     </div>
   );
 }

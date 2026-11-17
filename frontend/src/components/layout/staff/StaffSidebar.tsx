@@ -1,153 +1,250 @@
+// src/components/layout/staff/StaffSidebar.tsx
 'use client';
 
-import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, BookOpen, Calendar, Users, QrCode, ClipboardCheck,
-  Award, FileText, FolderOpen, Building2, User,
-  ChevronLeft, ChevronRight, LogOut,
+  LayoutDashboard,
+  BookOpen,
+  Calendar,
+  Users,
+  QrCode,
+  ClipboardCheck,
+  Award,
+  FileText,
+  FolderOpen,
+  Building2,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/ui.store';
-import { useAuth } from '@/hooks/useAuth';
+import { useMessagerieStore } from '@/store/messagerie.store';
+import { useMessagerieModalStore } from '@/store/messagerie-modal.store';
+import { SidebarLogo } from '@/components/shared/SidebarLogo';
+import { SidebarLink } from '@/components/shared/SidebarLink';
+import { ROUTES } from '@/lib/routes';
 
-const SECTIONS = [
+interface SectionItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  badgeKey?: 'messages';
+  modalTrigger?: 'messagerie';
+}
+
+interface Section {
+  label: string;
+  items: SectionItem[];
+}
+
+const SECTIONS: Section[] = [
   {
     label: 'Général',
     items: [
-      { href: '/staff/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+      { href: ROUTES.staff.dashboard, label: 'Tableau de bord', icon: LayoutDashboard },
     ],
   },
   {
     label: 'Catalogue',
     items: [
-      { href: '/staff/formations', label: 'Formations', icon: BookOpen },
-      { href: '/staff/sessions', label: 'Sessions', icon: Calendar },
+      { href: ROUTES.staff.formations, label: 'Formations', icon: BookOpen },
+      { href: ROUTES.staff.sessions, label: 'Sessions', icon: Calendar },
     ],
   },
   {
     label: 'Participants',
     items: [
-      { href: '/staff/selections', label: 'Sélections', icon: Users },
-      { href: '/staff/presences', label: 'Présences', icon: QrCode },
+      { href: ROUTES.staff.selections, label: 'Sélections', icon: Users },
+      { href: ROUTES.staff.presences, label: 'Présences', icon: QrCode },
     ],
   },
   {
     label: 'Pédagogie',
     items: [
-      { href: '/staff/evaluations', label: 'Évaluations', icon: ClipboardCheck },
-      { href: '/staff/notes', label: 'Notes', icon: FileText },
-      { href: '/staff/attestations', label: 'Attestations', icon: Award },
-      { href: '/staff/ressources', label: 'Ressources', icon: FolderOpen },
+      { href: ROUTES.staff.evaluations, label: 'Évaluations', icon: ClipboardCheck },
+      { href: ROUTES.staff.notes, label: 'Notes', icon: FileText },
+      { href: ROUTES.staff.attestations, label: 'Attestations', icon: Award },
+      { href: ROUTES.staff.ressources, label: 'Ressources', icon: FolderOpen },
+    ],
+  },
+  {
+    label: 'Communication',
+    items: [
+      {
+        href: ROUTES.common.messagerie,
+        label: 'Messagerie',
+        icon: MessageSquare,
+        badgeKey: 'messages',
+        modalTrigger: 'messagerie',
+      },
     ],
   },
   {
     label: 'Autres',
     items: [
-      { href: '/staff/partenaires', label: 'Partenaires', icon: Building2 },
-      { href: '/staff/profil', label: 'Mon profil', icon: User },
+      { href: ROUTES.staff.partenaires, label: 'Partenaires', icon: Building2 },
     ],
   },
 ];
 
 export function StaffSidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, toggleSidebarCollapse } = useUIStore();
-  const { user, logout } = useAuth();
+  const {
+    sidebarCollapsed,
+    sidebarMobileOpen,
+    setSidebarMobileOpen,
+    toggleSidebarCollapse,
+  } = useUIStore();
+  const unreadMessages = useMessagerieStore((s) => s.unreadCount);
+  const openMessagerie = useMessagerieModalStore((s) => s.open);
+  const asideRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarMobileOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [sidebarMobileOpen, setSidebarMobileOpen]);
+
+  useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [sidebarMobileOpen]);
+
+  const closeMobile = () => setSidebarMobileOpen(false);
 
   return (
-    <aside
-      className={cn(
-        'h-screen flex flex-col bg-odc-surface border-r border-odc-border transition-all duration-300',
-        sidebarCollapsed ? 'w-[72px]' : 'w-64',
+    <>
+      {sidebarMobileOpen && (
+        <button
+          type="button"
+          onClick={closeMobile}
+          aria-label="Fermer le menu"
+          className="fixed inset-0 z-40 animate-in fade-in bg-black/40 backdrop-blur-sm duration-200 lg:hidden"
+        />
       )}
-    >
-      <div className="flex items-center gap-2.5 h-16 px-4 border-b border-odc-border shrink-0">
-        <Link href="/staff/dashboard" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-odc-500 to-odc-700 flex items-center justify-center text-white font-display font-bold text-sm shrink-0">
-            ODC
-          </div>
-          {!sidebarCollapsed && (
-            <div className="flex flex-col leading-tight">
-              <span className="font-display font-bold text-sm">Espace Staff</span>
-              <span className="text-xs text-odc-muted">Orange Digital Center</span>
-            </div>
-          )}
-        </Link>
-      </div>
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 scrollbar-thin">
-        {SECTIONS.map((section) => (
-          <div key={section.label}>
-            {!sidebarCollapsed && (
-              <p className="text-[10px] uppercase tracking-wider text-odc-muted font-semibold px-3 mb-2">
-                {section.label}
-              </p>
-            )}
-            <ul className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const active =
-                  pathname === item.href || pathname.startsWith(item.href + '/');
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        'sidebar-link',
-                        active && 'sidebar-link-active',
-                        sidebarCollapsed && 'justify-center',
-                      )}
-                      title={sidebarCollapsed ? item.label : undefined}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-t border-odc-border p-3 space-y-1 shrink-0">
-        {!sidebarCollapsed && user && (
-          <div className="flex items-center gap-3 px-3 py-2 mb-1">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-odc-500 to-odc-700 flex items-center justify-center text-white text-xs font-medium">
-              {user.prenom?.charAt(0)}{user.nom?.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium truncate">
-                {user.prenom} {user.nom}
-              </p>
-              <p className="text-[10px] text-odc-muted truncate">Staff ODC</p>
-            </div>
-          </div>
+      <aside
+        ref={asideRef}
+        aria-label="Navigation staff"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col',
+          'border-r border-odc-border bg-odc-surface',
+          'transition-[transform,width] duration-300 ease-out',
+          'lg:sticky lg:top-0 lg:z-auto lg:translate-x-0',
+          sidebarMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:shadow-none',
+          sidebarCollapsed ? 'lg:w-[72px]' : 'lg:w-64',
         )}
-
-        <button
-          onClick={toggleSidebarCollapse}
-          className={cn('sidebar-link w-full', sidebarCollapsed && 'justify-center')}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <><ChevronLeft className="h-4 w-4" /><span>Replier</span></>
-          )}
-        </button>
-
-        <button
-          onClick={logout}
+      >
+        <div
           className={cn(
-            'sidebar-link w-full text-odc-error hover:bg-odc-error-bg',
-            sidebarCollapsed && 'justify-center',
+            'flex h-16 shrink-0 items-center border-b border-odc-border',
+            sidebarCollapsed ? 'justify-center px-2' : 'px-4',
           )}
         >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!sidebarCollapsed && <span>Déconnexion</span>}
-        </button>
-      </div>
-    </aside>
+          <SidebarLogo
+            href={ROUTES.staff.dashboard}
+            collapsed={sidebarCollapsed}
+            title="Espace Staff"
+            subtitle="Orange Digital Center"
+            onNavigate={closeMobile}
+          />
+        </div>
+
+        <nav
+          className="scrollbar-thin flex-1 overflow-y-auto px-3 py-4"
+          aria-label="Menu principal"
+        >
+          {SECTIONS.map((section, index) => (
+            <div key={section.label} className={cn(index > 0 && 'mt-6')}>
+              {!sidebarCollapsed && (
+                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-odc-text-secondary">
+                  {section.label}
+                </p>
+              )}
+              {sidebarCollapsed && index > 0 && (
+                <div className="mx-auto mb-3 h-px w-8 bg-odc-border" aria-hidden />
+              )}
+              <ul className="space-y-0.5">
+                {section.items.map((item) => {
+                  const badge =
+                    item.badgeKey === 'messages' ? unreadMessages : undefined;
+
+                  if (item.modalTrigger === 'messagerie') {
+                    return (
+                      <li key={item.href}>
+                        <SidebarLink
+                          href={item.href}
+                          label={item.label}
+                          icon={item.icon}
+                          active={false}
+                          collapsed={sidebarCollapsed}
+                          badge={badge}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            closeMobile();
+                            openMessagerie();
+                          }}
+                        />
+                      </li>
+                    );
+                  }
+
+                  const active =
+                    pathname === item.href || pathname?.startsWith(item.href + '/');
+                  return (
+                    <li key={item.href}>
+                      <SidebarLink
+                        href={item.href}
+                        label={item.label}
+                        icon={item.icon}
+                        active={active}
+                        collapsed={sidebarCollapsed}
+                        badge={badge}
+                        onClick={closeMobile}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        <div className="shrink-0 border-t border-odc-border p-3">
+          <button
+            type="button"
+            onClick={toggleSidebarCollapse}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-odc-text-primary transition-colors',
+              'hover:bg-odc-surface-alt hover:text-odc-primary',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-odc-primary focus-visible:ring-offset-2',
+              sidebarCollapsed && 'justify-center',
+            )}
+            aria-label={sidebarCollapsed ? 'Déplier la sidebar' : 'Replier la sidebar'}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <>
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Replier</span>
+              </>
+            )}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

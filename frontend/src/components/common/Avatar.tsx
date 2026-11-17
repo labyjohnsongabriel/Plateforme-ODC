@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { User } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { getMediaUrl } from '@/lib/media';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
@@ -60,7 +61,8 @@ export function Avatar({
       .toUpperCase();
   };
 
-  const showFallback = !src || imgError;
+  const imageSrc = getMediaUrl(src);
+  const showFallback = !imageSrc || imgError;
 
   return (
     <div className="relative inline-block">
@@ -68,10 +70,10 @@ export function Avatar({
         className={cn(
           'flex items-center justify-center overflow-hidden',
           'bg-gradient-to-br from-odc-primary to-odc-primary-dark',
-          'text-white font-semibold flex-shrink-0',
+          'flex-shrink-0 font-semibold text-white',
           rounded ? 'rounded-full' : 'rounded-xl',
           sizes[size],
-          className
+          className,
         )}
       >
         {showFallback ? (
@@ -82,9 +84,9 @@ export function Avatar({
           )
         ) : (
           <img
-            src={src}
+            src={imageSrc}
             alt={alt || name || 'Avatar'}
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
             onError={() => setImgError(true)}
           />
         )}
@@ -95,7 +97,7 @@ export function Avatar({
           className={cn(
             'absolute bottom-0 right-0 rounded-full border-2 border-white dark:border-odc-surface-dark',
             statusSizes[size],
-            statusColors[status]
+            statusColors[status],
           )}
         />
       )}

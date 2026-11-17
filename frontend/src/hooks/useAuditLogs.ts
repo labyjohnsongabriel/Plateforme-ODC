@@ -107,6 +107,9 @@ function detectSeverite(action: string): SeveriteAudit {
 }
 
 function normalizeLog(raw: any): AuditLog {
+  const details =
+    raw?.details && typeof raw.details === 'object' ? raw.details : undefined;
+
   return {
     id: String(raw?.id ?? raw?._id ?? ''),
     action: raw?.action ?? '',
@@ -126,8 +129,8 @@ function normalizeLog(raw: any): AuditLog {
     userAgent: raw?.userAgent ?? undefined,
     methode: raw?.methode ?? raw?.method ?? undefined,
     url: raw?.url ?? undefined,
-    payload: raw?.payload ?? undefined,
-    changes: raw?.changes ?? undefined,
+    payload: raw?.payload ?? details,
+    changes: raw?.changes ?? details?.changes,
     createdAt: raw?.createdAt ?? new Date().toISOString(),
   };
 }
@@ -136,15 +139,12 @@ function cleanFilters(filters?: AuditLogFilters): Record<string, any> {
   if (!filters) return {};
   const cleaned: Record<string, any> = {};
   Object.entries(filters).forEach(([key, value]) => {
-    if (
-      value === 'all' ||
-      value === '' ||
-      value === undefined ||
-      value === null
-    ) {
+    if (value === 'all' || value === '' || value === undefined || value === null) {
       return;
     }
-    cleaned[key] = value;
+    if (key === 'dateDebut') cleaned.from = value;
+    else if (key === 'dateFin') cleaned.to = `${value}T23:59:59.999`;
+    else cleaned[key] = value;
   });
   return cleaned;
 }
@@ -156,8 +156,7 @@ function cleanFilters(filters?: AuditLogFilters): Record<string, any> {
 export const auditLogKeys = {
   all: ['admin', 'audit-logs'] as const,
   lists: () => [...auditLogKeys.all, 'list'] as const,
-  list: (filters?: AuditLogFilters) =>
-    [...auditLogKeys.lists(), filters] as const,
+  list: (filters?: AuditLogFilters) => [...auditLogKeys.lists(), filters] as const,
   detail: (id: string) => [...auditLogKeys.all, 'detail', id] as const,
   stats: () => [...auditLogKeys.all, 'stats'] as const,
 };
@@ -197,30 +196,18 @@ export function useAuditLogsStats() {
   return useQuery({
     queryKey: auditLogKeys.stats(),
     queryFn: async (): Promise<AuditLogsStats> => {
-      try {
-        const response = await api.get('/admin/audit-logs/stats');
-        const raw = extractItem<any>(response) ?? {};
-        return {
-          total: Number(raw?.total ?? 0),
-          today: Number(raw?.today ?? 0),
-          thisWeek: Number(raw?.thisWeek ?? 0),
-          criticals: Number(raw?.criticals ?? 0),
-          parAction: Array.isArray(raw?.parAction) ? raw.parAction : [],
-          parEntite: Array.isArray(raw?.parEntite) ? raw.parEntite : [],
-        };
-      } catch {
-        // Fallback silencieux
-        return {
-          total: 0,
-          today: 0,
-          thisWeek: 0,
-          criticals: 0,
-          parAction: [],
-          parEntite: [],
-        };
-      }
+      const response = await api.get('/admin/audit-logs/stats');
+      const raw = extractItem<any>(response) ?? {};
+      return {
+        total: Number(raw?.total ?? 0),
+        today: Number(raw?.today ?? 0),
+        thisWeek: Number(raw?.thisWeek ?? 0),
+        criticals: Number(raw?.criticals ?? 0),
+        parAction: Array.isArray(raw?.parAction) ? raw.parAction : [],
+        parEntite: Array.isArray(raw?.parEntite) ? raw.parEntite : [],
+      };
     },
     staleTime: 60_000,
-    retry: 0,
+    retry: 1,
   });
 }

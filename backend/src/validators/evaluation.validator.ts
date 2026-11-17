@@ -19,7 +19,7 @@ export const createEvaluationSchema = z
         noteMinPassage: z.coerce.number().nonnegative().max(100).default(10),
         coefficient: z.coerce.number().positive().max(10).default(1),
         dateEvaluation: z.coerce.date().optional(),
-        dureeMinutes: z.coerce.number().int().positive().max(600).optional(),
+        dureeMinutes: z.coerce.number().int().min(5).max(600).optional(),
         description: z.string().trim().max(5000).optional(),
         consignes: z.string().trim().max(5000).optional(),
         publiee: z.boolean().optional().default(false),
@@ -44,9 +44,10 @@ export const updateEvaluationSchema = z
         noteMinPassage: z.coerce.number().nonnegative().max(100).optional(),
         coefficient: z.coerce.number().positive().max(10).optional(),
         dateEvaluation: z.coerce.date().optional(),
-        dureeMinutes: z.coerce.number().int().positive().max(600).optional(),
+        dureeMinutes: z.coerce.number().int().min(5).max(600).optional(),
         description: z.string().trim().max(5000).optional(),
         consignes: z.string().trim().max(5000).optional(),
+        publiee: z.boolean().optional(),
       })
       .strict()
       .refine((d) => Object.keys(d).length > 0, {

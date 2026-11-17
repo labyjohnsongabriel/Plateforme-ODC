@@ -74,17 +74,13 @@ export function AppRouter() {
           {/* 🌍 ROUTES PUBLIQUES — Accessibles par TOUS                    */}
           {/* (que l'utilisateur soit connecté ou non)                      */}
           {/* ============================================================ */}
-          <Route element={<PublicLayout />}>
-            {PUBLIC_ROUTES.map(renderRoute)}
-          </Route>
+          <Route element={<PublicLayout />}>{PUBLIC_ROUTES.map(renderRoute)}</Route>
 
           {/* ============================================================ */}
           {/* 🔓 ROUTES AUTH — Redirige si DÉJÀ connecté                    */}
           {/* ============================================================ */}
           <Route element={<PublicRoute />}>
-            <Route element={<PublicRoutes />}>
-              {AUTH_ROUTES.map(renderRoute)}
-            </Route>
+            <Route element={<PublicRoutes />}>{AUTH_ROUTES.map(renderRoute)}</Route>
           </Route>
 
           {/* ============================================================ */}

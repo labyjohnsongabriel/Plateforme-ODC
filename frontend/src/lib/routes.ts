@@ -53,13 +53,12 @@ export const ROUTES = {
 
   /* -------------------- AUTH -------------------- */
   auth: {
-    // ⭐ Routes directes (compatibilité AuthContext)
     connexion: '/connexion',
-    login: '/connexion',         // alias
+    login: '/connexion',
     inscription: '/inscription',
-    register: '/inscription',    // alias
+    register: '/inscription',
     motDePasseOublie: '/mot-de-passe-oublie',
-    forgotPassword: '/mot-de-passe-oublie', // alias
+    forgotPassword: '/mot-de-passe-oublie',
     reinitialiserMotDePasse: (token: string) =>
       `/reinitialiser-mot-de-passe/${token}`,
   },
@@ -68,42 +67,34 @@ export const ROUTES = {
   admin: {
     dashboard: '/admin/dashboard',
 
-    // Utilisateurs
     utilisateurs: '/admin/utilisateurs',
     utilisateurDetail: (id: string) => `/admin/utilisateurs/${id}`,
 
-    // Rôles
     roles: '/admin/roles',
     roleDetail: (id: string) => `/admin/roles/${id}`,
 
-    // Domaines
     domaines: '/admin/domaines',
     domaineNouveau: '/admin/domaines/nouveau',
     domaineDetail: (id: string) => `/admin/domaines/${id}`,
 
-    // Formations
     formations: '/admin/formations',
     formationNouvelle: '/admin/formations/nouveau',
     formationDetail: (id: string) => `/admin/formations/${id}`,
 
-    // Sessions
     sessions: '/admin/sessions',
     sessionNouvelle: '/admin/sessions/nouveau',
     sessionDetail: (id: string) => `/admin/sessions/${id}`,
 
-    // Partenaires
     partenaires: '/admin/partenaires',
     partenaireNouveau: '/admin/partenaires/nouveau',
     partenaireDetail: (id: string) => `/admin/partenaires/${id}`,
 
-    // Inscriptions
     inscriptions: '/admin/inscriptions',
     inscriptionDetail: (id: string) => `/admin/inscriptions/${id}`,
 
-    // Attestations
     attestations: '/admin/attestations',
+    presences: '/admin/presences',
 
-    // Autres
     exports: '/admin/exports',
     auditLogs: '/admin/audit-logs',
     parametres: '/admin/parametres',
@@ -181,6 +172,12 @@ export const ROUTES = {
     reseauDemandesEnAttente: '/participant/reseau/demandes/en-attente',
     reseauDemandesEnvoyees: '/participant/reseau/demandes/envoyees',
     reseauSuggestions: '/participant/reseau/suggestions',
+
+    // ✅ Messagerie & Réseautage participant — MODALE via ?chat=<id>
+    messagerie: '/participant/messagerie',
+    messagerieConversation: (id: string) =>
+      `/participant/messagerie?chat=${encodeURIComponent(id)}`, // ⭐ MODIFIÉ
+    reseautage: '/participant/reseautage',
   },
 
   /* -------------------- PARTENAIRE -------------------- */
@@ -200,14 +197,14 @@ export const ROUTES = {
   common: {
     notifications: '/notifications',
     messagerie: '/messagerie',
-    messagerieConversation: (id: string) => `/messagerie/${id}`,
+    messagerieConversation: (id: string) =>
+      `/messagerie?chat=${encodeURIComponent(id)}`, // ⭐ MODIFIÉ
     parametres: '/parametres',
   },
 } as const;
 
 /* ============================================================================
-   ⭐⭐⭐ ALIAS SCREAMING_SNAKE_CASE (pour AuthContext & Navigation)
-   ⚠️ Utilisez cette forme dans le code pour éviter les erreurs
+   ⭐⭐⭐ ALIAS SCREAMING_SNAKE_CASE
    ============================================================================ */
 
 export const ROUTES_ALIAS = {
@@ -215,9 +212,10 @@ export const ROUTES_ALIAS = {
   PUBLIC: {
     HOME: ROUTES.public.home,
     ABOUT: ROUTES.public.aPropos,
-    A_PROPROS: ROUTES.public.aPropos,
+    A_PROPOS: ROUTES.public.aPropos,
     ACTUALITES: ROUTES.public.actualites,
     CONTACT: ROUTES.public.contact,
+    COMMUNAUTE_Y2C: ROUTES.public.communauteY2C,
 
     FORMATIONS: ROUTES.public.formations,
     FORMATION_DETAIL: ROUTES.public.formationDetail,
@@ -233,10 +231,9 @@ export const ROUTES_ALIAS = {
 
     INSCRIPTION_EN_LIGNE: ROUTES.public.inscriptionEnLigne,
     VERIFIER_ATTESTATION: ROUTES.public.verifierAttestation,
-    COMMUNAUTE_Y2C: ROUTES.public.communauteY2C,
   },
 
-  /* -------------------- AUTH ⭐⭐⭐ -------------------- */
+  /* -------------------- AUTH -------------------- */
   AUTH: {
     LOGIN: ROUTES.auth.connexion,
     CONNEXION: ROUTES.auth.connexion,
@@ -354,6 +351,11 @@ export const ROUTES_ALIAS = {
     RESEAU_DEMANDES_EN_ATTENTE: ROUTES.participant.reseauDemandesEnAttente,
     RESEAU_DEMANDES_ENVOYEES: ROUTES.participant.reseauDemandesEnvoyees,
     RESEAU_SUGGESTIONS: ROUTES.participant.reseauSuggestions,
+
+    // ✅ Messagerie & Réseautage
+    MESSAGERIE: ROUTES.participant.messagerie,
+    MESSAGERIE_CONVERSATION: ROUTES.participant.messagerieConversation,
+    RESEAUTAGE: ROUTES.participant.reseautage,
   },
 
   /* -------------------- PARTENAIRE -------------------- */
@@ -380,15 +382,10 @@ export const ROUTES_ALIAS = {
 
 /* ============================================================================
    ⭐⭐⭐ ALIAS DIRECTS (compatibilité maximale)
-   Pour AuthContext : `ROUTES.LOGIN` doit fonctionner directement
    ============================================================================ */
 
-/**
- * Alias direct pour les usages fréquents.
- * Utilisable comme `ROUTES.LOGIN` (au lieu de `ROUTES_ALIAS.AUTH.LOGIN`)
- */
 export const ROUTES_FLAT = {
-  // ⭐ Auth direct (compatibilité AuthContext)
+  // Auth
   LOGIN: ROUTES.auth.connexion,
   REGISTER: ROUTES.auth.inscription,
   FORGOT_PASSWORD: ROUTES.auth.motDePasseOublie,
@@ -406,6 +403,11 @@ export const ROUTES_FLAT = {
   FORMATEUR_DASHBOARD: ROUTES.formateur.dashboard,
   PARTICIPANT_DASHBOARD: ROUTES.participant.dashboard,
   PARTENAIRE_DASHBOARD: ROUTES.partenaire.dashboard,
+
+  // ✅ Commun
+  MESSAGERIE: ROUTES.common.messagerie,
+  NOTIFICATIONS: ROUTES.common.notifications,
+  PARAMETRES: ROUTES.common.parametres,
 } as const;
 
 /* ============================================================================
@@ -426,12 +428,6 @@ export const ROLE_DASHBOARD: Record<RoleName, string> = {
 
 /**
  * Retourne la route du dashboard selon le rôle.
- *
- * @example
- * getDashboardRoute('PARTICIPANT')     // → '/participant/dashboard'
- * getDashboardRoute('ADMINISTRATEUR')  // → '/admin/dashboard'
- * getDashboardRoute(undefined)         // → '/'
- * getDashboardRoute(null)              // → '/'
  */
 export function getDashboardRoute(role?: string | null): string {
   if (!role) return ROUTES.public.home;
@@ -510,24 +506,46 @@ export function isProtectedRoute(pathname: string): boolean {
 }
 
 /* ============================================================================
-   EXPORTS GROUPÉS
+   ⭐ HELPERS MESSAGERIE — ouverture de la modale depuis n'importe où
    ============================================================================ */
 
 /**
- * ⭐ IMPORT RECOMMANDÉ :
+ * Construit l'URL de la messagerie avec la conversation ouverte en modale.
  *
- * ```tsx
- * import { ROUTES, ROUTES_ALIAS, ROUTES_FLAT, getDashboardRoute } from '@/lib/routes';
+ * @param conversationId — ID de la conversation à ouvrir
+ * @param basePath — Base de la messagerie selon le rôle (défaut : participant)
  *
- * // Utilisation 1 : hiérarchique (recommandé)
- * router.push(ROUTES.admin.dashboard);
- * router.push(ROUTES.auth.connexion);
- *
- * // Utilisation 2 : SCREAMING_SNAKE (AuthContext)
- * router.push(ROUTES_ALIAS.AUTH.LOGIN);
- *
- * // Utilisation 3 : direct
- * router.push(ROUTES_FLAT.LOGIN);
- * router.push(getDashboardRoute(user.role));
- * ```
+ * @example
+ *   withChat('abc-123')                              // '/participant/messagerie?chat=abc-123'
+ *   withChat('abc-123', ROUTES.common.messagerie)    // '/messagerie?chat=abc-123'
  */
+export function withChat(
+  conversationId: string,
+  basePath: string = ROUTES.participant.messagerie,
+): string {
+  return `${basePath}?chat=${encodeURIComponent(conversationId)}`;
+}
+
+/**
+ * Extrait l'ID de conversation d'un pathname + search (utilisable dans les pages).
+ *
+ * @example
+ *   extractChatId('?chat=abc-123')  // 'abc-123'
+ *   extractChatId('')               // null
+ */
+export function extractChatId(search: string): string | null {
+  const params = new URLSearchParams(search);
+  return params.get('chat');
+}
+
+/**
+ * Vérifie si l'URL courante correspond à la messagerie (avec ou sans chat).
+ */
+export function isMessagerieRoute(pathname: string): boolean {
+  return (
+    pathname === ROUTES.participant.messagerie ||
+    pathname === ROUTES.common.messagerie ||
+    pathname.startsWith(`${ROUTES.participant.messagerie}/`) ||
+    pathname.startsWith(`${ROUTES.common.messagerie}/`)
+  );
+}

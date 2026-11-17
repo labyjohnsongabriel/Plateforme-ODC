@@ -1,4 +1,12 @@
-import { Entity, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
+// src/entities/Session.entity.ts
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  Index,
+} from 'typeorm';
 import { BaseEntity } from './BaseEntity';
 import { Formation } from './Formation.entity';
 import { User } from './User.entity';
@@ -20,6 +28,10 @@ export enum StatutSession {
 @Index(['statut'])
 @Index(['dateDebut'])
 export class Session extends BaseEntity {
+  /* ════════════════════════════════════════════════════════════════════════
+     INFORMATIONS DE BASE
+     ════════════════════════════════════════════════════════════════════════ */
+
   @Column({ type: 'date', name: 'date_debut' })
   dateDebut: Date;
 
@@ -27,29 +39,66 @@ export class Session extends BaseEntity {
   dateFin: Date;
 
   @Column({ type: 'varchar', length: 200, nullable: true })
-  lieu: string;
+  lieu: string | null;
+  @Column({
+  type: 'varchar',
+  length: 50,
+  unique: true,
+  name: 'code_session',
+  default: () => `'SESS-' || EXTRACT(YEAR FROM CURRENT_DATE) || '-' || UPPER(SUBSTRING(gen_random_uuid()::text, 1, 6))`,
+})
+codeSession: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'lien_visio' })
-  lienVisio: string;
+  lienVisio: string | null;
 
   @Column({ type: 'int', default: 30 })
   capacite: number;
 
-  @Column({ type: 'varchar', length: 30, default: StatutSession.OUVERTE })
+  @Column({
+    type: 'varchar',
+    length: 30,
+    default: StatutSession.OUVERTE,
+  })
   statut: StatutSession;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'date_ouverture_inscriptions' })
-  dateOuvertureInscriptions: Date;
+  @Column({
+    type: 'timestamp',
+    nullable: true,
+    name: 'date_ouverture_inscriptions',
+  })
+  dateOuvertureInscriptions: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'date_fermeture_inscriptions' })
-  dateFermetureInscriptions: Date;
+  @Column({
+    type: 'timestamp',
+    nullable: true,
+    name: 'date_fermeture_inscriptions',
+  })
+  dateFermetureInscriptions: Date | null;
 
-  // ==========================================================================
-  // RELATIONS
-  // ==========================================================================
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ QR CODE & PRÉSENCES
+     ════════════════════════════════════════════════════════════════════════ */
+
+  @Column({ type: 'boolean', default: false, name: 'presence_ouverte' })
+  presenceOuverte: boolean;
+
+  @Column({ type: 'text', nullable: true, name: 'qr_code_secret' })
+  qrCodeSecret: string | null;
+
+  @Column({
+    type: 'timestamp',
+    nullable: true,
+    name: 'qr_code_expires_at',
+  })
+  qrCodeExpiresAt: Date | null;
+
+  /* ════════════════════════════════════════════════════════════════════════
+     RELATIONS
+     ════════════════════════════════════════════════════════════════════════ */
 
   @ManyToOne(() => Formation, (f) => f.sessions, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'formation_id' })
@@ -60,10 +109,10 @@ export class Session extends BaseEntity {
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'formateur_id' })
-  formateur: User;
+  formateur: User | null;
 
   @Column({ name: 'formateur_id', nullable: true })
-  formateurId: string;
+  formateurId: string | null;
 
   @OneToMany(() => Inscription, (i) => i.session)
   inscriptions: Inscription[];
@@ -74,7 +123,6 @@ export class Session extends BaseEntity {
   @OneToMany(() => Evaluation, (e) => e.session)
   evaluations: Evaluation[];
 
-  // ⚠️ LA LIGNE QUI MANQUAIT PROBABLEMENT
   @OneToMany(() => Attestation, (a) => a.session)
   attestations: Attestation[];
 

@@ -1,3 +1,6 @@
+// src/components/messagerie/NewConversationModal.tsx
+'use client';
+
 import { useState } from 'react';
 import { Search, Users, UserPlus, Check, X } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
@@ -34,20 +37,17 @@ export function NewConversationModal({
 
   const { data, loading: loadingUsers } = useFetch(
     () => reseautageApi.annuaire({ search: debouncedSearch, limit: 50 }),
-    [debouncedSearch, isOpen]
+    [debouncedSearch, isOpen],
   );
 
   const users = data?.data || [];
 
-  // ========================================================================
-  // Actions
-  // ========================================================================
   const toggleSelect = (userId: string) => {
     if (mode === 'private') {
       setSelected([userId]);
     } else {
       setSelected((prev) =>
-        prev.includes(userId) ? prev.filter((i) => i !== userId) : [...prev, userId]
+        prev.includes(userId) ? prev.filter((i) => i !== userId) : [...prev, userId],
       );
     }
   };
@@ -100,18 +100,18 @@ export function NewConversationModal({
       }
     >
       <div className="space-y-4">
-        {/* Mode tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-odc-surface-alt-light dark:bg-odc-surface-alt-dark">
+        {/* Onglets mode */}
+        <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
           <button
             onClick={() => {
               setMode('private');
               setSelected([]);
             }}
             className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
               mode === 'private'
-                ? 'bg-white dark:bg-odc-surface-dark text-odc-primary shadow-sm'
-                : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
+                ? 'bg-white text-orange-600 shadow-sm dark:bg-slate-950 dark:text-orange-400'
+                : 'text-slate-500 dark:text-slate-400',
             )}
           >
             <UserPlus size={16} />
@@ -123,10 +123,10 @@ export function NewConversationModal({
               setSelected([]);
             }}
             className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
               mode === 'group'
-                ? 'bg-white dark:bg-odc-surface-dark text-odc-primary shadow-sm'
-                : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
+                ? 'bg-white text-orange-600 shadow-sm dark:bg-slate-950 dark:text-orange-400'
+                : 'text-slate-500 dark:text-slate-400',
             )}
           >
             <Users size={16} />
@@ -144,7 +144,7 @@ export function NewConversationModal({
           />
         )}
 
-        {/* Search */}
+        {/* Recherche */}
         <Input
           placeholder="Rechercher un membre..."
           icon={<Search size={16} />}
@@ -152,23 +152,23 @@ export function NewConversationModal({
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        {/* Selection chips */}
+        {/* Chips sélection */}
         {selected.length > 0 && mode === 'group' && (
-          <div className="flex flex-wrap gap-2 p-2 rounded-lg bg-odc-primary-soft/50 dark:bg-odc-primary-soft/10">
+          <div className="flex flex-wrap gap-2 rounded-lg bg-orange-50 p-2 dark:bg-orange-500/10">
             {selected.map((id) => {
               const user = users.find((u: any) => u.id === id);
               if (!user) return null;
               return (
                 <div
                   key={id}
-                  className="flex items-center gap-2 px-2 py-1 rounded-full bg-white dark:bg-odc-surface-dark"
+                  className="flex items-center gap-2 rounded-full bg-white px-2 py-1 dark:bg-slate-950"
                 >
-                  <span className="text-xs font-medium">
+                  <span className="text-xs font-medium text-slate-900 dark:text-slate-50">
                     {user.prenom} {user.nom}
                   </span>
                   <button
                     onClick={() => toggleSelect(id)}
-                    className="p-0.5 rounded-full hover:bg-odc-error-bg text-odc-error"
+                    className="rounded-full p-0.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
                   >
                     <X size={12} />
                   </button>
@@ -178,8 +178,8 @@ export function NewConversationModal({
           </div>
         )}
 
-        {/* Users list */}
-        <div className="max-h-80 overflow-y-auto -mx-2">
+        {/* Liste utilisateurs */}
+        <div className="-mx-2 max-h-80 overflow-y-auto">
           {loadingUsers ? (
             <Loader />
           ) : users.length === 0 ? (
@@ -196,10 +196,10 @@ export function NewConversationModal({
                   key={user.id}
                   onClick={() => toggleSelect(user.id)}
                   className={cn(
-                    'w-full flex items-center gap-3 p-3 rounded-lg transition-colors mx-2',
+                    'mx-2 flex w-full items-center gap-3 rounded-lg p-3 transition-colors',
                     isSelected
-                      ? 'bg-odc-primary-soft dark:bg-odc-primary-soft/20'
-                      : 'hover:bg-odc-surface-alt-light dark:hover:bg-odc-surface-alt-dark'
+                      ? 'bg-orange-50 dark:bg-orange-500/10'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-900',
                   )}
                 >
                   <Avatar
@@ -207,16 +207,16 @@ export function NewConversationModal({
                     name={`${user.prenom} ${user.nom}`}
                     size="md"
                   />
-                  <div className="flex-1 min-w-0 text-left">
-                    <div className="font-medium text-sm text-odc-text-light dark:text-odc-text-dark truncate">
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">
                       {user.prenom} {user.nom}
                     </div>
-                    <div className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark truncate">
+                    <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                       {user.role?.nom}
                     </div>
                   </div>
                   {isSelected && (
-                    <div className="w-5 h-5 rounded-full bg-odc-primary flex items-center justify-center flex-shrink-0">
+                    <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-orange-500">
                       <Check size={12} className="text-white" strokeWidth={3} />
                     </div>
                   )}

@@ -2,9 +2,8 @@
 // ⭐ PAS de 'use client' ici — c'est un Server Component
 
 import type { Metadata } from 'next';
-import { LayoutDashboard, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { LayoutDashboard } from 'lucide-react';
+import { RefreshDashboardButton } from './components/RefreshDashboardButton';
 import { StatsOverview } from './components/StatsOverview';
 import { ChartsSection } from './components/ChartsSection';
 import { RecentActivity } from './components/RecentActivity';
@@ -27,25 +26,25 @@ export default function AdminDashboardPage() {
       {/* ================================================================ */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-odc-500 to-odc-700 flex items-center justify-center shadow-odc-md">
-            <LayoutDashboard className="h-6 w-6 text-white" />
+          {/* Icône : dégradé basé sur --primary (light + dark compatible) */}
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-xl shadow-md
+                       bg-gradient-to-br from-primary to-primary/80
+                       ring-1 ring-primary/20"
+          >
+            <LayoutDashboard className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="font-display text-2xl md:text-3xl font-bold text-odc-text-primary">
+            <h1 className="font-display text-2xl font-bold text-foreground md:text-3xl">
               Tableau de bord
             </h1>
-            <p className="text-odc-muted mt-1">
+            <p className="mt-1 text-muted-foreground">
               Vue d&apos;ensemble de la plateforme Orange Digital Center
             </p>
           </div>
         </div>
 
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/admin/dashboard">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualiser
-          </Link>
-        </Button>
+        <RefreshDashboardButton />
       </header>
 
       {/* ================================================================ */}

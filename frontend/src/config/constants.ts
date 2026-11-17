@@ -1,9 +1,15 @@
-// ============================================================================
-//  CONSTANTES CONFIG
-// ============================================================================
+// src/config/constants.ts
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const APP_NAME = 'ODC Platform';
 export const APP_VERSION = '1.0.0';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STORAGE KEYS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'odc_access_token',
@@ -15,6 +21,10 @@ export const STORAGE_KEYS = {
   REMEMBER_EMAIL: 'odc_remember_email',
   PREFERENCES: 'odc_preferences',
 } as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HTTP STATUS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const HTTP_STATUS = {
   OK: 200,
@@ -29,12 +39,20 @@ export const HTTP_STATUS = {
   SERVER_ERROR: 500,
 } as const;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAGINATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 10,
   MAX_LIMIT: 100,
-  LIMIT_OPTIONS: [10, 25, 50, 100],
+  LIMIT_OPTIONS: [10, 25, 50, 100] as const,
 } as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEBOUNCE / TOAST
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const DEBOUNCE = {
   SHORT: 200,
@@ -43,10 +61,14 @@ export const DEBOUNCE = {
 } as const;
 
 export const TOAST = {
-  SHORT: 2000,
-  MEDIUM: 4000,
-  LONG: 6000,
+  SHORT: 2_000,
+  MEDIUM: 4_000,
+  LONG: 6_000,
 } as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BREAKPOINTS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const BREAKPOINTS = {
   xs: 0,
@@ -56,6 +78,10 @@ export const BREAKPOINTS = {
   xl: 1280,
   '2xl': 1536,
 } as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATE FORMATS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const DATE_FORMATS = {
   SHORT: 'dd/MM/yyyy',
@@ -70,11 +96,19 @@ export const DATE_FORMATS = {
   MONTH_YEAR: 'MMMM yyyy',
 } as const;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILE LIMITS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export const FILE_LIMITS = {
   MAX_AVATAR_SIZE: 2 * 1024 * 1024,
   MAX_DOCUMENT_SIZE: 20 * 1024 * 1024,
   MAX_FILE_SIZE: 10 * 1024 * 1024,
 } as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REGEX
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const REGEX = {
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -85,46 +119,54 @@ export const REGEX = {
   ATTESTATION_NUMBER: /^ODC-\d{4}-[A-Z]{3}-[A-F0-9]{6}$/,
 } as const;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   QUERY KEYS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export const QUERY_KEYS = {
   AUTH: {
-    ME: ['auth', 'me'],
+    ME: ['auth', 'me'] as const,
   },
   USERS: {
-    ALL: ['users'],
-    LIST: (filters: any) => ['users', 'list', filters],
-    DETAIL: (id: string) => ['users', 'detail', id],
+    ALL: ['users'] as const,
+    LIST: (filters: any) => ['users', 'list', filters] as const,
+    DETAIL: (id: string) => ['users', 'detail', id] as const,
   },
   FORMATIONS: {
-    ALL: ['formations'],
-    LIST: (filters: any) => ['formations', 'list', filters],
-    DETAIL: (id: string) => ['formations', 'detail', id],
-    TOP: ['formations', 'top'],
+    ALL: ['formations'] as const,
+    LIST: (filters: any) => ['formations', 'list', filters] as const,
+    DETAIL: (id: string) => ['formations', 'detail', id] as const,
+    TOP: ['formations', 'top'] as const,
   },
   SESSIONS: {
-    ALL: ['sessions'],
-    LIST: (filters: any) => ['sessions', 'list', filters],
-    DETAIL: (id: string) => ['sessions', 'detail', id],
+    ALL: ['sessions'] as const,
+    LIST: (filters: any) => ['sessions', 'list', filters] as const,
+    DETAIL: (id: string) => ['sessions', 'detail', id] as const,
   },
   INSCRIPTIONS: {
-    ALL: ['inscriptions'],
-    LIST: (filters: any) => ['inscriptions', 'list', filters],
-    DETAIL: (id: string) => ['inscriptions', 'detail', id],
+    ALL: ['inscriptions'] as const,
+    LIST: (filters: any) => ['inscriptions', 'list', filters] as const,
+    DETAIL: (id: string) => ['inscriptions', 'detail', id] as const,
   },
   ATTESTATIONS: {
-    MINE: ['attestations', 'mine'],
-    LIST: (filters: any) => ['attestations', 'list', filters],
-    DETAIL: (id: string) => ['attestations', 'detail', id],
+    MINE: ['attestations', 'mine'] as const,
+    LIST: (filters: any) => ['attestations', 'list', filters] as const,
+    DETAIL: (id: string) => ['attestations', 'detail', id] as const,
   },
   DASHBOARD: {
-    MY_STATS: ['dashboard', 'my-stats'],
-    ADMIN: ['dashboard', 'admin'],
+    MY_STATS: ['dashboard', 'my-stats'] as const,
+    ADMIN: ['dashboard', 'admin'] as const,
+    STAFF: ['dashboard', 'staff'] as const,
+    FORMATEUR: ['dashboard', 'formateur'] as const,
+    PARTICIPANT: ['dashboard', 'participant'] as const,
+    PARTENAIRE: ['dashboard', 'partenaire'] as const,
   },
   NOTIFICATIONS: {
-    ALL: ['notifications'],
-    COUNT: ['notifications', 'count'],
+    ALL: ['notifications'] as const,
+    COUNT: ['notifications', 'count'] as const,
   },
   MESSAGERIE: {
-    CONVERSATIONS: ['messagerie', 'conversations'],
-    MESSAGES: (id: string) => ['messagerie', 'messages', id],
+    CONVERSATIONS: ['messagerie', 'conversations'] as const,
+    MESSAGES: (id: string) => ['messagerie', 'messages', id] as const,
   },
 } as const;

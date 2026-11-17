@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { formatRelativeTime } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/error-handler';
 
 const TYPE_CONFIG: Record<
   string,
@@ -43,7 +45,7 @@ interface Props {
 export function NotificationItem({ notification }: Props) {
   const qc = useQueryClient();
   const config = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.INFO;
-  const Icon = notification.icon
+  const Icon = notification.icone
     ? Bell
     : config.icon;
 
@@ -55,7 +57,9 @@ export function NotificationItem({ notification }: Props) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const deleteMutation = useMutation({
@@ -64,7 +68,9 @@ export function NotificationItem({ notification }: Props) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
+    onError: (error) => toast.error(getErrorMessage(error)),
   });
 
   const handleClick = () => {
@@ -72,15 +78,7 @@ export function NotificationItem({ notification }: Props) {
   };
 
   const content = (
-    <div
-      className={cn(
-        'flex items-start gap-4 p-4 transition-colors',
-        !notification.lue
-          ? 'bg-odc-primary-soft/20 hover:bg-odc-primary-soft/40'
-          : 'hover:bg-odc-surface-alt/50',
-      )}
-      onClick={handleClick}
-    >
+    <>
       <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center shrink-0', config.bg)}>
         <Icon className={cn('h-5 w-5', config.color)} />
       </div>
@@ -106,28 +104,45 @@ export function NotificationItem({ notification }: Props) {
           {formatRelativeTime(notification.createdAt)}
         </p>
       </div>
+    </>
+  );
 
+  return (
+    <li
+      className={cn(
+        'flex items-start gap-4 p-4 transition-colors',
+        !notification.lue
+          ? 'bg-odc-primary-soft/20 hover:bg-odc-primary-soft/40'
+          : 'hover:bg-odc-surface-alt/50',
+      )}
+    >
+      {notification.lien ? (
+        <Link
+          href={notification.lien}
+          onClick={handleClick}
+          className="flex min-w-0 flex-1 items-start gap-4"
+        >
+          {content}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={handleClick}
+          className="flex min-w-0 flex-1 items-start gap-4 text-left"
+        >
+          {content}
+        </button>
+      )}
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 text-odc-muted hover:text-odc-error hover:bg-odc-error-bg shrink-0"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          deleteMutation.mutate();
-        }}
+        className="h-8 w-8 shrink-0 text-odc-muted hover:bg-odc-error-bg hover:text-odc-error"
+        onClick={() => deleteMutation.mutate()}
+        disabled={deleteMutation.isPending}
         aria-label="Supprimer"
       >
         <Trash2 className="h-4 w-4" />
       </Button>
-    </div>
-  );
-
-  return notification.lien ? (
-    <li>
-      <Link href={notification.lien}>{content}</Link>
     </li>
-  ) : (
-    <li>{content}</li>
   );
 }

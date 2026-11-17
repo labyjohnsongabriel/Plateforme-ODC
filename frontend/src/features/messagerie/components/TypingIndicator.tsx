@@ -1,3 +1,6 @@
+// src/components/messagerie/TypingIndicator.tsx
+'use client';
+
 interface TypingIndicatorProps {
   users: string[];
 }
@@ -7,23 +10,23 @@ export function TypingIndicator({ users }: TypingIndicatorProps) {
 
   return (
     <div className="flex items-center gap-2 px-4 py-2">
-      <div className="flex items-center gap-1 bg-white dark:bg-odc-surface-alt-dark rounded-full px-3 py-2 shadow-sm">
+      <div className="flex items-center gap-1 rounded-full bg-white px-3 py-2 shadow-sm dark:bg-slate-800">
         <div className="flex gap-1">
           <span
-            className="w-1.5 h-1.5 rounded-full bg-odc-primary animate-bounce"
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-orange-500"
             style={{ animationDelay: '0ms' }}
           />
           <span
-            className="w-1.5 h-1.5 rounded-full bg-odc-primary animate-bounce"
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-orange-500"
             style={{ animationDelay: '150ms' }}
           />
           <span
-            className="w-1.5 h-1.5 rounded-full bg-odc-primary animate-bounce"
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-orange-500"
             style={{ animationDelay: '300ms' }}
           />
         </div>
       </div>
-      <span className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
+      <span className="text-xs text-slate-500 dark:text-slate-400">
         {users.length === 1
           ? `${users[0]} écrit...`
           : `${users.length} personnes écrivent...`}

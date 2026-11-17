@@ -6,6 +6,16 @@ import { BadRequestError, ForbiddenError } from '../errors/AppError';
 import { RoleName } from '../entities/enums';
 import { logger } from '../config/logger';
 
+async function assertFormateurOwnsRessource(req: Request, ressourceId: string): Promise<void> {
+  if (req.userRole !== RoleName.FORMATEUR) {
+    return;
+  }
+  const ressource = await ressourceService.findById(ressourceId);
+  if (ressource.session?.formateurId !== req.userId) {
+    throw new ForbiddenError('Vous ne pouvez gérer que les ressources de vos sessions');
+  }
+}
+
 export class RessourceController {
   // ==========================================================================
   // 📋 LECTURE
@@ -23,9 +33,24 @@ export class RessourceController {
       if (!sessionId) throw new BadRequestError('sessionId requis');
 
       const isParticipant = req.userRole === RoleName.PARTICIPANT;
-      const data = await ressourceService.findBySession(sessionId, isParticipant);
+      const data = isParticipant
+        ? await ressourceService.findForParticipant(req.userId!, sessionId)
+        : await ressourceService.findBySession(sessionId);
 
       return successResponse(res, data, 'Ressources de la session');
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /**
+   * GET /api/participant/ressources
+   * Liste les ressources visibles des sessions auxquelles le participant est inscrit.
+   */
+  static async findForParticipant(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await ressourceService.findForParticipant(req.userId!);
+      return successResponse(res, data, 'Ressources du participant');
     } catch (e) {
       next(e);
     }
@@ -40,10 +65,7 @@ export class RessourceController {
       const ressource = await ressourceService.findById(req.params.id);
 
       // Participant : interdiction d'accéder aux ressources masquées
-      if (
-        req.userRole === RoleName.PARTICIPANT &&
-        !ressource.visibleParticipants
-      ) {
+      if (req.userRole === RoleName.PARTICIPANT && !ressource.visibleParticipants) {
         throw new ForbiddenError('Ressource non accessible');
       }
 
@@ -71,16 +93,10 @@ export class RessourceController {
         q: req.query.q as string,
         page: Number(req.query.page) || 1,
         limit: Number(req.query.limit) || 20,
+        formateurId: req.userRole === RoleName.FORMATEUR ? req.userId : undefined,
       });
 
-      return paginatedResponse(
-        res,
-        r.data,
-        r.total,
-        r.page,
-        r.limit,
-        'Liste des ressources',
-      );
+      return paginatedResponse(res, r.data, r.total, r.page, r.limit, 'Liste des ressources');
     } catch (e) {
       next(e);
     }
@@ -121,7 +137,7 @@ export class RessourceController {
           fichierNom,
           fichierTaille,
         },
-        req.userId!,
+        req.userId!
       );
 
       logger.info(`📎 Ressource créée : ${ressource.titre}`);
@@ -136,6 +152,7 @@ export class RessourceController {
    */
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
+      await assertFormateurOwnsRessource(req, req.params.id);
       const ressource = await ressourceService.update(req.params.id, req.body);
       logger.info(`📝 Ressource mise à jour : ${ressource.titre}`);
       return successResponse(res, ressource, 'Ressource mise à jour');
@@ -154,13 +171,13 @@ export class RessourceController {
       const ressource = await ressourceService.toggleVisibilite(req.params.id, visible);
 
       logger.info(
-        `${visible ? '👁️' : '🙈'} Ressource ${visible ? 'visible' : 'masquée'} : ${ressource.titre}`,
+        `${visible ? '👁️' : '🙈'} Ressource ${visible ? 'visible' : 'masquée'} : ${ressource.titre}`
       );
 
       return successResponse(
         res,
         ressource,
-        visible ? 'Ressource visible aux participants' : 'Ressource masquée',
+        visible ? 'Ressource visible aux participants' : 'Ressource masquée'
       );
     } catch (e) {
       next(e);
@@ -193,6 +210,7 @@ export class RessourceController {
    */
   static async delete(req: Request, res: Response, next: NextFunction) {
     try {
+      await assertFormateurOwnsRessource(req, req.params.id);
       await ressourceService.delete(req.params.id);
       logger.info(`🗑️ Ressource supprimée : ${req.params.id}`);
       return successResponse(res, null, 'Ressource supprimée');
@@ -211,6 +229,15 @@ export class RessourceController {
    */
   static async telecharger(req: Request, res: Response, next: NextFunction) {
     try {
+      const accessible = await ressourceService.findForParticipant(
+        req.userId!,
+        undefined,
+        req.params.id
+      );
+      if (!accessible.length) {
+        throw new ForbiddenError('Ressource non accessible');
+      }
+
       const ressource = await ressourceService.incrementerTelechargement(req.params.id);
       return successResponse(res, ressource, 'Téléchargement enregistré');
     } catch (e) {

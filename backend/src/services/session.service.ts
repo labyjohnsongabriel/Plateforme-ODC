@@ -1,73 +1,15 @@
-<<<<<<< HEAD
-import { AppDataSource } from '../config/database';
-import { Session, StatutSession } from '../models/Session.entity';
-import { Formation } from '../models/Formation.entity';
-import { User } from '../models/User.entity';
-import { NotFoundError, ConflictError } from '../errors/AppError';
-import { getPagination } from '../utils/pagination.util';
-import { logger } from '../config/logger';
-
-export class SessionService {
-  private static get repo() { return AppDataSource.getRepository(Session); }
-
-  static async create(data: any) {
-    const formation = await AppDataSource.getRepository(Formation).findOne({ where: { id: data.formationId } });
-    if (!formation) throw new NotFoundError('Formation introuvable');
-    if (new Date(data.dateDebut) >= new Date(data.dateFin)) throw new ConflictError('Date debut >= date fin');
-    const session = this.repo.create({ ...data, statut: StatutSession.OUVERTE }) as Session;
-    await this.repo.save(session);
-    logger.info(`Session creee : ${session.id}`);
-    return this.findById(session.id);
-  }
-
-  static async findAll(params: any) {
-    const { page, limit, skip } = getPagination(params.page, params.limit);
-    const qb = this.repo.createQueryBuilder('s')
-      .leftJoinAndSelect('s.formation', 'f')
-      .leftJoinAndSelect('s.formateur', 'fo');
-    if (params.statut) qb.andWhere('s.statut = :st', { st: params.statut });
-    if (params.formationId) qb.andWhere('s.formation_id = :fid', { fid: params.formationId });
-    if (params.formateurId) qb.andWhere('s.formateur_id = :foid', { foid: params.formateurId });
-    qb.orderBy('s.dateDebut', 'DESC').skip(skip).take(limit);
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
-  }
-
-  static async findById(id: string) {
-    const s = await this.repo.findOne({ where: { id }, relations: ['formation', 'formateur', 'inscriptions'] });
-    if (!s) throw new NotFoundError('Session introuvable');
-    return s;
-  }
-
-  static async update(id: string, data: any) {
-    const s = await this.findById(id);
-    Object.assign(s, data);
-    await this.repo.save(s);
-    return s;
-  }
-
-  static async changerStatut(id: string, statut: StatutSession) {
-    const s = await this.findById(id);
-    s.statut = statut;
-    await this.repo.save(s);
-    return s;
-  }
-
-  static async delete(id: string) {
-    await this.findById(id);
-    await this.repo.softDelete(id);
-  }
-
-  static async findMesSessions(formateurId: string) {
-    return this.repo.find({ where: { formateurId }, relations: ['formation'], order: { dateDebut: 'DESC' } });
-=======
 // src/services/session.service.ts
 import { AppDataSource } from '../config/database';
 import { Session } from '../entities/Session.entity';
 import { Inscription } from '../entities/Inscription.entity';
 import { Presence } from '../entities/Presence.entity';
 import { NotFoundError, BadRequestError } from '../errors/AppError';
-import { StatutSession, ModaliteSession } from '../entities/enums';
+import {
+  StatutInscription,
+  StatutSession,
+  ModaliteSession,
+  StatutPresence,
+} from '../entities/enums';
 import { logger } from '../config/logger';
 
 /* ============================================================================
@@ -88,24 +30,36 @@ export class SessionService {
      ========================================================================== */
 
   static async findAllPublic(query: any) {
-    const {
-      page = 1,
-      limit = 12,
-      q,
-      formationId,
-      modalite,
-    } = query;
+    const { page = 1, limit = 12, q, formationId, modalite } = query;
 
     const qb = sessionRepo()
       .createQueryBuilder('s')
-      .leftJoinAndSelect('s.formation', 'f')
+      .innerJoinAndSelect('s.formation', 'f')
+      .leftJoinAndSelect('f.domaineRelation', 'd')
+      .loadRelationCountAndMap('s.inscriptionsCount', 's.inscriptions', 'i', (relationQuery) =>
+        relationQuery.andWhere('i.statut = :accepted', {
+          accepted: StatutInscription.ACCEPTEE,
+        })
+      )
       .where('s.estPubliee = :pub', { pub: true })
-      .andWhere('s.deletedAt IS NULL');
+      .andWhere('s.deletedAt IS NULL')
+      .andWhere('f.estPubliee = :formationPublished', {
+        formationPublished: true,
+      })
+      .andWhere('f.actif = :formationActive', { formationActive: true })
+      .andWhere('f.deletedAt IS NULL')
+      .andWhere('s.statut IN (:...publicStatuses)', {
+        publicStatuses: [StatutSession.PLANIFIEE, StatutSession.OUVERTE, StatutSession.EN_COURS],
+      })
+      .andWhere('s.dateFin >= CURRENT_DATE');
 
     if (q) {
-      qb.andWhere('(s.titre ILIKE :q OR f.titre ILIKE :q)', {
+      qb.andWhere('(s.codeSession ILIKE :q OR f.titre ILIKE :q)', {
         q: `%${q}%`,
       });
+    }
+    if (query.statut) {
+      qb.andWhere('s.statut = :statut', { statut: query.statut });
     }
     if (formationId) {
       qb.andWhere('s.formationId = :formationId', { formationId });
@@ -119,11 +73,7 @@ export class SessionService {
     const skip = (pageNum - 1) * limitNum;
 
     const total = await qb.getCount();
-    const data = await qb
-      .orderBy('s.dateDebut', 'ASC')
-      .offset(skip)
-      .limit(limitNum)
-      .getMany();
+    const data = await qb.orderBy('s.dateDebut', 'ASC').offset(skip).limit(limitNum).getMany();
 
     return {
       data,
@@ -133,13 +83,47 @@ export class SessionService {
     };
   }
 
+  static async findPublicByFormation(formationId: string): Promise<Session[]> {
+    return sessionRepo()
+      .createQueryBuilder('s')
+      .innerJoinAndSelect('s.formation', 'f')
+      .leftJoinAndSelect('f.domaineRelation', 'd')
+      .loadRelationCountAndMap('s.inscriptionsCount', 's.inscriptions', 'i', (relationQuery) =>
+        relationQuery.andWhere('i.statut = :accepted', {
+          accepted: StatutInscription.ACCEPTEE,
+        })
+      )
+      .where('s.formationId = :formationId', { formationId })
+      .andWhere('s.estPubliee = :published', { published: true })
+      .andWhere('s.deletedAt IS NULL')
+      .andWhere('f.estPubliee = :formationPublished', {
+        formationPublished: true,
+      })
+      .andWhere('f.actif = :formationActive', { formationActive: true })
+      .andWhere('f.deletedAt IS NULL')
+      .andWhere('s.statut IN (:...publicStatuses)', {
+        publicStatuses: [StatutSession.PLANIFIEE, StatutSession.OUVERTE, StatutSession.EN_COURS],
+      })
+      .andWhere('s.dateFin >= CURRENT_DATE')
+      .orderBy('s.dateDebut', 'ASC')
+      .getMany();
+  }
+
   static async findByCodePublic(codeSession: string) {
     return sessionRepo()
       .createQueryBuilder('s')
-      .leftJoinAndSelect('s.formation', 'f')
-      .leftJoinAndSelect('s.formateur', 'u')
+      .innerJoinAndSelect('s.formation', 'f')
+      .leftJoinAndSelect('f.domaineRelation', 'd')
+      .leftJoin('s.formateur', 'u')
+      .addSelect(['u.id', 'u.prenom', 'u.nom'])
       .where('s.codeSession = :code', { code: codeSession })
       .andWhere('s.estPubliee = :pub', { pub: true })
+      .andWhere('s.deletedAt IS NULL')
+      .andWhere('f.estPubliee = :formationPublished', {
+        formationPublished: true,
+      })
+      .andWhere('f.actif = :formationActive', { formationActive: true })
+      .andWhere('f.deletedAt IS NULL')
       .getOne();
   }
 
@@ -170,10 +154,9 @@ export class SessionService {
       .where('s.deletedAt IS NULL');
 
     if (q) {
-      qb.andWhere(
-        '(s.codeSession ILIKE :q OR s.titre ILIKE :q OR f.titre ILIKE :q)',
-        { q: `%${q}%` },
-      );
+      qb.andWhere('(s.codeSession ILIKE :q OR s.titre ILIKE :q OR f.titre ILIKE :q)', {
+        q: `%${q}%`,
+      });
     }
     if (statut && statut !== 'all') {
       qb.andWhere('s.statut = :statut', { statut });
@@ -202,11 +185,7 @@ export class SessionService {
     const skip = (pageNum - 1) * limitNum;
 
     const total = await qb.getCount();
-    const data = await qb
-      .orderBy('s.dateDebut', 'DESC')
-      .offset(skip)
-      .limit(limitNum)
-      .getMany();
+    const data = await qb.orderBy('s.dateDebut', 'DESC').offset(skip).limit(limitNum).getMany();
 
     return {
       data,
@@ -251,23 +230,18 @@ export class SessionService {
      ========================================================================== */
   static async getStats() {
     try {
-      const [
-        total,
-        planifiees,
-        ouvertes,
-        enCours,
-        terminees,
-        annulees,
-        totalInscriptions,
-      ] = await Promise.all([
-        sessionRepo().count(),
-        sessionRepo().count({ where: { statut: StatutSession.PLANIFIEE } }),
-        sessionRepo().count({ where: { statut: StatutSession.OUVERTE } }),
-        sessionRepo().count({ where: { statut: StatutSession.EN_COURS } }),
-        sessionRepo().count({ where: { statut: StatutSession.TERMINEE } }),
-        sessionRepo().count({ where: { statut: StatutSession.ANNULEE } }),
-        inscriptionRepo().count().catch(() => 0),
-      ]);
+      const [total, planifiees, ouvertes, enCours, terminees, annulees, totalInscriptions] =
+        await Promise.all([
+          sessionRepo().count(),
+          sessionRepo().count({ where: { statut: StatutSession.PLANIFIEE } }),
+          sessionRepo().count({ where: { statut: StatutSession.OUVERTE } }),
+          sessionRepo().count({ where: { statut: StatutSession.EN_COURS } }),
+          sessionRepo().count({ where: { statut: StatutSession.TERMINEE } }),
+          sessionRepo().count({ where: { statut: StatutSession.ANNULEE } }),
+          inscriptionRepo()
+            .count()
+            .catch(() => 0),
+        ]);
 
       return {
         total,
@@ -309,7 +283,7 @@ export class SessionService {
         .getMany();
 
       logger.info(
-        `[SessionService.getInscriptions] ${inscriptions.length} inscription(s) trouvée(s)`,
+        `[SessionService.getInscriptions] ${inscriptions.length} inscription(s) trouvée(s)`
       );
 
       return inscriptions.map((i: any) => ({
@@ -341,41 +315,36 @@ export class SessionService {
      ⭐ PRÉSENCES D'UNE SESSION — CORRIGÉ
      ========================================================================== */
   static async getPresences(sessionId: string) {
-    try {
-      logger.info(`[SessionService.getPresences] sessionId=${sessionId}`);
+    logger.info(`[SessionService.getPresences] sessionId=${sessionId}`);
 
-      // ⭐ Utilisation directe de AppDataSource
-      const presences = await presenceRepo()
-        .createQueryBuilder('p')
-        .leftJoinAndSelect('p.participant', 'u')
-        .where('p.sessionId = :sessionId', { sessionId })
-        .orderBy('p.createdAt', 'DESC')
-        .getMany();
+    const presences = await presenceRepo()
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.participant', 'u')
+      .where('p.sessionId = :sessionId', { sessionId })
+      .orderBy('p.createdAt', 'DESC')
+      .getMany();
 
-      logger.info(
-        `[SessionService.getPresences] ${presences.length} présence(s) trouvée(s)`,
-      );
-
-      return presences.map((p: any) => ({
-        id: p.id,
-        statut: p.statut,
-        datePresence: p.datePresence,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        participant: p.participant
-          ? {
-              id: p.participant.id,
-              nom: p.participant.nom,
-              prenom: p.participant.prenom,
-              email: p.participant.email,
-              photoUrl: p.participant.photoUrl,
-            }
-          : null,
-      }));
-    } catch (error) {
-      logger.error(`[SessionService.getPresences] Erreur: ${error}`);
-      return [];
-    }
+    return presences.map((p: any) => ({
+      id: p.id,
+      sessionId: p.sessionId,
+      participantId: p.participantId,
+      present: p.statut === StatutPresence.PRESENT || p.statut === StatutPresence.RETARD,
+      statut: p.statut,
+      methode: p.methode,
+      datePresence: p.datePresence,
+      scanneLe: p.scanneLe,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      participant: p.participant
+        ? {
+            id: p.participant.id,
+            nom: p.participant.nom,
+            prenom: p.participant.prenom,
+            email: p.participant.email,
+            photoUrl: p.participant.photoUrl,
+          }
+        : null,
+    }));
   }
 
   /* ==========================================================================
@@ -435,10 +404,7 @@ export class SessionService {
     // ⭐ Logique automatique de présence
     if (statut === StatutSession.EN_COURS || statut === StatutSession.OUVERTE) {
       session.presenceOuverte = true;
-    } else if (
-      statut === StatutSession.TERMINEE ||
-      statut === StatutSession.ANNULEE
-    ) {
+    } else if (statut === StatutSession.TERMINEE || statut === StatutSession.ANNULEE) {
       session.presenceOuverte = false;
     }
 
@@ -464,6 +430,7 @@ export class SessionService {
     if (!session) throw new NotFoundError('Session introuvable');
 
     session.presenceOuverte = ouverte;
+    if (!ouverte) session.qrCodeSecret = null;
     return sessionRepo().save(session);
   }
 
@@ -499,9 +466,7 @@ export class SessionService {
 
     const saved = await sessionRepo().save(copy);
 
-    logger.info(
-      `📋 Session dupliquée : ${original.codeSession} → ${saved.codeSession}`,
-    );
+    logger.info(`📋 Session dupliquée : ${original.codeSession} → ${saved.codeSession}`);
 
     return saved;
   }
@@ -520,19 +485,14 @@ export class SessionService {
   }
 
   static async getParticipants(sessionId: string) {
-    try {
-      const inscriptions = await inscriptionRepo()
-        .createQueryBuilder('i')
-        .leftJoinAndSelect('i.participant', 'p')
-        .where('i.sessionId = :sessionId', { sessionId })
-        .andWhere('i.statut = :statut', { statut: 'ACCEPTEE' })
-        .getMany();
+    const inscriptions = await inscriptionRepo()
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.participant', 'p')
+      .where('i.sessionId = :sessionId', { sessionId })
+      .andWhere('i.statut = :statut', { statut: 'ACCEPTEE' })
+      .getMany();
 
-      return inscriptions.map((i: any) => i.participant);
-    } catch (error) {
-      logger.error(`[SessionService.getParticipants] Erreur: ${error}`);
-      return [];
-    }
+    return inscriptions.map((i: any) => i.participant);
   }
 
   static async getStatistiques(sessionId: string) {
@@ -585,6 +545,5 @@ export class SessionService {
     } while (exists);
 
     return code;
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

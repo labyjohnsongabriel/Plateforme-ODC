@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { PublicInscriptionForm } from './components/PublicInscriptionForm';
 import { PageHero } from '@/components/shared/PageHero';
+import { InscriptionPageClient } from './InscriptionPageClient';
 
 export const metadata: Metadata = {
   title: 'Inscription en ligne',
@@ -19,8 +19,8 @@ export default function InscriptionEnLignePage() {
           { label: 'Inscription en ligne' },
         ]}
       />
-      <div className="container-page py-12 max-w-3xl">
-        <PublicInscriptionForm />
+      <div className="container-page py-12 max-w-2xl">
+        <InscriptionPageClient />
       </div>
     </>
   );

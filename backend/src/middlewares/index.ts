@@ -53,12 +53,9 @@ export {
 // UPLOAD (Multer)
 // ----------------------------------------------------------------------------
 export {
-  upload,
   uploadAvatar,
   uploadDocument,
   uploadImage,
-  uploadMultiple,
-  SUBFOLDERS,
 } from './upload.middleware';
 
 // ----------------------------------------------------------------------------

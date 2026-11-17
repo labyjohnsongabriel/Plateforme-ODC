@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/error-handler';
+import { getMediaUrl } from '@/lib/media';
 
 interface ImageUploaderProps {
   value?: string | null;
@@ -119,19 +120,19 @@ export function ImageUploader({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {label && (
-        <p className="text-sm font-medium text-odc-text-primary">{label}</p>
-      )}
+      {label && <p className="text-odc-text-primary text-sm font-medium">{label}</p>}
 
       <div
         className={cn(
-          'relative rounded-lg border-2 border-dashed transition-colors overflow-hidden',
+          'relative overflow-hidden rounded-lg border-2 border-dashed transition-colors',
           dragActive
             ? 'border-odc-primary bg-odc-primary-soft/40'
             : 'border-odc-border bg-odc-surface-alt',
           ASPECTS[aspect],
-          disabled && 'opacity-60 cursor-not-allowed',
-          !disabled && !value && 'cursor-pointer hover:border-odc-primary hover:bg-odc-primary-soft/30',
+          disabled && 'cursor-not-allowed opacity-60',
+          !disabled &&
+            !value &&
+            'cursor-pointer hover:border-odc-primary hover:bg-odc-primary-soft/30',
         )}
         onDrop={disabled ? undefined : handleDrop}
         onDragOver={disabled ? undefined : handleDragOver}
@@ -141,12 +142,12 @@ export function ImageUploader({
         {value ? (
           <>
             <img
-              src={value}
+              src={getMediaUrl(value)}
               alt="Preview"
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
             />
             {!disabled && (
-              <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity hover:opacity-100">
                 <Button
                   type="button"
                   variant="outline"
@@ -157,7 +158,7 @@ export function ImageUploader({
                   }}
                   disabled={busy}
                 >
-                  <Camera className="h-4 w-4 mr-1.5" />
+                  <Camera className="mr-1.5 h-4 w-4" />
                   Changer
                 </Button>
                 {onDelete && (
@@ -182,18 +183,18 @@ export function ImageUploader({
             )}
           </>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
             {uploading ? (
-              <Loader2 className="h-8 w-8 animate-spin text-odc-primary mb-2" />
+              <Loader2 className="mb-2 h-8 w-8 animate-spin text-odc-primary" />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-odc-primary-soft flex items-center justify-center mb-2">
+              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-odc-primary-soft">
                 <Upload className="h-6 w-6 text-odc-primary" />
               </div>
             )}
             <p className="text-sm font-medium">
               {uploading ? 'Téléversement…' : 'Cliquez ou glissez une image'}
             </p>
-            <p className="text-xs text-odc-muted mt-1">
+            <p className="text-odc-muted mt-1 text-xs">
               PNG, JPG, WEBP — Max {maxSizeMB} Mo
             </p>
           </div>
@@ -209,9 +210,7 @@ export function ImageUploader({
         />
       </div>
 
-      {helperText && (
-        <p className="text-xs text-odc-muted">{helperText}</p>
-      )}
+      {helperText && <p className="text-odc-muted text-xs">{helperText}</p>}
     </div>
   );
 }

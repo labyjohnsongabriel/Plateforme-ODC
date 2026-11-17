@@ -4,10 +4,28 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const INFOS = [
-  { icon: MapPin, label: 'Adresse', value: 'Antananarivo, Madagascar' },
-  { icon: Mail, label: 'Email', value: 'contact@odc.mg', href: 'mailto:contact@odc.mg' },
-  { icon: Phone, label: 'Téléphone', value: '+261 00 000 00', href: 'tel:+2610000000' },
-  { icon: Clock, label: 'Horaires', value: 'Lundi - Vendredi, 8h - 17h' },
+  {
+    icon: MapPin,
+    label: 'Adresse',
+    value: 'Orange Digital Center — Fianarantsoa, Madagascar',
+  },
+  {
+    icon: Mail,
+    label: 'Email',
+    value: 'contact@odc.mg',
+    href: 'mailto:contact@odc.mg',
+  },
+  {
+    icon: Phone,
+    label: 'Téléphone',
+    value: '+261 00 000 00',
+    href: 'tel:+2610000000',
+  },
+  {
+    icon: Clock,
+    label: 'Horaires',
+    value: 'Lundi – Vendredi, 8h – 17h',
+  },
 ];
 
 const SOCIALS = [

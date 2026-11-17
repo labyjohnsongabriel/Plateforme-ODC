@@ -1,623 +1,124 @@
-import { Link } from 'react-router-dom';
-import { Controller } from 'react-hook-form';
-import {
-  Mail, Lock, User, Phone, ArrowRight, Check, X,
-  AlertCircle, Eye, EyeOff, CheckCircle2,
-} from 'lucide-react';
-import { useState } from 'react';
+'use client';
 
+import Link from 'next/link';
+import { Lock, Mail, Phone, User } from 'lucide-react';
 import { useRegister } from '../hooks/useRegister';
-import { useAuth } from '@/context/AuthContext';
 import { Input } from '@/components/common/Input';
-import { Checkbox } from '@/components/common/Checkbox';
 import { Button } from '@/components/common/Button';
 import { Card } from '@/components/common/Card';
-import { Alert } from '@/components/common/Alert';
-<<<<<<< HEAD
-import { Select } from '@/components/common/Select';
-import { cn } from '@/utils/cn';
-import logoOdc from '@/assets/images/logo_odc.png';
-=======
-import { cn } from '@/utils/cn';
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-
-// ============================================================================
-//  CONFIG
-// ============================================================================
-
-const STRENGTH_COLORS = [
-  'bg-odc-border-light dark:bg-odc-border-dark',
-  'bg-odc-error',
-  'bg-odc-error',
-  'bg-odc-warning',
-  'bg-odc-info',
-  'bg-odc-success',
-] as const;
-
-const STRENGTH_LABELS = ['', 'Très faible', 'Faible', 'Moyen', 'Bon', 'Excellent'] as const;
-
-const STRENGTH_TEXT_COLORS = [
-  'text-odc-text-muted-light',
-  'text-odc-error',
-  'text-odc-error',
-  'text-odc-warning',
-  'text-odc-info',
-  'text-odc-success',
-] as const;
-
-<<<<<<< HEAD
-const ROLE_OPTIONS = [
-  { value: 'PARTICIPANT', label: 'Participant — Suivre des formations' },
-  { value: 'FORMATEUR', label: 'Formateur — Animer des formations' },
-  { value: 'STAFF_ODC', label: 'Staff ODC — Gérer les formations' },
-  { value: 'PARTENAIRE', label: 'Partenaire — Collaborer avec l\'ODC' },
-];
-
-=======
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-interface PasswordCheck {
-  key: string;
-  check: boolean;
-  label: string;
-}
-
-function getPasswordChecks(password: string): PasswordCheck[] {
-  return [
-    { key: 'length', check: password.length >= 8, label: '8 caractères' },
-    { key: 'uppercase', check: /[A-Z]/.test(password), label: '1 majuscule' },
-    { key: 'lowercase', check: /[a-z]/.test(password), label: '1 minuscule' },
-    { key: 'number', check: /[0-9]/.test(password), label: '1 chiffre' },
-  ];
-}
-
-// ============================================================================
-//  REGISTER FORM
-// ============================================================================
 
 export function RegisterForm() {
   const { form, loading, onSubmit } = useRegister();
-  const { error: authError } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
   const {
     register,
-    watch,
-    control,
     formState: { errors },
   } = form;
 
-  const motDePasse = watch('motDePasse') ?? '';
-  const confirmMotDePasse = watch('confirmMotDePasse') ?? '';
-  const passwordsMatch = motDePasse && confirmMotDePasse && motDePasse === confirmMotDePasse;
-
-  const passwordChecks = getPasswordChecks(motDePasse);
-  const passwordStrength = passwordChecks.filter((c) => c.check).length;
-  const strengthColor = STRENGTH_COLORS[passwordStrength] ?? STRENGTH_COLORS[0];
-  const strengthLabel = STRENGTH_LABELS[passwordStrength] ?? '';
-  const strengthTextColor = STRENGTH_TEXT_COLORS[passwordStrength] ?? STRENGTH_TEXT_COLORS[0];
-
   return (
-    <div className="w-full max-w-lg mx-auto">
-      <Card
-        padding="lg"
-        className="animate-fade-in shadow-2xl border-odc-border-light/50 dark:border-odc-border-dark/50 backdrop-blur-sm"
-      >
-<<<<<<< HEAD
-        {/* HEADER */}
-        <div className="text-center mb-8">
-          <div className="inline-flex w-24 h-24 items-center justify-center mb-5">
-            <img
-              src={logoOdc}
-              alt="Logo ODC"
-              className="w-full h-full object-contain drop-shadow-lg"
-            />
-=======
-        {/* ============================================================ */}
-        {/* HEADER                                                        */}
-        {/* ============================================================ */}
-        <div className="text-center mb-8">
-          <div className="inline-flex w-20 h-20 rounded-3xl bg-gradient-to-br from-odc-primary via-odc-primary to-odc-primary-dark items-center justify-center text-white font-bold text-3xl shadow-odc-lg mb-5 relative overflow-hidden group">
-            <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            <span className="relative z-10">ODC</span>
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-          </div>
+    <Card padding="lg" className="mx-auto w-full max-w-lg">
+      <div className="mb-8 text-center">
+        <h1 className="font-heading mb-2 text-3xl font-bold">Créer un compte</h1>
+        <p className="text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark">
+          Rejoignez la communauté ODC
+        </p>
+      </div>
 
-          <h1 className="font-heading text-3xl font-bold text-odc-text-light dark:text-odc-text-dark mb-2">
-            Créer un compte
-          </h1>
-          <p className="text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark max-w-xs mx-auto">
-            Rejoignez la communauté ODC en 2 minutes
-          </p>
+      <form onSubmit={onSubmit} className="space-y-5" noValidate>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Prénom"
+            placeholder="Jean"
+            icon={<User size={16} />}
+            error={errors.prenom?.message}
+            autoComplete="given-name"
+            required
+            {...register('prenom')}
+          />
+          <Input
+            label="Nom"
+            placeholder="Rakoto"
+            icon={<User size={16} />}
+            error={errors.nom?.message}
+            autoComplete="family-name"
+            required
+            {...register('nom')}
+          />
         </div>
-
-<<<<<<< HEAD
-        {/* ERREUR GLOBALE */}
-=======
-        {/* ============================================================ */}
-        {/* ERREUR GLOBALE                                                */}
-        {/* ============================================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-        {authError && (
-          <Alert variant="error" className="mb-5">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-              <span className="text-sm font-medium">{authError}</span>
-            </div>
-          </Alert>
-        )}
-
-<<<<<<< HEAD
-        {/* FORMULAIRE */}
-        <form onSubmit={onSubmit} className="space-y-5" noValidate>
-          {/* SECTION 1 : Identité */}
-=======
-        {/* ============================================================ */}
-        {/* FORMULAIRE                                                    */}
-        {/* ============================================================ */}
-        <form onSubmit={onSubmit} className="space-y-5" noValidate>
-          {/* ============================================ */}
-          {/* SECTION 1 : Identité                          */}
-          {/* ============================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-odc-text-muted-light dark:text-odc-text-muted-dark uppercase tracking-wider">
-              <div className="w-1 h-4 bg-odc-primary rounded-full" />
-              Votre identité
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label="Prénom"
-<<<<<<< HEAD
-                placeholder="Amelia"
-=======
-                placeholder="Jean"
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-                icon={<User size={16} />}
-                error={errors.prenom?.message}
-                autoComplete="given-name"
-                required
-                {...register('prenom')}
-              />
-              <Input
-                label="Nom"
-<<<<<<< HEAD
-                placeholder="FANIRY"
-=======
-                placeholder="Dupont"
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-                icon={<User size={16} />}
-                error={errors.nom?.message}
-                autoComplete="family-name"
-                required
-                {...register('nom')}
-              />
-            </div>
-
-            <Input
-              label="Adresse email"
-              type="email"
-<<<<<<< HEAD
-              placeholder="amelia@gmail.com"
-=======
-              placeholder="jean@odc.mg"
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-              icon={<Mail size={16} />}
-              error={errors.email?.message}
-              autoComplete="email"
-              required
-              {...register('email')}
-            />
-
-            <Input
-              label="Téléphone (optionnel)"
-              type="tel"
-<<<<<<< HEAD
-              placeholder="+261 32 12 345 67"
-              icon={<Phone size={16} />}
-              error={errors.telephone?.message}
-              helper="Format malgache : +261 ou 032..."
-              autoComplete="tel"
-              {...register('telephone')}
-            />
-
-            {/* ✅ SÉLECTEUR DE RÔLE */}
-            <Select
-              label="Je m'inscris en tant que"
-              options={ROLE_OPTIONS}
-              error={errors.roleNom?.message}
-              required
-              {...register('roleNom')}
-            />
-          </div>
-
-          {/* SECTION 2 : Sécurité */}
-=======
-              placeholder="+261 34 12 345 67"
-              icon={<Phone size={16} />}
-              error={errors.telephone?.message}
-              helper="Format malgache : +261 ou 034..."
-              autoComplete="tel"
-              {...register('telephone')}
-            />
-          </div>
-
-          {/* ============================================ */}
-          {/* SECTION 2 : Sécurité                          */}
-          {/* ============================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-odc-text-muted-light dark:text-odc-text-muted-dark uppercase tracking-wider">
-              <div className="w-1 h-4 bg-odc-primary rounded-full" />
-              Sécurité
-            </div>
-
-<<<<<<< HEAD
-            {/* ✅ GRILLE : Mot de passe + Confirmation côte à côte */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Mot de passe */}
-              <div>
-                <Input
-                  label="Mot de passe"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  icon={<Lock size={16} />}
-                  error={errors.motDePasse?.message}
-                  autoComplete="new-password"
-                  required
-                  {...register('motDePasse')}
-                  suffix={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  }
-                />
-
-                {motDePasse && (
-                  <div className="mt-3 space-y-2.5">
-                    <div className="flex gap-1.5">
-                      {[0, 1, 2, 3].map((i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            'h-1.5 flex-1 rounded-full transition-all duration-300',
-                            i < passwordStrength
-                              ? strengthColor
-                              : 'bg-odc-border-light dark:bg-odc-border-dark'
-                          )}
-                        />
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
-                        Force
-                      </span>
-                      <span className={cn('text-xs font-bold', strengthTextColor)}>
-                        {strengthLabel}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      {passwordChecks.map((item) => (
-                        <div
-                          key={item.key}
-                          className={cn(
-                            'flex items-center gap-1.5 text-xs transition-colors',
-                            item.check
-                              ? 'text-odc-success'
-                              : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              'w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-                              item.check
-                                ? 'bg-odc-success text-white'
-                                : 'bg-odc-border-light dark:bg-odc-border-dark'
-                            )}
-                          >
-                            {item.check ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
-                          </div>
-                          {item.label}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Confirmation */}
-              <div>
-                <Input
-                  label="Confirmer le mot de passe"
-                  type={showConfirm ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  icon={<Lock size={16} />}
-                  error={errors.confirmMotDePasse?.message}
-                  autoComplete="new-password"
-                  required
-                  {...register('confirmMotDePasse')}
-                  suffix={
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm(!showConfirm)}
-                      className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
-                      tabIndex={-1}
-                    >
-                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  }
-                />
-
-                {confirmMotDePasse && (
-                  <div className="mt-2 flex items-center gap-1.5 text-xs">
-                    {passwordsMatch ? (
-                      <>
-                        <CheckCircle2 size={14} className="text-odc-success" />
-                        <span className="text-odc-success font-medium">
-                          Correspondent
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle size={14} className="text-odc-error" />
-                        <span className="text-odc-error font-medium">
-                          Ne correspondent pas
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 3 : Termes */}
-=======
-            {/* Mot de passe */}
-            <div>
-              <Input
-                label="Mot de passe"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                icon={<Lock size={16} />}
-                error={errors.motDePasse?.message}
-                autoComplete="new-password"
-                required
-                {...register('motDePasse')}
-                suffix={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                }
-              />
-
-              {/* Indicateur de force */}
-              {motDePasse && (
-                <div className="mt-3 space-y-2.5">
-                  {/* Barres */}
-                  <div className="flex gap-1.5">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          'h-1.5 flex-1 rounded-full transition-all duration-300',
-                          i < passwordStrength
-                            ? strengthColor
-                            : 'bg-odc-border-light dark:bg-odc-border-dark'
-                        )}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Label */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
-                      Force du mot de passe
-                    </span>
-                    <span className={cn('text-xs font-bold', strengthTextColor)}>
-                      {strengthLabel}
-                    </span>
-                  </div>
-
-                  {/* Checklist */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    {passwordChecks.map((item) => (
-                      <div
-                        key={item.key}
-                        className={cn(
-                          'flex items-center gap-1.5 text-xs transition-colors',
-                          item.check
-                            ? 'text-odc-success'
-                            : 'text-odc-text-muted-light dark:text-odc-text-muted-dark'
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            'w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
-                            item.check
-                              ? 'bg-odc-success text-white'
-                              : 'bg-odc-border-light dark:bg-odc-border-dark'
-                          )}
-                        >
-                          {item.check ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
-                        </div>
-                        {item.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Confirmation */}
-            <div>
-              <Input
-                label="Confirmer le mot de passe"
-                type={showConfirm ? 'text' : 'password'}
-                placeholder="••••••••"
-                icon={<Lock size={16} />}
-                error={errors.confirmMotDePasse?.message}
-                autoComplete="new-password"
-                required
-                {...register('confirmMotDePasse')}
-                suffix={
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="text-odc-text-muted-light hover:text-odc-primary transition-colors p-1"
-                    tabIndex={-1}
-                  >
-                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                }
-              />
-
-              {/* Indicateur de correspondance */}
-              {confirmMotDePasse && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs">
-                  {passwordsMatch ? (
-                    <>
-                      <CheckCircle2 size={14} className="text-odc-success" />
-                      <span className="text-odc-success font-medium">
-                        Les mots de passe correspondent
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle size={14} className="text-odc-error" />
-                      <span className="text-odc-error font-medium">
-                        Les mots de passe ne correspondent pas
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ============================================ */}
-          {/* SECTION 3 : Termes                            */}
-          {/* ============================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-          <div className="pt-2 space-y-2">
-            <Controller
-              name="acceptTerms"
-              control={control}
-              defaultValue={false}
-              render={({ field }) => (
-                <Checkbox
-                  checked={field.value}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    field.onChange(e.target.checked)
-                  }
-                  onBlur={field.onBlur}
-                  name={field.name}
-                  ref={field.ref}
-                  error={!!errors.acceptTerms}
-                  label={
-                    <span className="text-xs leading-relaxed">
-                      J'accepte les{' '}
-                      <Link
-                        to="/terms"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-odc-primary hover:underline font-medium"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        conditions d'utilisation
-                      </Link>{' '}
-                      et la{' '}
-                      <Link
-                        to="/privacy"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-odc-primary hover:underline font-medium"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        politique de confidentialité
-                      </Link>
-                    </span>
-                  }
-                />
-              )}
-            />
-
-            {errors.acceptTerms && (
-              <p role="alert" className="flex items-center gap-1.5 text-xs text-odc-error">
-                <AlertCircle size={12} />
-                {errors.acceptTerms.message}
-              </p>
-            )}
-          </div>
-
-<<<<<<< HEAD
-          {/* Submit */}
-=======
-          {/* ============================================ */}
-          {/* Submit                                        */}
-          {/* ============================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={loading}
-            icon={<ArrowRight size={18} />}
-            className="mt-2 shadow-odc-md"
+        <Input
+          label="Adresse email"
+          type="email"
+          placeholder="vous@exemple.mg"
+          icon={<Mail size={16} />}
+          error={errors.email?.message}
+          autoComplete="email"
+          required
+          {...register('email')}
+        />
+        <Input
+          label="Téléphone (optionnel)"
+          type="tel"
+          placeholder="+261 34 12 345 67"
+          icon={<Phone size={16} />}
+          error={errors.telephone?.message}
+          autoComplete="tel"
+          {...register('telephone')}
+        />
+        <div>
+          <label htmlFor="roleNom" className="mb-2 block text-sm font-medium">
+            Type de compte
+          </label>
+          <select
+            id="roleNom"
+            className="w-full rounded-lg border border-odc-border-light bg-white px-4 py-3 dark:border-odc-border-dark dark:bg-odc-surface-dark"
+            {...register('roleNom')}
           >
-            {loading ? 'Création du compte...' : 'Créer mon compte'}
-          </Button>
-        </form>
-
-<<<<<<< HEAD
-        {/* SÉPARATEUR */}
-=======
-        {/* ============================================================ */}
-        {/* SÉPARATEUR                                                    */}
-        {/* ============================================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-odc-border-light dark:border-odc-border-dark" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="px-3 bg-white dark:bg-odc-surface-dark text-odc-text-muted-light dark:text-odc-text-muted-dark font-medium">
-              DÉJÀ INSCRIT ?
-            </span>
-          </div>
+            <option value="PARTICIPANT">Participant</option>
+            <option value="PARTENAIRE">Partenaire</option>
+          </select>
+          {errors.roleNom?.message && (
+            <p className="mt-1 text-xs text-odc-error">{errors.roleNom.message}</p>
+          )}
         </div>
+        <Input
+          label="Mot de passe"
+          type="password"
+          placeholder="8 caractères minimum"
+          icon={<Lock size={16} />}
+          error={errors.motDePasse?.message}
+          autoComplete="new-password"
+          required
+          {...register('motDePasse')}
+        />
+        <Input
+          label="Confirmer le mot de passe"
+          type="password"
+          placeholder="Répétez votre mot de passe"
+          icon={<Lock size={16} />}
+          error={errors.confirmMotDePasse?.message}
+          autoComplete="new-password"
+          required
+          {...register('confirmMotDePasse')}
+        />
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" {...register('acceptTerms')} />
+          <span>
+            J&apos;accepte les conditions d&apos;utilisation et la politique de confidentialité.
+          </span>
+        </label>
+        {errors.acceptTerms?.message && (
+          <p className="text-xs text-odc-error">{errors.acceptTerms.message}</p>
+        )}
+        <Button type="submit" fullWidth size="lg" loading={loading}>
+          Créer mon compte
+        </Button>
+      </form>
 
-<<<<<<< HEAD
-        {/* LIEN LOGIN */}
-=======
-        {/* ============================================================ */}
-        {/* LIEN LOGIN                                                    */}
-        {/* ============================================================ */}
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-        <Link
-          to="/login"
-          className="block text-center text-sm text-odc-primary hover:underline font-semibold group"
-        >
-          Se connecter à mon compte
-          <ArrowRight size={14} className="inline ml-1 group-hover:translate-x-0.5 transition-transform" />
+      <p className="mt-6 text-center text-sm">
+        Vous avez déjà un compte ?{' '}
+        <Link href="/connexion" className="font-semibold text-odc-primary hover:underline">
+          Se connecter
         </Link>
-      </Card>
-    </div>
+      </p>
+    </Card>
   );
 }
-
-export default RegisterForm;

@@ -8,7 +8,11 @@ import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { roleMiddleware } from '../middlewares/role.middleware';
 import { validateRequest } from '../middlewares/validation.middleware';
-import { uploadImage } from '../middlewares/upload.middleware';
+import {
+  uploadDomaineImage,
+  uploadFormationImage,
+  uploadLogo,
+} from '../middlewares/upload.middleware';
 
 /* ============================================================================
    ENUMS
@@ -30,15 +34,13 @@ import { AttestationController } from '../controllers/attestation.controller';
 import { DomaineController } from '../controllers/domaine.controller';
 import { AuditLogController } from '../controllers/auditLog.controller';
 import { ExportController } from '../controllers/export.controller';
+import { InscriptionController } from '../controllers/inscription.controller';
 
 /* ============================================================================
    VALIDATORS
    ============================================================================ */
 
-import {
-  createDomaineSchema,
-  updateDomaineSchema,
-} from '../validators/domaine.validator';
+import { createDomaineSchema, updateDomaineSchema } from '../validators/domaine.validator';
 
 /* ============================================================================
    ROUTER
@@ -65,13 +67,13 @@ router.use(roleMiddleware([RoleName.ADMINISTRATEUR]));
 router.get('/dashboard/status', DashboardController.systemStatus);
 
 // GET /api/admin/dashboard/top-formations
-router.get(
-  '/dashboard/top-formations',
-  DashboardController.topFormations,
-);
+router.get('/dashboard/top-formations', DashboardController.topFormations);
 
 // GET /api/admin/dashboard
 router.get('/dashboard', DashboardController.adminStats);
+
+/* -------------------- Inscriptions -------------------- */
+router.get('/inscriptions', InscriptionController.findAll);
 
 /* ============================================================================
    👥 UTILISATEURS
@@ -97,10 +99,7 @@ router.put('/users/:id/role', UserController.changeRole);
 router.put('/users/:id/actif', UserController.toggleActif);
 
 // POST /api/admin/users/:id/reset-password
-router.post(
-  '/users/:id/reset-password',
-  UserController.resetPassword,
-);
+router.post('/users/:id/reset-password', UserController.resetPassword);
 
 /* -------------------- Détail & mise à jour -------------------- */
 // GET /api/admin/users/:id
@@ -150,21 +149,14 @@ router.delete('/roles/:id', RoleController.delete);
 
 /* -------------------- Stats -------------------- */
 // GET /api/admin/domaines/stats/formations
-router.get(
-  '/domaines/stats/formations',
-  DomaineController.statsByDomaine,
-);
+router.get('/domaines/stats/formations', DomaineController.statsByDomaine);
 
 /* -------------------- Liste & création -------------------- */
 // GET /api/admin/domaines
 router.get('/domaines', DomaineController.findAll);
 
 // POST /api/admin/domaines
-router.post(
-  '/domaines',
-  validateRequest(createDomaineSchema),
-  DomaineController.create,
-);
+router.post('/domaines', validateRequest(createDomaineSchema), DomaineController.create);
 
 /* -------------------- Actions spécifiques -------------------- */
 // PUT /api/admin/domaines/:id/publier
@@ -173,8 +165,14 @@ router.put('/domaines/:id/publier', DomaineController.publier);
 // POST /api/admin/domaines/:id/image
 router.post(
   '/domaines/:id/image',
-  uploadImage.single('image'),
-  DomaineController.uploadImage,
+  uploadDomaineImage.single('image'),
+  DomaineController.uploadImage
+);
+
+
+router.post(
+  '/attestations/:id/envoyer',
+  AttestationController.envoyerParEmail,
 );
 
 /* -------------------- Détail & mise à jour -------------------- */
@@ -182,11 +180,7 @@ router.post(
 router.get('/domaines/:id', DomaineController.findOne);
 
 // PUT /api/admin/domaines/:id
-router.put(
-  '/domaines/:id',
-  validateRequest(updateDomaineSchema),
-  DomaineController.update,
-);
+router.put('/domaines/:id', validateRequest(updateDomaineSchema), DomaineController.update);
 
 /* -------------------- Suppression -------------------- */
 // DELETE /api/admin/domaines/:id
@@ -199,10 +193,7 @@ router.delete('/domaines/:id', DomaineController.delete);
 
 /* -------------------- Stats -------------------- */
 // GET /api/admin/formations/stats/domaines
-router.get(
-  '/formations/stats/domaines',
-  FormationController.statsByDomaine,
-);
+router.get('/formations/stats/domaines', FormationController.statsByDomaine);
 
 /* -------------------- Liste & création -------------------- */
 // GET /api/admin/formations
@@ -218,8 +209,8 @@ router.put('/formations/:id/publier', FormationController.publier);
 // POST /api/admin/formations/:id/image
 router.post(
   '/formations/:id/image',
-  uploadImage.single('image'),
-  FormationController.uploadImage,
+  uploadFormationImage.single('image'),
+  FormationController.uploadImage
 );
 
 /* -------------------- Détail & mise à jour -------------------- */
@@ -252,17 +243,11 @@ router.post('/sessions', SessionController.create);
 /* -------------------- ⭐ Actions spécifiques (AVANT /:id) -------------------- */
 // GET /api/admin/sessions/:id/inscriptions
 // ⭐⭐ CRITIQUE : doit être AVANT GET /sessions/:id
-router.get(
-  '/sessions/:id/inscriptions',
-  SessionController.getInscriptions,
-);
+router.get('/sessions/:id/inscriptions', SessionController.getInscriptions);
 
 // GET /api/admin/sessions/:id/presences
 // ⭐⭐ CRITIQUE : doit être AVANT GET /sessions/:id
-router.get(
-  '/sessions/:id/presences',
-  SessionController.getPresences,
-);
+router.get('/sessions/:id/presences', SessionController.getPresences);
 
 // PUT /api/admin/sessions/:id/statut
 router.put('/sessions/:id/statut', SessionController.changerStatut);
@@ -271,10 +256,7 @@ router.put('/sessions/:id/statut', SessionController.changerStatut);
 router.put('/sessions/:id/publier', SessionController.publier);
 
 // PUT /api/admin/sessions/:id/ouvrir-presence
-router.put(
-  '/sessions/:id/ouvrir-presence',
-  SessionController.ouvrirPresence,
-);
+router.put('/sessions/:id/ouvrir-presence', SessionController.ouvrirPresence);
 
 /* -------------------- Détail & mise à jour -------------------- */
 // GET /api/admin/sessions/:id
@@ -301,17 +283,10 @@ router.post('/partenaires', PartenaireController.create);
 
 /* -------------------- Actions spécifiques -------------------- */
 // POST /api/admin/partenaires/:id/logo
-router.post(
-  '/partenaires/:id/logo',
-  uploadImage.single('logo'),
-  PartenaireController.uploadLogo,
-);
+router.post('/partenaires/:id/logo', uploadLogo.single('logo'), PartenaireController.uploadLogo);
 
 // PUT /api/admin/partenaires/:id/publier
-router.put(
-  '/partenaires/:id/publier',
-  PartenaireController.publier,
-);
+router.put('/partenaires/:id/publier', PartenaireController.publier);
 
 /* -------------------- Détail & mise à jour -------------------- */
 // GET /api/admin/partenaires/:id
@@ -334,29 +309,20 @@ router.delete('/partenaires/:id', PartenaireController.delete);
 router.get('/attestations/stats', AttestationController.stats);
 
 // GET /api/admin/attestations/preview-session/:sessionId
-router.get(
-  '/attestations/preview-session/:sessionId',
-  AttestationController.previewSession,
-);
+router.get('/attestations/preview-session/:sessionId', AttestationController.previewSession);
 
 // GET /api/admin/attestations/eligibilite/:sessionId/:participantId
 router.get(
   '/attestations/eligibilite/:sessionId/:participantId',
-  AttestationController.verifierEligibilite,
+  AttestationController.verifierEligibilite
 );
 
 /* -------------------- Génération -------------------- */
 // POST /api/admin/attestations/generer-une
-router.post(
-  '/attestations/generer-une',
-  AttestationController.genererUne,
-);
+router.post('/attestations/generer-une', AttestationController.genererUne);
 
 // POST /api/admin/attestations/generer-session/:sessionId
-router.post(
-  '/attestations/generer-session/:sessionId',
-  AttestationController.genererParSession,
-);
+router.post('/attestations/generer-session/:sessionId', AttestationController.genererParSession);
 
 /* -------------------- Liste -------------------- */
 // GET /api/admin/attestations
@@ -364,22 +330,13 @@ router.get('/attestations', AttestationController.findAll);
 
 /* -------------------- Actions spécifiques -------------------- */
 // PUT /api/admin/attestations/:id/invalider
-router.put(
-  '/attestations/:id/invalider',
-  AttestationController.invalider,
-);
+router.put('/attestations/:id/invalider', AttestationController.invalider);
 
 // PUT /api/admin/attestations/:id/reactiver
-router.put(
-  '/attestations/:id/reactiver',
-  AttestationController.reactiver,
-);
+router.put('/attestations/:id/reactiver', AttestationController.reactiver);
 
 // GET /api/admin/attestations/:id/telecharger
-router.get(
-  '/attestations/:id/telecharger',
-  AttestationController.telecharger,
-);
+router.get('/attestations/:id/telecharger', AttestationController.telecharger);
 
 // GET /api/admin/attestations/:id/voir
 router.get('/attestations/:id/voir', AttestationController.voir);
@@ -400,10 +357,7 @@ router.get('/audit-logs/stats', AuditLogController.stats);
 
 /* -------------------- Par utilisateur -------------------- */
 // GET /api/admin/audit-logs/user/:userId
-router.get(
-  '/audit-logs/user/:userId',
-  AuditLogController.findByUser,
-);
+router.get('/audit-logs/user/:userId', AuditLogController.findByUser);
 
 /* -------------------- Liste -------------------- */
 // GET /api/admin/audit-logs
@@ -425,29 +379,17 @@ router.get('/exports/stats', ExportController.stats);
 
 /* -------------------- Utilisateurs -------------------- */
 // GET /api/admin/exports/utilisateurs/csv
-router.get(
-  '/exports/utilisateurs/csv',
-  ExportController.utilisateursCSV,
-);
+router.get('/exports/utilisateurs/csv', ExportController.utilisateursCSV);
 
 // GET /api/admin/exports/utilisateurs/pdf
-router.get(
-  '/exports/utilisateurs/pdf',
-  ExportController.utilisateursPDF,
-);
+router.get('/exports/utilisateurs/pdf', ExportController.utilisateursPDF);
 
 /* -------------------- Formations -------------------- */
 // GET /api/admin/exports/formations/csv
-router.get(
-  '/exports/formations/csv',
-  ExportController.formationsCSV,
-);
+router.get('/exports/formations/csv', ExportController.formationsCSV);
 
 // GET /api/admin/exports/formations/pdf
-router.get(
-  '/exports/formations/pdf',
-  ExportController.formationsPDF,
-);
+router.get('/exports/formations/pdf', ExportController.formationsPDF);
 
 router.get('/formations/:id', FormationController.findOne);
 
@@ -459,29 +401,17 @@ router.delete('/formations/:id', FormationController.delete);
 
 /* -------------------- Inscriptions -------------------- */
 // GET /api/admin/exports/inscriptions/csv
-router.get(
-  '/exports/inscriptions/csv',
-  ExportController.inscriptionsCSV,
-);
+router.get('/exports/inscriptions/csv', ExportController.inscriptionsCSV);
 
 // GET /api/admin/exports/inscriptions/pdf
-router.get(
-  '/exports/inscriptions/pdf',
-  ExportController.inscriptionsPDF,
-);
+router.get('/exports/inscriptions/pdf', ExportController.inscriptionsPDF);
 
 /* -------------------- Attestations -------------------- */
 // GET /api/admin/exports/attestations/csv
-router.get(
-  '/exports/attestations/csv',
-  ExportController.attestationsCSV,
-);
+router.get('/exports/attestations/csv', ExportController.attestationsCSV);
 
 // GET /api/admin/exports/attestations/pdf
-router.get(
-  '/exports/attestations/pdf',
-  ExportController.attestationsPDF,
-);
+router.get('/exports/attestations/pdf', ExportController.attestationsPDF);
 
 /* -------------------- Sessions -------------------- */
 // GET /api/admin/exports/sessions/csv
@@ -492,16 +422,10 @@ router.get('/exports/sessions/pdf', ExportController.sessionsPDF);
 
 /* -------------------- Partenaires -------------------- */
 // GET /api/admin/exports/partenaires/csv
-router.get(
-  '/exports/partenaires/csv',
-  ExportController.partenairesCSV,
-);
+router.get('/exports/partenaires/csv', ExportController.partenairesCSV);
 
 // GET /api/admin/exports/partenaires/pdf
-router.get(
-  '/exports/partenaires/pdf',
-  ExportController.partenairesPDF,
-);
+router.get('/exports/partenaires/pdf', ExportController.partenairesPDF);
 
 /* -------------------- Domaines -------------------- */
 // GET /api/admin/exports/domaines/csv
@@ -512,16 +436,10 @@ router.get('/exports/domaines/pdf', ExportController.domainesPDF);
 
 /* -------------------- Audit Logs -------------------- */
 // GET /api/admin/exports/audit-logs/csv
-router.get(
-  '/exports/audit-logs/csv',
-  ExportController.auditLogsCSV,
-);
+router.get('/exports/audit-logs/csv', ExportController.auditLogsCSV);
 
 // GET /api/admin/exports/audit-logs/pdf
-router.get(
-  '/exports/audit-logs/pdf',
-  ExportController.auditLogsPDF,
-);
+router.get('/exports/audit-logs/pdf', ExportController.auditLogsPDF);
 
 /* -------------------- Export complet (ZIP) -------------------- */
 // GET /api/admin/exports/complet

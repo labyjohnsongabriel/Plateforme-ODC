@@ -11,12 +11,12 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
 import { getErrorMessage } from '@/lib/error-handler';
+import type { PaginatedResponse } from '@/types/common.types';
 import type {
   Session,
   SessionFilters,
   SessionCreateInput,
   SessionUpdateInput,
-  PaginatedResponse,
 } from '@/types/session.types';
 
 /* ============================================================================
@@ -31,26 +31,10 @@ export function useSessionsPublic(filters?: SessionFilters) {
   return useQuery({
     queryKey: queryKeys.sessions.public(filters),
     queryFn: async () => {
-      const { data } = await api.get<{
-        data: PaginatedResponse<Session> | Session[];
-      }>('/public/sessions', { params: filters });
-
-      // Normalisation : accepte tableau OU objet paginé
-      const payload = data.data;
-
-      if (Array.isArray(payload)) {
-        return {
-          data: payload,
-          pagination: {
-            page: 1,
-            limit: payload.length,
-            total: payload.length,
-            totalPages: 1,
-          },
-        } as PaginatedResponse<Session>;
-      }
-
-      return payload;
+      const { data } = await api.get<PaginatedResponse<Session>>('/public/sessions', {
+        params: filters,
+      });
+      return data;
     },
     staleTime: 3 * 60_000,
     retry: 1,
@@ -64,12 +48,10 @@ export function useInfiniteSessionsPublic(filters?: SessionFilters) {
   return useInfiniteQuery({
     queryKey: queryKeys.sessions.publicInfinite(filters),
     queryFn: async ({ pageParam = 1 }) => {
-      const { data } = await api.get<{
-        data: PaginatedResponse<Session>;
-      }>('/public/sessions', {
+      const { data } = await api.get<PaginatedResponse<Session>>('/public/sessions', {
         params: { ...filters, page: pageParam },
       });
-      return data.data;
+      return data;
     },
     initialPageParam: 1,
     getNextPageParam: (last) =>
@@ -104,10 +86,9 @@ export function useUpcomingSessionsPublic(limit = 6) {
   return useQuery({
     queryKey: queryKeys.sessions.publicUpcoming(limit),
     queryFn: async () => {
-      const { data } = await api.get<{ data: Session[] }>(
-        '/public/sessions/a-venir',
-        { params: { limit } },
-      );
+      const { data } = await api.get<PaginatedResponse<Session>>('/public/sessions', {
+        params: { page: 1, limit },
+      });
       return data.data;
     },
     staleTime: 2 * 60_000,
@@ -117,16 +98,16 @@ export function useUpcomingSessionsPublic(limit = 6) {
 /**
  * ⭐ Sessions publiques d'une formation.
  */
-export function useSessionsPublicByFormation(formationSlug: string) {
+export function useSessionsPublicByFormation(formationId: string) {
   return useQuery({
-    queryKey: queryKeys.sessions.publicByFormation(formationSlug),
+    queryKey: queryKeys.sessions.publicByFormation(formationId),
     queryFn: async () => {
       const { data } = await api.get<{ data: Session[] }>(
-        `/public/sessions/formation/${formationSlug}`,
+        `/sessions/formation/${formationId}`,
       );
       return data.data;
     },
-    enabled: !!formationSlug,
+    enabled: !!formationId,
     staleTime: 3 * 60_000,
   });
 }
@@ -139,11 +120,10 @@ export function useSessions(filters?: SessionFilters) {
   return useQuery({
     queryKey: queryKeys.sessions.list(filters),
     queryFn: async () => {
-      const { data } = await api.get<{ data: PaginatedResponse<Session> }>(
-        '/sessions',
-        { params: filters },
-      );
-      return data.data;
+      const { data } = await api.get<PaginatedResponse<Session>>('/sessions', {
+        params: filters,
+      });
+      return data;
     },
     staleTime: 3 * 60_000,
   });
@@ -153,11 +133,10 @@ export function useInfiniteSessions(filters?: SessionFilters) {
   return useInfiniteQuery({
     queryKey: queryKeys.sessions.infinite(filters),
     queryFn: async ({ pageParam = 1 }) => {
-      const { data } = await api.get<{ data: PaginatedResponse<Session> }>(
-        '/sessions',
-        { params: { ...filters, page: pageParam } },
-      );
-      return data.data;
+      const { data } = await api.get<PaginatedResponse<Session>>('/sessions', {
+        params: { ...filters, page: pageParam },
+      });
+      return data;
     },
     initialPageParam: 1,
     getNextPageParam: (last) =>
@@ -171,9 +150,7 @@ export function useSession(codeSession: string) {
   return useQuery({
     queryKey: queryKeys.sessions.detail(codeSession),
     queryFn: async () => {
-      const { data } = await api.get<{ data: Session }>(
-        `/sessions/${codeSession}`,
-      );
+      const { data } = await api.get<{ data: Session }>(`/sessions/${codeSession}`);
       return data.data;
     },
     enabled: !!codeSession,
@@ -198,10 +175,9 @@ export function useUpcomingSessions(limit = 10) {
   return useQuery({
     queryKey: queryKeys.sessions.upcoming(limit),
     queryFn: async () => {
-      const { data } = await api.get<{ data: Session[] }>(
-        '/sessions/a-venir',
-        { params: { limit } },
-      );
+      const { data } = await api.get<PaginatedResponse<Session>>('/sessions', {
+        params: { page: 1, limit },
+      });
       return data.data;
     },
     staleTime: 2 * 60_000,
@@ -254,26 +230,14 @@ export function useUpdateSession() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      input,
-    }: {
-      id: string;
-      input: SessionUpdateInput;
-    }) => {
-      const { data } = await api.put<{ data: Session }>(
-        `/sessions/${id}`,
-        input,
-      );
+    mutationFn: async ({ id, input }: { id: string; input: SessionUpdateInput }) => {
+      const { data } = await api.put<{ data: Session }>(`/sessions/${id}`, input);
       return data.data;
     },
     onSuccess: (session) => {
       toast.success('Session mise à jour');
       qc.invalidateQueries({ queryKey: queryKeys.sessions.all });
-      qc.setQueryData(
-        queryKeys.sessions.detail(session.codeSession),
-        session,
-      );
+      qc.setQueryData(queryKeys.sessions.detail(session.codeSession), session);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });

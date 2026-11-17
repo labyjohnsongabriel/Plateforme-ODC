@@ -7,65 +7,59 @@ import { Search, X, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/hooks/useDebounce';
-import { cn } from '@/lib/utils';
-
-/* ============================================================================
-   COMPOSANT
-   ============================================================================ */
 
 export function FormationSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [search, setSearch] = React.useState(
-    searchParams.get('q') ?? '',
-  );
-  const [isSearching, setIsSearching] = React.useState(false);
-  const debouncedSearch = useDebounce(search, 500);
+  // Valeur "source de vérité" lue depuis l'URL
+  const qFromUrl = searchParams.get('q') ?? '';
 
-  /* -------------------- Effet de recherche -------------------- */
+  // Input contrôlé
+  const [search, setSearch] = React.useState(qFromUrl);
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Indique si la valeur tapée diffère de celle validée dans l'URL
+  const isPending = search.trim() !== qFromUrl;
+
+  /* ─── 1. URL → Input (sync externe : Retour, filtres, liens) ────────── */
   React.useEffect(() => {
+    // Ne resynchronise que si l'URL a changé "pour de vrai"
+    setSearch((prev) => (prev.trim() === qFromUrl ? prev : qFromUrl));
+  }, [qFromUrl]);
+
+  /* ─── 2. Input (debounced) → URL ────────────────────────────────────── */
+  React.useEffect(() => {
+    const nextQ = debouncedSearch.trim();
+    if (nextQ === qFromUrl) return;
+
     const params = new URLSearchParams(searchParams.toString());
-    const currentQ = params.get('q') ?? '';
-
-    if (debouncedSearch === currentQ) return;
-
-    setIsSearching(true);
     params.delete('page');
+    if (nextQ) params.set('q', nextQ);
+    else params.delete('q');
 
-    if (debouncedSearch.trim()) {
-      params.set('q', debouncedSearch.trim());
-    } else {
-      params.delete('q');
-    }
+    // replace : évite de polluer l'historique à chaque frappe
+    router.replace(`/formations?${params.toString()}`, { scroll: false });
+  }, [debouncedSearch, qFromUrl, router, searchParams]);
 
-    router.push(`/formations?${params.toString()}`, { scroll: false });
-
-    const timeout = setTimeout(() => setIsSearching(false), 300);
-    return () => clearTimeout(timeout);
-  }, [debouncedSearch, router, searchParams]);
-
-  /* -------------------- Reset -------------------- */
   const clearSearch = () => setSearch('');
 
-  /* -------------------- Rendu -------------------- */
   return (
     <div className="relative w-full max-w-md">
-      {isSearching ? (
-        <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-odc-primary" />
-      ) : (
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-odc-text-muted" />
-      )}
+      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+        {isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin text-odc-primary" />
+        ) : (
+          <Search className="h-4 w-4 text-odc-text-muted" />
+        )}
+      </div>
 
       <Input
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Rechercher une formation..."
-        className={cn(
-          'h-11 pl-9 pr-10 text-sm',
-          'input-odc',
-        )}
+        className="input-odc h-11 pl-9 pr-10 text-sm"
         aria-label="Rechercher une formation"
       />
 
@@ -73,9 +67,9 @@ export function FormationSearch() {
         <Button
           type="button"
           variant="ghost"
-          size="icon-sm"
+          size="icon"
           onClick={clearSearch}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2"
+          className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
           aria-label="Effacer la recherche"
         >
           <X className="h-3.5 w-3.5" />

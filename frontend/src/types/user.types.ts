@@ -1,22 +1,13 @@
-<<<<<<< HEAD
-import type { ID, Timestamp, PaginationParams } from './common.types';
+import type { ID, PaginationParams, Timestamp } from './common.types';
+import type { AppRoleName } from './role.types';
 
-// ============================================================================
-//  UTILISATEURS
-// ============================================================================
-
-export enum RoleName {
-  ADMIN = 'ADMIN',
-  STAFF = 'STAFF',
-  FORMATEUR = 'FORMATEUR',
-  PARTICIPANT = 'PARTICIPANT',
-  PARTENAIRE = 'PARTENAIRE',
-}
+export { RoleName } from './role.types';
 
 export interface Role {
   id: ID;
-  nom: RoleName;
-  description?: string;
+  nom: AppRoleName;
+  libelle?: string;
+  description?: string | null;
 }
 
 export interface User {
@@ -24,18 +15,22 @@ export interface User {
   nom: string;
   prenom: string;
   email: string;
-  telephone?: string;
-  photoUrl?: string;
-  bio?: string;
-  ville?: string;
-  linkedin?: string;
-  entreprise?: string;
-  poste?: string;
-  competences?: string[];
+  telephone?: string | null;
+  photoUrl?: string | null;
+  photoCouvertureUrl?: string | null;
+  bio?: string | null;
+  ville?: string | null;
+  linkedin?: string | null;
+  siteWeb?: string | null;
+  entreprise?: string | null;
+  poste?: string | null;
+  competences?: string[] | null;
   actif: boolean;
   emailVerifie: boolean;
-  derniereConnexion?: Timestamp;
-  role: Role;
+  profilPublic?: boolean;
+  derniereConnexion?: Timestamp | null;
+  role: Role & { permissions?: Array<{ code: string }> };
+  roleId?: ID;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -46,7 +41,7 @@ export interface CreateUserPayload {
   email: string;
   motDePasse: string;
   telephone?: string;
-  roleNom: RoleName;
+  roleNom: AppRoleName;
   ville?: string;
 }
 
@@ -63,7 +58,7 @@ export interface UpdateUserPayload {
 }
 
 export interface ChangeRolePayload {
-  roleNom: RoleName;
+  roleNom: AppRoleName;
 }
 
 export interface ToggleActifPayload {
@@ -71,42 +66,12 @@ export interface ToggleActifPayload {
 }
 
 export interface UserFilters extends PaginationParams {
-  role?: RoleName;
+  role?: AppRoleName;
   actif?: boolean;
   ville?: string;
 }
 
 export interface UserStatsByRole {
-  role: RoleName;
+  role: AppRoleName;
   count: string;
-=======
-// src/types/user.types.ts
-export interface User {
-  id: string;
-  nom: string;
-  prenom: string;
-  email: string;
-  telephone?: string | null;
-  photoUrl?: string | null;
-  photoCouvertureUrl?: string | null;
-  bio?: string | null;
-  ville?: string | null;
-  linkedin?: string | null;
-  siteWeb?: string | null;
-  entreprise?: string | null;
-  poste?: string | null;
-  competences?: string[] | null;
-  actif: boolean;
-  emailVerifie: boolean;
-  profilPublic: boolean;
-  derniereConnexion?: string | null;
-  role: {
-    id: string;
-    nom: 'ADMINISTRATEUR' | 'STAFF_ODC' | 'FORMATEUR' | 'PARTICIPANT' | 'PARTENAIRE';
-    libelle: string;
-  };
-  roleId: string;
-  createdAt: string;
-  updatedAt: string;
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 }

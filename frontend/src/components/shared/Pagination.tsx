@@ -9,10 +9,8 @@ import { cn } from '@/lib/utils';
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  /** Optionnel : callback custom (par défaut : navigation via URL) */
   onPageChange?: (page: number) => void;
   className?: string;
-  /** Nom du paramètre URL (par défaut `page`) */
   paramName?: string;
 }
 
@@ -53,7 +51,7 @@ export function Pagination({
         onClick={() => goTo(currentPage - 1)}
         aria-label="Page précédente"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4" aria-hidden />
       </Button>
 
       {pages.map((p, i) => {
@@ -61,7 +59,7 @@ export function Pagination({
           return (
             <span
               key={`e-${i}`}
-              className="px-3 text-sm text-odc-muted select-none"
+              className="select-none px-3 text-sm text-slate-400 dark:text-slate-500"
             >
               …
             </span>
@@ -71,11 +69,10 @@ export function Pagination({
         return (
           <Button
             key={p}
-            variant={active ? 'odc' : 'ghost'}
+            variant={active ? 'primary' : 'ghost'}
             size="icon"
             onClick={() => goTo(p as number)}
             aria-current={active ? 'page' : undefined}
-            className="min-w-9"
           >
             {p}
           </Button>
@@ -89,7 +86,7 @@ export function Pagination({
         onClick={() => goTo(currentPage + 1)}
         aria-label="Page suivante"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4" aria-hidden />
       </Button>
     </nav>
   );

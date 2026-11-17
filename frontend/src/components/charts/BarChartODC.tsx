@@ -17,10 +17,6 @@ import { cn } from '@/lib/utils';
 import { ChartTooltip } from './ChartTooltip';
 import { ChartLegend } from './ChartLegend';
 
-/* ============================================================================
-   TYPES
-   ============================================================================ */
-
 export interface BarChartDataItem {
   name: string;
   value: number;
@@ -28,50 +24,28 @@ export interface BarChartDataItem {
 }
 
 export interface BarChartSeries {
-  /** Clé des données à afficher */
   dataKey: string;
-  /** Nom affiché dans la légende */
   name: string;
-  /** Couleur (hex) */
   color: string;
 }
 
 export interface BarChartODCProps {
-  /** Données à afficher */
   data: BarChartDataItem[];
-  /** Configuration des barres */
   series: BarChartSeries[];
-  /** Hauteur du graphique */
   height?: number;
-  /** Orientation */
   layout?: 'horizontal' | 'vertical';
-  /** Afficher la grille */
   showGrid?: boolean;
-  /** Afficher la légende */
   showLegend?: boolean;
-  /** Afficher les valeurs sur les barres */
   showLabels?: boolean;
-  /** Rayon des barres */
   barRadius?: number;
-  /** Largeur des barres */
   barSize?: number;
-  /** Espacement entre les groupes */
   barGap?: number;
-  /** Couleur du texte des axes */
   axisColor?: string;
-  /** Couleur de la grille */
   gridColor?: string;
-  /** Formateur des valeurs tooltip */
   valueFormatter?: (value: number) => string;
-  /** Formateur des labels d'axe X */
   xAxisFormatter?: (value: any) => string;
-  /** Classes CSS */
   className?: string;
 }
-
-/* ============================================================================
-   COMPOSANT
-   ============================================================================ */
 
 export function BarChartODC({
   data,
@@ -84,8 +58,8 @@ export function BarChartODC({
   barRadius = 6,
   barSize,
   barGap = 4,
-  axisColor = 'currentColor',
-  gridColor = 'rgba(0, 0, 0, 0.06)',
+  axisColor = 'hsl(var(--muted-foreground))',
+  gridColor = 'hsl(var(--border))',
   valueFormatter,
   xAxisFormatter,
   className,
@@ -107,8 +81,9 @@ export function BarChartODC({
         >
           {showGrid && (
             <CartesianGrid
-              strokeDasharray="3 3"
+              strokeDasharray="4 4"
               stroke={gridColor}
+              strokeOpacity={0.6}
               vertical={!isVertical}
               horizontal={isVertical}
             />
@@ -155,20 +130,12 @@ export function BarChartODC({
           )}
 
           <Tooltip
-            content={
-              <ChartTooltip
-                valueFormatter={valueFormatter}
-                indicator="square"
-              />
-            }
-            cursor={{ fill: 'rgba(255, 121, 0, 0.06)' }}
+            content={<ChartTooltip valueFormatter={valueFormatter} indicator="square" />}
+            cursor={{ fill: 'hsl(var(--accent) / 0.5)' }}
           />
 
           {showLegend && (
-            <Legend
-              content={<ChartLegend />}
-              wrapperStyle={{ paddingTop: 16 }}
-            />
+            <Legend content={<ChartLegend />} wrapperStyle={{ paddingTop: 16 }} />
           )}
 
           {series.map((s) => (
@@ -177,12 +144,16 @@ export function BarChartODC({
               dataKey={s.dataKey}
               name={s.name}
               fill={s.color}
-              radius={[barRadius, barRadius, 0, 0]}
+              radius={
+                isVertical
+                  ? [0, barRadius, barRadius, 0]
+                  : [barRadius, barRadius, 0, 0]
+              }
               barSize={barSize}
               maxBarSize={80}
             >
               {showLabels &&
-                data.map((entry, index) => (
+                data.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={s.color} />
                 ))}
             </Bar>

@@ -1,91 +1,47 @@
-<<<<<<< HEAD
-import winston from 'winston';
-=======
 // src/config/logger.ts
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 import path from 'path';
 import fs from 'fs';
-import { env } from './env';
 
-<<<<<<< HEAD
-// Créer le dossier logs
-const logDir = path.resolve(process.cwd(), env.LOG_DIR);
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
+// ⭐ Import avec fallback — si env.ts n'est pas encore chargé, on utilise des valeurs par défaut
+let env: any = {};
+try {
+  env = require('./env').env ?? {};
+} catch (err) {
+  console.error('⚠️ env.ts non chargé, valeurs par défaut utilisées');
 }
 
-/**
- * Format personnalisé
- */
-const customFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.errors({ stack: true }),
-  winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
-    const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-    const stackStr = stack ? `\n${stack}` : '';
-    return `[${timestamp}] ${level.toUpperCase()}: ${message}${metaStr}${stackStr}`;
-  })
-);
+const LOG_DIR = env.LOG_DIR ?? 'logs';
+const APP_NAME = env.APP_NAME ?? 'odc-api';
+const NODE_ENV = env.NODE_ENV ?? 'development';
+const LOG_LEVEL = env.LOG_LEVEL ?? 'info';
 
-export const logger = winston.createLogger({
-  level: env.LOG_LEVEL,
-  format: customFormat,
-  transports: [
-    // Console
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize({ all: true }),
-        customFormat
-      ),
-    }),
-    // Fichier app.log
-    new winston.transports.File({
-      filename: path.join(logDir, 'app.log'),
-      maxsize: 5 * 1024 * 1024, // 5MB
-      maxFiles: 5,
-    }),
-    // Fichier error.log
-    new winston.transports.File({
-      filename: path.join(logDir, 'error.log'),
-      level: 'error',
-      maxsize: 5 * 1024 * 1024,
-      maxFiles: 5,
-    }),
-  ],
-});
-=======
 // =============================================================================
 // 📁 DOSSIER DES LOGS
 // =============================================================================
-const logDir = path.resolve(process.cwd(), env.LOG_DIR ?? 'logs');
+const logDir = path.resolve(process.cwd(), LOG_DIR);
 
 try {
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
 } catch (err) {
-  // Ne jamais faire planter l'app à cause des logs
   console.error(`⚠️ Impossible de créer le dossier logs ${logDir}:`, err);
 }
 
 // =============================================================================
-// 🧩 MÉTADONNÉES GLOBALES (injectées dans chaque log)
+// 🧩 MÉTADONNÉES GLOBALES
 // =============================================================================
 const GLOBAL_META = {
-  service: env.APP_NAME ?? 'odc-api',
-  env: env.NODE_ENV ?? 'development',
+  service: APP_NAME,
+  env: NODE_ENV,
   pid: process.pid,
 };
 
 // =============================================================================
-// 🔒 SÉRIALISATION SÛRE DES MÉTADONNÉES
+// 🔒 SÉRIALISATION SÛRE
 // =============================================================================
-/**
- * Évite les crashs sur objets circulaires (Request, Error, Socket, ...)
- * et limite la taille des valeurs.
- */
 function safeStringify(obj: unknown): string {
   const seen = new WeakSet();
   try {
@@ -108,19 +64,10 @@ function safeStringify(obj: unknown): string {
 // =============================================================================
 // 🎨 FORMATS
 // =============================================================================
-
-/** Champs internes winston à exclure du JSON de métadonnées */
 const INTERNAL_FIELDS = new Set([
-  'timestamp',
-  'level',
-  'message',
-  'splat',
-  'service',
-  'env',
-  'pid',
+  'timestamp', 'level', 'message', 'splat', 'service', 'env', 'pid',
 ]);
 
-/** Format des logs FICHIERS (JSON structuré — parsable par Loki/ELK) */
 const fileFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
   winston.format.errors({ stack: true }),
@@ -128,25 +75,18 @@ const fileFormat = winston.format.combine(
   winston.format.json(),
 );
 
-/** Format CONSOLE (lisible humain, colorisé) */
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.colorize({ level: true }),
   winston.format.printf((info) => {
     const { timestamp, level, message, stack } = info as any;
-
-    // Métadonnées : on prend tout sauf les champs internes
     const meta: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(info)) {
       if (!INTERNAL_FIELDS.has(k) && k !== 'stack') meta[k] = v;
     }
-
-    const metaStr = Object.keys(meta).length
-      ? ` ${safeStringify(meta)}`
-      : '';
+    const metaStr = Object.keys(meta).length ? ` ${safeStringify(meta)}` : '';
     const stackStr = stack ? `\n${stack}` : '';
-
     return `[${timestamp}] ${level}: ${message}${metaStr}${stackStr}`;
   }),
 );
@@ -159,12 +99,11 @@ const transports: winston.transport[] = [
     format: consoleFormat,
     handleExceptions: true,
     handleRejections: true,
-    silent: env.NODE_ENV === 'test',
+    silent: NODE_ENV === 'test',
   }),
 ];
 
-// Fichiers uniquement hors test
-if (env.NODE_ENV !== 'test') {
+if (NODE_ENV !== 'test') {
   transports.push(
     new DailyRotateFile({
       dirname: logDir,
@@ -174,7 +113,7 @@ if (env.NODE_ENV !== 'test') {
       maxSize: '20m',
       maxFiles: '14d',
       format: fileFormat,
-      level: env.LOG_LEVEL ?? 'info',
+      level: LOG_LEVEL,
     }),
     new DailyRotateFile({
       dirname: logDir,
@@ -193,7 +132,7 @@ if (env.NODE_ENV !== 'test') {
 // 🚀 LOGGER
 // =============================================================================
 export const logger = winston.createLogger({
-  level: env.LOG_LEVEL ?? 'info',
+  level: LOG_LEVEL,
   defaultMeta: GLOBAL_META,
   format: fileFormat,
   transports,
@@ -201,11 +140,10 @@ export const logger = winston.createLogger({
 });
 
 // =============================================================================
-// 🛡️ GESTION DES ERREURS NON CAPTURÉES
+// 🛡️ GESTION DES ERREURS
 // =============================================================================
 process.on('uncaughtException', (err) => {
   logger.error('💥 uncaughtException', { error: err.message, stack: err.stack });
-  // Laisser le process mourir après flush
   setTimeout(() => process.exit(1), 500);
 });
 
@@ -218,7 +156,7 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // =============================================================================
-// 📡 STREAM POUR MORGAN (utilisé dans app.ts)
+// 📡 STREAM POUR MORGAN
 // =============================================================================
 export const logStream = {
   write: (message: string) => {
@@ -227,7 +165,7 @@ export const logStream = {
 };
 
 // =============================================================================
-// 🧪 HELPERS TYPÉS (facultatif mais pratique)
+// 🧪 HELPERS
 // =============================================================================
 export const log = {
   info:  (msg: string, meta?: Record<string, unknown>) => logger.info(msg, meta),
@@ -238,4 +176,3 @@ export const log = {
 };
 
 export default logger;
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234

@@ -18,6 +18,7 @@ import { getInitials } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/error-handler';
 import { useAuthStore } from '@/store/auth.store';
 import { useSocket } from '@/hooks/useSocket';
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
 
 interface Props {
   conversationId: string;
@@ -31,7 +32,7 @@ export function ChatWindow({ conversationId }: Props) {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['messagerie', 'conversation', conversationId],
     queryFn: async () => {
       const { data } = await api.get(
@@ -39,6 +40,7 @@ export function ChatWindow({ conversationId }: Props) {
       );
       return data.data;
     },
+    refetchInterval: 5000,
   });
 
   const sendMutation = useMutation({
@@ -60,6 +62,7 @@ export function ChatWindow({ conversationId }: Props) {
   // Socket temps réel
   useEffect(() => {
     if (!socket) return;
+    socket.emit('conversation:join', conversationId);
     const handler = (msg: any) => {
       if (msg.conversationId === conversationId) {
         qc.invalidateQueries({
@@ -70,13 +73,32 @@ export function ChatWindow({ conversationId }: Props) {
     socket.on('message:new', handler);
     return () => {
       socket.off('message:new', handler);
+      socket.emit('conversation:leave', conversationId);
     };
   }, [socket, conversationId, qc]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    void api.put(`/messagerie/conversations/${conversationId}/lu`)
+      .then(() => qc.invalidateQueries({ queryKey: ['messagerie'] }))
+      .catch((error) => toast.error(getErrorMessage(error)));
+  }, [conversationId, qc]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [data?.messages]);
+
+  if (isError) {
+    return (
+      <Card className="h-full p-6">
+        <QueryErrorState
+          onRetry={() => { void refetch(); }}
+          isRetrying={isFetching}
+        />
+      </Card>
+    );
+  }
 
   if (isLoading || !data) {
     return <Skeleton className="h-full" />;

@@ -14,12 +14,19 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import api from '@/lib/api'; // ⭐ ton instance axios existante
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCHÉMA
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const schema = z.object({
   nom: z.string().trim().min(2, 'Nom requis').max(100),
-  email: z.string().trim().email('Email invalide'),
+  email: z.string().trim().email('Email invalide').max(200),
   sujet: z.enum(['information', 'partenariat', 'support', 'autre']),
-  message: z.string().trim().min(10, 'Message trop court').max(2000),
+  message: z.string().trim().min(10, 'Message trop court (10 caractères min)').max(2000),
+  // ⭐ Honeypot : ce champ doit rester vide (anti-bot)
+  website: z.string().max(0).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -29,7 +36,11 @@ const SUJETS = [
   { value: 'partenariat', label: 'Partenariat' },
   { value: 'support', label: 'Support technique' },
   { value: 'autre', label: 'Autre' },
-];
+] as const;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSANT
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function ContactForm() {
   const [success, setSuccess] = useState(false);
@@ -42,20 +53,53 @@ export function ContactForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: {
+      nom: '',
+      email: '',
+      message: '',
+      website: '',
+    },
   });
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     SOUMISSION — appelle vraiment le backend
+     ═══════════════════════════════════════════════════════════════════════ */
   const onSubmit = async (data: FormData) => {
     try {
-      // TODO: endpoint /api/public/contact
-      await new Promise((r) => setTimeout(r, 1000));
+      // ⭐ Honeypot : si rempli, c'est un bot → on ignore silencieusement
+      if (data.website && data.website.length > 0) {
+        console.warn('[contact] Honeypot déclenché — bot ignoré');
+        setSuccess(true); // Faux succès pour ne pas alerter le bot
+        reset();
+        return;
+      }
+
+      const { website, ...payload } = data;
+
+      const response = await api.post('/public/contact', payload, {
+        timeout: 15_000,
+      });
+
+      if (response.data?.success === false) {
+        throw new Error(response.data?.message ?? 'Erreur serveur');
+      }
+
       toast.success('Message envoyé ! Nous vous répondrons rapidement.');
       setSuccess(true);
       reset();
-    } catch {
-      toast.error("Erreur lors de l'envoi. Réessayez plus tard.");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Erreur lors de l'envoi. Réessayez plus tard.";
+      toast.error(msg);
+      console.error('[contact] Erreur envoi:', err);
     }
   };
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     ÉCRAN SUCCÈS
+     ═══════════════════════════════════════════════════════════════════════ */
   if (success) {
     return (
       <Card>
@@ -67,7 +111,7 @@ export function ContactForm() {
             Message envoyé !
           </h3>
           <p className="text-odc-muted text-sm mb-6">
-            Nous vous répondrons dans les plus brefs délais.
+            Nous vous répondrons dans les plus brefs délais à l'adresse indiquée.
           </p>
           <Button variant="outline" onClick={() => setSuccess(false)}>
             Envoyer un autre message
@@ -77,17 +121,39 @@ export function ContactForm() {
     );
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     FORMULAIRE
+     ═══════════════════════════════════════════════════════════════════════ */
   return (
     <Card>
       <CardHeader>
         <CardTitle>Envoyez-nous un message</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+
+          {/* ⭐ Honeypot invisible (anti-bot) */}
+          <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }} aria-hidden="true">
+            <Label htmlFor="website">Ne pas remplir</Label>
+            <Input
+              id="website"
+              tabIndex={-1}
+              autoComplete="off"
+              {...register('website')}
+            />
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="nom">Nom complet</Label>
-              <Input id="nom" {...register('nom')} className="mt-1.5" />
+              <Input
+                id="nom"
+                autoComplete="name"
+                placeholder="Votre nom"
+                {...register('nom')}
+                className="mt-1.5"
+                aria-invalid={!!errors.nom}
+              />
               {errors.nom && (
                 <p className="text-odc-error text-xs mt-1">{errors.nom.message}</p>
               )}
@@ -95,7 +161,15 @@ export function ContactForm() {
 
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" {...register('email')} className="mt-1.5" />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="vous@exemple.com"
+                {...register('email')}
+                className="mt-1.5"
+                aria-invalid={!!errors.email}
+              />
               {errors.email && (
                 <p className="text-odc-error text-xs mt-1">{errors.email.message}</p>
               )}
@@ -104,7 +178,7 @@ export function ContactForm() {
 
           <div>
             <Label htmlFor="sujet">Sujet</Label>
-            <Select onValueChange={(v) => setValue('sujet', v as any)}>
+            <Select onValueChange={(v) => setValue('sujet', v as FormData['sujet'], { shouldValidate: true })}>
               <SelectTrigger className="mt-1.5">
                 <SelectValue placeholder="Sélectionnez un sujet" />
               </SelectTrigger>
@@ -129,6 +203,7 @@ export function ContactForm() {
               placeholder="Décrivez votre demande..."
               {...register('message')}
               className="mt-1.5"
+              aria-invalid={!!errors.message}
             />
             {errors.message && (
               <p className="text-odc-error text-xs mt-1">{errors.message.message}</p>
@@ -143,12 +218,21 @@ export function ContactForm() {
             className="w-full"
           >
             {isSubmitting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Envoi en cours...
+              </>
             ) : (
-              <Send className="h-4 w-4 mr-2" />
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Envoyer le message
+              </>
             )}
-            Envoyer le message
           </Button>
+
+          <p className="text-xs text-odc-muted text-center">
+            En envoyant ce message, vous acceptez d'être recontacté par email.
+          </p>
         </form>
       </CardContent>
     </Card>

@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import { Camera, X, Zap, ZapOff, RefreshCw, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/common/Button';
-import { toast } from '@/components/common/Toast';
-import { cn } from '@/utils/cn';
+// src/components/qr/QrCodeScanner.tsx
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Camera, X, Zap, ZapOff, RefreshCw, AlertCircle, ScanLine } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+/* ============================================================================
+   TYPES
+   ============================================================================ */
 
 export interface QrCodeScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -11,6 +18,12 @@ export interface QrCodeScannerProps {
   continuous?: boolean;
   className?: string;
 }
+
+type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
+
+/* ============================================================================
+   COMPOSANT
+   ============================================================================ */
 
 export function QrCodeScanner({
   onScanSuccess,
@@ -23,59 +36,22 @@ export function QrCodeScanner({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
+  const isScanningRef = useRef(false);
+  const lastScanRef = useRef<string | null>(null);
+  const jsQRRef = useRef<((data: Uint8ClampedArray, w: number, h: number, opts?: unknown) => { data: string } | null) | null>(null);
 
-  const [isScanning, setIsScanning] = useState(autoStart);
+  const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
-  const [lastScan, setLastScan] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
-  // ========================================================================
-  // Démarrer la caméra
-  // ========================================================================
-  const startCamera = async () => {
-    try {
-      setError(null);
+  /* ==========================================================================
+     ARRÊTER LA CAMÉRA
+     ========================================================================== */
+  const stopCamera = useCallback(() => {
+    isScanningRef.current = false;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
-
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-
-        // Vérifier si le flash est supporté
-        const track = stream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities?.() as any;
-        setTorchSupported(!!capabilities?.torch);
-
-        setIsScanning(true);
-        scanFrame();
-      }
-    } catch (err: any) {
-      const message =
-        err.name === 'NotAllowedError'
-          ? 'Accès à la caméra refusé'
-          : err.name === 'NotFoundError'
-          ? 'Aucune caméra détectée'
-          : 'Erreur d\'accès à la caméra';
-
-      setError(message);
-      onScanError?.(message);
-    }
-  };
-
-  // ========================================================================
-  // Arrêter la caméra
-  // ========================================================================
-  const stopCamera = () => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -91,19 +67,26 @@ export function QrCodeScanner({
     }
 
     setIsScanning(false);
-  };
+    setTorchOn(false);
+    setTorchSupported(false);
+  }, []);
 
-  // ========================================================================
-  // Analyser les frames
-  // ========================================================================
-  const scanFrame = async () => {
-    if (!videoRef.current || !canvasRef.current || !isScanning) return;
+  /* ==========================================================================
+     BOUCLE DE SCAN — stable via useCallback
+     ========================================================================== */
+  const scanFrame = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || !isScanningRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    if (!ctx || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (video.readyState < video.HAVE_ENOUGH_DATA) {
+      animationRef.current = requestAnimationFrame(scanFrame);
+      return;
+    }
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
       animationRef.current = requestAnimationFrame(scanFrame);
       return;
     }
@@ -112,20 +95,25 @@ export function QrCodeScanner({
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
     try {
-      // Utiliser jsQR si disponible (import dynamique)
-      const jsQR = (await import('jsqr')).default;
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert',
-      });
+      // ⭐ Charger jsQR UNE SEULE FOIS
+      if (!jsQRRef.current) {
+        const mod = await import('jsqr');
+        jsQRRef.current = mod.default as typeof jsQRRef.current;
+      }
 
-      if (code && code.data && code.data !== lastScan) {
-        setLastScan(code.data);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQRRef.current?.(
+        imageData.data,
+        imageData.width,
+        imageData.height,
+        { inversionAttempts: 'dontInvert' },
+      );
+
+      if (code?.data && code.data !== lastScanRef.current) {
+        lastScanRef.current = code.data;
         onScanSuccess(code.data);
 
-        // Vibration
         if (navigator.vibrate) navigator.vibrate(100);
 
         if (!continuous) {
@@ -134,57 +122,111 @@ export function QrCodeScanner({
         }
 
         // Reset après 2s en mode continu
-        setTimeout(() => setLastScan(null), 2000);
+        setTimeout(() => {
+          lastScanRef.current = null;
+        }, 2000);
       }
     } catch (err) {
-      // jsQR non installé, continuer
+      console.error('[QR Scanner] Erreur scan:', err);
     }
 
-    if (isScanning) {
+    if (isScanningRef.current) {
       animationRef.current = requestAnimationFrame(scanFrame);
     }
-  };
+  }, [onScanSuccess, continuous, stopCamera]);
 
-  // ========================================================================
-  // Toggle flash
-  // ========================================================================
-  const toggleTorch = async () => {
+  /* ==========================================================================
+     DÉMARRER LA CAMÉRA
+     ========================================================================== */
+  const startCamera = useCallback(async () => {
+    if (isStarting || isScanningRef.current) return;
+    setIsStarting(true);
+    setError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+
+      streamRef.current = stream;
+
+      if (!videoRef.current) return;
+
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+
+      // Détection du flash
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities?.() as TorchCapabilities | undefined;
+      setTorchSupported(!!capabilities?.torch);
+
+      isScanningRef.current = true;
+      setIsScanning(true);
+      // ⭐ Démarrer la boucle
+      animationRef.current = requestAnimationFrame(scanFrame);
+    } catch (err: unknown) {
+      const name = (err as { name?: string })?.name;
+      const message =
+        name === 'NotAllowedError'
+          ? 'Accès à la caméra refusé'
+          : name === 'NotFoundError'
+            ? 'Aucune caméra détectée'
+            : "Erreur d'accès à la caméra";
+
+      setError(message);
+      onScanError?.(message);
+      isScanningRef.current = false;
+      setIsScanning(false);
+    } finally {
+      setIsStarting(false);
+    }
+  }, [isStarting, scanFrame, onScanError]);
+
+  /* ==========================================================================
+     TOGGLE FLASH
+     ========================================================================== */
+  const toggleTorch = useCallback(async () => {
     if (!streamRef.current || !torchSupported) return;
 
     try {
       const track = streamRef.current.getVideoTracks()[0];
       await track.applyConstraints({
         advanced: [{ torch: !torchOn }],
-      } as any);
-      setTorchOn(!torchOn);
+      } as MediaTrackConstraints);
+      setTorchOn((v) => !v);
     } catch {
-      toast.error('Impossible d\'activer le flash');
+      toast.error("Impossible d'activer le flash");
     }
-  };
+  }, [torchOn, torchSupported]);
 
-  // ========================================================================
-  // Cleanup
-  // ========================================================================
+  /* ==========================================================================
+     AUTO-START + CLEANUP
+     ========================================================================== */
   useEffect(() => {
-    if (autoStart) startCamera();
-
+    if (autoStart) void startCamera();
     return () => {
       stopCamera();
     };
-  }, [autoStart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ========================================================================
-  // RENDER
-  // ========================================================================
+  /* ==========================================================================
+     RENDU
+     ========================================================================== */
   return (
     <div className={cn('w-full', className)}>
-      <div className="relative aspect-square max-w-lg mx-auto bg-black rounded-2xl overflow-hidden">
+      <div className="relative mx-auto aspect-square w-full max-w-lg overflow-hidden rounded-2xl bg-black shadow-odc-lg">
         {/* Vidéo */}
         <video
           ref={videoRef}
-          className={cn('w-full h-full object-cover', !isScanning && 'hidden')}
+          className={cn('h-full w-full object-cover', !isScanning && 'hidden')}
           playsInline
           muted
+          aria-label="Flux caméra pour scanner un QR code"
         />
 
         <canvas ref={canvasRef} className="hidden" />
@@ -192,47 +234,44 @@ export function QrCodeScanner({
         {/* Overlay de scan */}
         {isScanning && (
           <>
-            {/* Coin supérieur gauche */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="relative w-64 h-64">
-                {/* Coins */}
-                <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-odc-primary rounded-tl-lg" />
-                <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-odc-primary rounded-tr-lg" />
-                <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-odc-primary rounded-bl-lg" />
-                <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-odc-primary rounded-br-lg" />
-
-                {/* Ligne de scan animée */}
-                <div className="absolute left-0 right-0 h-0.5 bg-odc-primary shadow-[0_0_10px_#FF7900] animate-scan" />
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="relative h-64 w-64">
+                <div className="border-odc-primary absolute left-0 top-0 h-12 w-12 rounded-tl-lg border-l-4 border-t-4" />
+                <div className="border-odc-primary absolute right-0 top-0 h-12 w-12 rounded-tr-lg border-r-4 border-t-4" />
+                <div className="border-odc-primary absolute bottom-0 left-0 h-12 w-12 rounded-bl-lg border-b-4 border-l-4" />
+                <div className="border-odc-primary absolute bottom-0 right-0 h-12 w-12 rounded-br-lg border-b-4 border-r-4" />
+                <div className="bg-odc-primary absolute left-0 right-0 h-0.5 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#FF7900]" />
               </div>
             </div>
 
-            {/* Texte d'instruction */}
-            <div className="absolute bottom-8 left-0 right-0 text-center">
-              <p className="text-white text-sm font-medium bg-black/50 inline-block px-4 py-2 rounded-full backdrop-blur-sm">
+            <div className="absolute inset-x-0 bottom-8 text-center">
+              <p className="inline-flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur-md">
+                <ScanLine className="h-4 w-4" />
                 Pointez vers un QR Code
               </p>
             </div>
 
-            {/* Bouton flash */}
             {torchSupported && (
               <button
+                type="button"
                 onClick={toggleTorch}
                 className={cn(
-                  'absolute top-4 right-4 w-12 h-12 rounded-full',
-                  'flex items-center justify-center',
-                  'bg-black/50 backdrop-blur-sm text-white',
-                  'hover:bg-black/70 transition-all',
-                  torchOn && 'bg-odc-primary hover:bg-odc-primary-dark'
+                  'absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full',
+                  'bg-black/50 text-white backdrop-blur-md transition-all',
+                  'hover:bg-black/70 active:scale-95',
+                  torchOn && 'bg-odc-primary hover:bg-odc-primary/90',
                 )}
+                aria-label={torchOn ? 'Désactiver le flash' : 'Activer le flash'}
               >
                 {torchOn ? <Zap size={20} /> : <ZapOff size={20} />}
               </button>
             )}
 
-            {/* Bouton fermer */}
             <button
+              type="button"
               onClick={stopCamera}
-              className="absolute top-4 left-4 w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-all"
+              className="absolute left-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-all hover:bg-black/70 active:scale-95"
+              aria-label="Fermer le scanner"
             >
               <X size={20} />
             </button>
@@ -241,31 +280,38 @@ export function QrCodeScanner({
 
         {/* État initial / erreur */}
         {!isScanning && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white">
             {error ? (
               <>
                 <AlertCircle size={48} className="text-odc-error mb-4" />
-                <p className="text-sm mb-4">{error}</p>
+                <p className="mb-4 text-sm">{error}</p>
                 <Button
-                  variant="primary"
-                  icon={<RefreshCw size={16} />}
+                  variant="brand"
                   onClick={startCamera}
+                  loading={isStarting}
+                  leftIcon={<RefreshCw className="h-4 w-4" />}
                 >
                   Réessayer
                 </Button>
               </>
             ) : (
               <>
-                <Camera size={64} className="text-odc-primary mb-4" />
-                <h3 className="font-heading font-bold text-lg mb-2">Scanner un QR Code</h3>
-                <p className="text-sm text-white/70 mb-6">
-                  Autorisez l'accès à la caméra pour scanner
+                <div className="bg-odc-primary/20 mb-4 flex h-20 w-20 items-center justify-center rounded-full">
+                  <Camera size={40} className="text-odc-primary" />
+                </div>
+                <h3 className="font-display mb-2 text-lg font-bold">
+                  Scanner un QR Code
+                </h3>
+                <p className="text-odc-muted mb-6 max-w-xs text-sm text-white/70">
+                  Autorisez l&apos;accès à la caméra pour scanner
                 </p>
                 <Button
-                  variant="primary"
+                  variant="brand"
                   size="lg"
-                  icon={<Camera size={18} />}
                   onClick={startCamera}
+                  loading={isStarting}
+                  loadingText="Démarrage…"
+                  leftIcon={<Camera className="h-4 w-4" />}
                 >
                   Activer la caméra
                 </Button>

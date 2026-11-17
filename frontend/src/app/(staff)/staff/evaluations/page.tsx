@@ -1,26 +1,25 @@
+// src/app/(staff)/staff/evaluations/page.tsx
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { EvaluationsTable } from './components/EvaluationsTable';
+import * as EvaluationsTableModule from './components/EvaluationsTable';
 
-export const metadata: Metadata = { title: 'Évaluations' };
+// ⭐ Récupère le composant quel que soit l'export (nommé ou default)
+const EvaluationsTable =
+  (EvaluationsTableModule as any).EvaluationsTable ??
+  (EvaluationsTableModule as any).default;
+
+export const metadata: Metadata = { title: 'Évaluations — Staff' };
 
 export default function EvaluationsPage() {
+  if (!EvaluationsTable) {
+    return (
+      <div className="p-6 text-destructive">
+        ❌ EvaluationsTable introuvable (mauvais export dans components/EvaluationsTable.tsx)
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Évaluations</h1>
-          <p className="text-odc-muted mt-1">Créez et gérez les évaluations</p>
-        </div>
-        <Button variant="odc" asChild>
-          <Link href="/staff/evaluations/nouveau">
-            <Plus className="h-4 w-4 mr-2" /> Nouvelle évaluation
-          </Link>
-        </Button>
-      </header>
-
       <EvaluationsTable />
     </div>
   );

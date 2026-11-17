@@ -77,7 +77,7 @@ export function AvatarUpload({
   return (
     <>
       {/* Avatar + overlay */}
-      <div className="relative group inline-block">
+      <div className="group relative inline-block">
         <Avatar src={currentAvatar} name={name} size={size} />
 
         {/* Overlay */}
@@ -88,11 +88,11 @@ export function AvatarUpload({
             'bg-black/60 backdrop-blur-sm',
             'flex flex-col items-center justify-center',
             'opacity-0 group-hover:opacity-100',
-            'transition-opacity cursor-pointer'
+            'cursor-pointer transition-opacity',
           )}
         >
-          <Camera size={24} className="text-white mb-1" />
-          <span className="text-white text-[10px] font-semibold uppercase tracking-wider">
+          <Camera size={24} className="mb-1 text-white" />
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-white">
             Changer
           </span>
         </button>
@@ -134,11 +134,11 @@ export function AvatarUpload({
               <img
                 src={preview}
                 alt="Aperçu"
-                className="w-40 h-40 rounded-full object-cover ring-4 ring-odc-primary shadow-odc-lg"
+                className="h-40 w-40 rounded-full object-cover shadow-odc-lg ring-4 ring-odc-primary"
               />
               <button
                 onClick={handleClose}
-                className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-odc-error text-white flex items-center justify-center hover:bg-red-700 transition-colors"
+                className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-odc-error text-white transition-colors hover:bg-red-700"
               >
                 <X size={16} />
               </button>
@@ -150,14 +150,14 @@ export function AvatarUpload({
               <div className="text-sm font-medium text-odc-text-light dark:text-odc-text-dark">
                 {selectedFile.name}
               </div>
-              <div className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark mt-1">
+              <div className="mt-1 text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </div>
             </div>
           )}
 
-          <div className="mt-6 p-3 rounded-lg bg-odc-info-bg border border-odc-info/20 w-full">
-            <p className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark text-center">
+          <div className="mt-6 w-full rounded-lg border border-odc-info/20 bg-odc-info-bg p-3">
+            <p className="text-center text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark">
               Formats acceptés : JPEG, PNG, WEBP • Max 2 MB
             </p>
           </div>

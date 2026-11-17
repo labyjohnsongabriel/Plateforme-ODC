@@ -1,0 +1,62 @@
+@'
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>Nouveau message de contact</title></head>
+<body style="margin:0;padding:0;background:#F5F5F5;font-family:'Segoe UI',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="padding:30px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+          <tr>
+            <td bgcolor="#FF7900" style="background:#FF7900;padding:28px 32px;">
+              <h1 style="color:#FFFFFF;margin:0;font-size:20px;font-weight:700;">📬 Nouveau message de contact</h1>
+              <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;font-size:13px;">{{dateFr}}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px 12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:6px 0;font-size:13px;color:#6B6B6B;width:100px;"><strong style="color:#1A1A1A;">De :</strong></td>
+                  <td style="padding:6px 0;font-size:14px;color:#1A1A1A;">{{nom}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:13px;color:#6B6B6B;"><strong style="color:#1A1A1A;">Email :</strong></td>
+                  <td style="padding:6px 0;font-size:14px;"><a href="mailto:{{email}}" style="color:#FF7900;text-decoration:none;">{{email}}</a></td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:13px;color:#6B6B6B;"><strong style="color:#1A1A1A;">Sujet :</strong></td>
+                  <td style="padding:6px 0;font-size:14px;color:#1A1A1A;">{{sujetLabel}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:13px;color:#6B6B6B;"><strong style="color:#1A1A1A;">IP :</strong></td>
+                  <td style="padding:6px 0;font-size:12px;color:#8A8A8A;font-family:monospace;">{{ip}}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px 28px;">
+              <div style="background:#FFF8F2;border-left:4px solid #FF7900;border-radius:8px;padding:20px;">
+                <p style="margin:0 0 6px;font-size:11px;color:#8A8A8A;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Message</p>
+                <div style="font-size:14px;color:#1A1A1A;line-height:1.7;white-space:pre-wrap;">{{message}}</div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 32px;" align="center">
+              <a href="mailto:{{email}}?subject=Re: {{sujetLabel}}" style="display:inline-block;background:#FF7900;color:#FFFFFF;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:14px;">✉️ Répondre à {{nom}}</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#FAFAFA;padding:20px 32px;text-align:center;border-top:1px solid #F0F0F0;">
+              <p style="color:#8A8A8A;font-size:11px;margin:0;line-height:1.5;">{{odcName}} — {{odcAdresse}}<br>Ce message a été envoyé via le formulaire de contact du site.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+'@ | Set-Content -Path "src\templates\email-contact-admin.hbs" -Encoding UTF8

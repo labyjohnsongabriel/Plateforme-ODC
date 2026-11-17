@@ -1,3 +1,4 @@
+// src/app/(auth)/connexion/components/LoginForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,9 +17,6 @@ import { useAuthStore } from '@/store/auth.store';
 import { ROLE_DASHBOARD } from '@/lib/routes';
 import { getErrorMessage } from '@/lib/error-handler';
 
-/* ============================================================================
-   SCHÉMA
-   ============================================================================ */
 const schema = z.object({
   email: z
     .string()
@@ -29,12 +27,8 @@ const schema = z.object({
   motDePasse: z.string().min(1, 'Mot de passe requis'),
   remember: z.boolean().optional(),
 });
-
 type FormData = z.infer<typeof schema>;
 
-/* ============================================================================
-   COMPOSANT
-   ============================================================================ */
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,26 +43,19 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      remember: true,
-    },
+    defaultValues: { remember: true },
   });
 
   const remember = watch('remember');
 
-  /* -------------------------------------------------------------------- */
-  /* SOUMISSION                                                          */
-  /* -------------------------------------------------------------------- */
   const onSubmit = async (data: FormData) => {
     try {
       const { data: res } = await api.post('/auth/login', {
         email: data.email,
         motDePasse: data.motDePasse,
       });
-
       const auth = res.data;
 
-      // Persistance du token
       setAuth({
         user: auth.user,
         accessToken: auth.accessToken,
@@ -76,8 +63,6 @@ export function LoginForm() {
       });
 
       toast.success(`Bienvenue ${auth.user.prenom} !`);
-
-      // Redirection
       const next = searchParams.get('next');
       const dashboard = ROLE_DASHBOARD[auth.user.role.nom] ?? '/';
       router.push(next ?? dashboard);
@@ -88,31 +73,47 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {/* -------- Email -------- */}
+      {/* Email */}
       <div>
-        <Label htmlFor="email">Adresse email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="vous@exemple.mg"
-          autoComplete="email"
-          autoFocus
-          disabled={isSubmitting}
-          {...register('email')}
-          className="mt-1.5"
-          aria-invalid={!!errors.email}
-        />
+        <Label htmlFor="email" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Adresse email
+        </Label>
+        <div className="relative mt-1.5">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            id="email"
+            type="email"
+            placeholder="vous@exemple.mg"
+            autoComplete="email"
+            autoFocus
+            disabled={isSubmitting}
+            {...register('email')}
+            className="h-11 pl-10"
+            aria-invalid={!!errors.email}
+          />
+        </div>
         {errors.email && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.email.message}
           </p>
         )}
       </div>
 
-      {/* -------- Mot de passe -------- */}
+      {/* Mot de passe */}
       <div>
-        <Label htmlFor="motDePasse">Mot de passe</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="motDePasse" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+            Mot de passe
+          </Label>
+          <a
+            href="/mot-de-passe-oublie"
+            className="text-xs font-medium text-orange-600 hover:underline dark:text-orange-400"
+          >
+            Oublié ?
+          </a>
+        </div>
         <div className="relative mt-1.5">
+          <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             id="motDePasse"
             type={showPassword ? 'text' : 'password'}
@@ -120,31 +121,27 @@ export function LoginForm() {
             autoComplete="current-password"
             disabled={isSubmitting}
             {...register('motDePasse')}
-            className="pr-10"
+            className="h-11 pl-10 pr-10"
             aria-invalid={!!errors.motDePasse}
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
             aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
             tabIndex={-1}
           >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
         {errors.motDePasse && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.motDePasse.message}
           </p>
         )}
       </div>
 
-      {/* -------- Se souvenir -------- */}
+      {/* Se souvenir */}
       <div className="flex items-center gap-2">
         <Checkbox
           id="remember"
@@ -152,23 +149,19 @@ export function LoginForm() {
           onCheckedChange={(v) => setValue('remember', !!v)}
           disabled={isSubmitting}
         />
-        <Label
-          htmlFor="remember"
-          className="text-sm text-odc-secondary cursor-pointer"
-        >
+        <Label htmlFor="remember" className="cursor-pointer text-sm text-slate-600 dark:text-slate-400">
           Se souvenir de moi
         </Label>
       </div>
 
-      {/* -------- Bouton -------- */}
+      {/* Bouton */}
       <Button
         type="submit"
-        variant="odc"
         size="lg"
         disabled={isSubmitting}
-        className="w-full"
+        className="h-11 w-full bg-slate-900 text-white shadow-md hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
       >
-        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Se connecter
       </Button>
     </form>

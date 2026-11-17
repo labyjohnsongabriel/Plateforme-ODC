@@ -5,7 +5,6 @@ import * as React from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
-import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,16 +38,20 @@ export function DatePicker({
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
+          variant="secondary"
           disabled={disabled}
           className={cn(
             'w-full justify-start text-left font-normal',
-            !date && 'text-odc-muted',
+            !date && 'text-slate-500 dark:text-slate-400',
             className,
           )}
+          leftIcon={<CalendarIcon className="h-4 w-4" />}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, 'PPP', { locale: fr }) : <span>{placeholder}</span>}
+          {date ? (
+            format(date, 'PPP', { locale: fr })
+          ) : (
+            <span>{placeholder}</span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">

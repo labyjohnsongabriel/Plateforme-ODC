@@ -1,53 +1,9 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { SessionService } from '../services/session.service';
-import { StatutSession } from '../models/Session.entity';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-
-export class SessionController {
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await SessionService.create(req.body), 'Session creee', 201); }
-    catch (e) { next(e); }
-  }
-  static async findAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const r = await SessionService.findAll(req.query);
-      return paginatedResponse(res, r.data, r.total, r.page, r.limit);
-    } catch (e) { next(e); }
-  }
-  static async findOne(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await SessionService.findById(req.params.id)); }
-    catch (e) { next(e); }
-  }
-  static async update(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await SessionService.update(req.params.id, req.body), 'Session mise a jour'); }
-    catch (e) { next(e); }
-  }
-  static async changerStatut(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await SessionService.changerStatut(req.params.id, req.body.statut), 'Statut modifie'); }
-    catch (e) { next(e); }
-  }
-  static async delete(req: Request, res: Response, next: NextFunction) {
-    try { await SessionService.delete(req.params.id); return successResponse(res, null, 'Session supprimee'); }
-    catch (e) { next(e); }
-  }
-  static async mesSessions(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await SessionService.findMesSessions(req.userId!)); }
-    catch (e) { next(e); }
-=======
 // src/controllers/SessionController.ts
 import { Request, Response, NextFunction } from 'express';
 import { SessionService } from '../services/session.service';
-import { StatutSession, ModaliteSession } from '../entities/enums';
-import {
-  successResponse,
-  paginatedResponse,
-} from '../utils/response.util';
-import {
-  BadRequestError,
-  NotFoundError,
-  ForbiddenError,
-} from '../errors/AppError';
+import { RoleName, StatutSession, ModaliteSession } from '../entities/enums';
+import { successResponse, paginatedResponse } from '../utils/response.util';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../errors/AppError';
 import { logger } from '../config/logger';
 
 /* ============================================================================
@@ -59,22 +15,18 @@ const VALID_MODALITES = Object.values(ModaliteSession);
 
 function validateStatut(statut: unknown): asserts statut is StatutSession {
   if (!statut || !VALID_STATUTS.includes(statut as StatutSession)) {
-    throw new BadRequestError(
-      `Statut invalide. Valeurs acceptées : ${VALID_STATUTS.join(', ')}`,
-    );
+    throw new BadRequestError(`Statut invalide. Valeurs acceptées : ${VALID_STATUTS.join(', ')}`);
   }
 }
 
-function validateModalite(
-  modalite: unknown,
-): asserts modalite is ModaliteSession {
+function validateModalite(modalite: unknown): asserts modalite is ModaliteSession {
   if (
     modalite !== undefined &&
     modalite !== '' &&
     !VALID_MODALITES.includes(modalite as ModaliteSession)
   ) {
     throw new BadRequestError(
-      `Modalité invalide. Valeurs acceptées : ${VALID_MODALITES.join(', ')}`,
+      `Modalité invalide. Valeurs acceptées : ${VALID_MODALITES.join(', ')}`
     );
   }
 }
@@ -94,9 +46,7 @@ function validateDates(dateDebut: unknown, dateFin: unknown): void {
     throw new BadRequestError('dateFin invalide');
   }
   if (fin <= debut) {
-    throw new BadRequestError(
-      'dateFin doit être postérieure à dateDebut',
-    );
+    throw new BadRequestError('dateFin doit être postérieure à dateDebut');
   }
 }
 
@@ -130,16 +80,12 @@ export class SessionController {
   /* ==========================================================================
      🌐 PUBLIC — Liste des sessions
      ========================================================================== */
-  static async listPublic(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async listPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const query: SessionQuery = {
         page: req.query.page as string,
         limit: req.query.limit as string,
-        q: req.query.q as string,
+        q: (req.query.q ?? req.query.search) as string,
         statut: req.query.statut as StatutSession,
         modalite: req.query.modalite as ModaliteSession,
         formationId: req.query.formationId as string,
@@ -153,8 +99,32 @@ export class SessionController {
         result.total,
         result.page,
         result.limit,
-        'Sessions ouvertes',
+        'Sessions ouvertes'
       );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* Public sessions for a formation. */
+  static async listPublicByFormation(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const formationId = req.params.formationId;
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          formationId
+        )
+      ) {
+        throw new BadRequestError('Identifiant de formation invalide');
+      }
+
+      const sessions = await SessionService.findPublicByFormation(formationId);
+      successResponse(res, sessions, 'Sessions publiques de la formation');
+      return;
     } catch (e) {
       next(e);
     }
@@ -163,20 +133,12 @@ export class SessionController {
   /* ==========================================================================
      🌐 PUBLIC — Détail par code
      ========================================================================== */
-  static async detailPublic(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async detailPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const session = await SessionService.findByCodePublic(
-        req.params.codeSession,
-      );
+      const session = await SessionService.findByCodePublic(req.params.codeSession);
 
       if (!session) {
-        throw new NotFoundError(
-          `Session "${req.params.codeSession}" introuvable`,
-        );
+        throw new NotFoundError(`Session "${req.params.codeSession}" introuvable`);
       }
 
       return successResponse(res, session);
@@ -188,11 +150,7 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Création
      ========================================================================== */
-  static async create(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { formationId, dateDebut, dateFin, modalite } = req.body;
 
@@ -214,11 +172,7 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Liste paginée
      ========================================================================== */
-  static async findAll(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const query: SessionQuery = {
         page: req.query.page as string,
@@ -234,13 +188,7 @@ export class SessionController {
 
       const result = await SessionService.findAll(query);
 
-      return paginatedResponse(
-        res,
-        result.data,
-        result.total,
-        result.page,
-        result.limit,
-      );
+      return paginatedResponse(res, result.data, result.total, result.page, result.limit);
     } catch (e) {
       next(e);
     }
@@ -251,11 +199,7 @@ export class SessionController {
      ⚠️ Route : GET /api/admin/sessions/stats
      ⚠️ DOIT ÊTRE DÉCLARÉE AVANT /:id dans les routes
      ========================================================================== */
-  static async getStats(
-    _req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async getStats(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const stats = await SessionService.getStats();
       return successResponse(res, stats, 'Statistiques des sessions');
@@ -267,16 +211,18 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Détail par ID
      ========================================================================== */
-  static async findOne(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async findOne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const session = await SessionService.findById(req.params.id);
 
       if (!session) {
         throw new NotFoundError('Session introuvable');
+      }
+      if (
+        (req.userRole ?? req.user?.role?.nom) === RoleName.FORMATEUR &&
+        session.formateurId !== getUserId(req)
+      ) {
+        throw new ForbiddenError('Vous ne pouvez consulter que vos sessions');
       }
 
       return successResponse(res, session);
@@ -290,11 +236,7 @@ export class SessionController {
      ⚠️ Route : GET /api/admin/sessions/:id/inscriptions
      ⚠️ DOIT ÊTRE DÉCLARÉE AVANT /:id dans les routes
      ========================================================================== */
-  static async getInscriptions(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async getInscriptions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const sessionId = req.params.id;
 
@@ -306,11 +248,7 @@ export class SessionController {
 
       const inscriptions = await SessionService.getInscriptions(sessionId);
 
-      return successResponse(
-        res,
-        inscriptions,
-        'Inscriptions de la session',
-      );
+      return successResponse(res, inscriptions, 'Inscriptions de la session');
     } catch (e) {
       next(e);
     }
@@ -321,11 +259,7 @@ export class SessionController {
      ⚠️ Route : GET /api/admin/sessions/:id/presences
      ⚠️ DOIT ÊTRE DÉCLARÉE AVANT /:id dans les routes
      ========================================================================== */
-  static async getPresences(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async getPresences(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const sessionId = req.params.id;
 
@@ -346,11 +280,7 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Mise à jour
      ========================================================================== */
-  static async update(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       // Validation modalité si présente
       if (req.body.modalite !== undefined) {
@@ -362,10 +292,7 @@ export class SessionController {
         validateDates(req.body.dateDebut, req.body.dateFin);
       }
 
-      const session = await SessionService.update(
-        req.params.id,
-        req.body,
-      );
+      const session = await SessionService.update(req.params.id, req.body);
 
       return successResponse(res, session, 'Session mise à jour');
     } catch (e) {
@@ -376,20 +303,13 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Changer le statut
      ========================================================================== */
-  static async changerStatut(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async changerStatut(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { statut } = req.body;
 
       validateStatut(statut);
 
-      const session = await SessionService.changerStatut(
-        req.params.id,
-        statut,
-      );
+      const session = await SessionService.changerStatut(req.params.id, statut);
 
       return successResponse(res, session, 'Statut modifié');
     } catch (e) {
@@ -400,27 +320,13 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Publier / Dépublier
      ========================================================================== */
-  static async publier(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async publier(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const estPubliee =
-        typeof req.body.estPubliee === 'boolean'
-          ? req.body.estPubliee
-          : true;
+      const estPubliee = typeof req.body.estPubliee === 'boolean' ? req.body.estPubliee : true;
 
-      const session = await SessionService.togglePublication(
-        req.params.id,
-        estPubliee,
-      );
+      const session = await SessionService.togglePublication(req.params.id, estPubliee);
 
-      return successResponse(
-        res,
-        session,
-        estPubliee ? 'Session publiée' : 'Session dépubliée',
-      );
+      return successResponse(res, session, estPubliee ? 'Session publiée' : 'Session dépubliée');
     } catch (e) {
       next(e);
     }
@@ -429,24 +335,21 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Ouvrir / Fermer présence
      ========================================================================== */
-  static async ouvrirPresence(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async ouvrirPresence(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const ouverte = req.body.ouverte !== false;
+      const role = req.userRole ?? req.user?.role?.nom;
+      if (role === RoleName.FORMATEUR) {
+        const session = await SessionService.findById(req.params.id);
+        if (!session) throw new NotFoundError('Session introuvable');
+        if (session.formateurId !== getUserId(req)) {
+          throw new ForbiddenError('Vous ne pouvez gérer que les présences de vos sessions');
+        }
+      }
 
-      const session = await SessionService.ouvrirPresence(
-        req.params.id,
-        ouverte,
-      );
+      const session = await SessionService.ouvrirPresence(req.params.id, ouverte);
 
-      return successResponse(
-        res,
-        session,
-        ouverte ? 'Présence ouverte' : 'Présence fermée',
-      );
+      return successResponse(res, session, ouverte ? 'Présence ouverte' : 'Présence fermée');
     } catch (e) {
       next(e);
     }
@@ -455,11 +358,7 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Suppression
      ========================================================================== */
-  static async delete(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       await SessionService.delete(req.params.id);
       return successResponse(res, null, 'Session supprimée');
@@ -471,11 +370,7 @@ export class SessionController {
   /* ==========================================================================
      🔒 STAFF / ADMIN — Dupliquer une session
      ========================================================================== */
-  static async dupliquer(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async dupliquer(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const session = await SessionService.dupliquer(req.params.id);
       return successResponse(res, session, 'Session dupliquée', 201);
@@ -487,11 +382,7 @@ export class SessionController {
   /* ==========================================================================
      🔒 FORMATEUR — Mes sessions
      ========================================================================== */
-  static async mesSessions(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async mesSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = getUserId(req);
       const data = await SessionService.findMesSessions(userId);
@@ -504,12 +395,16 @@ export class SessionController {
   /* ==========================================================================
      🔒 FORMATEUR / STAFF — Participants d'une session
      ========================================================================== */
-  static async participants(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async participants(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const session = await SessionService.findById(req.params.id);
+      if (!session) throw new NotFoundError('Session introuvable');
+      if (
+        (req.userRole ?? req.user?.role?.nom) === RoleName.FORMATEUR &&
+        session.formateurId !== getUserId(req)
+      ) {
+        throw new ForbiddenError('Vous ne pouvez consulter que les participants de vos sessions');
+      }
       const data = await SessionService.getParticipants(req.params.id);
       return successResponse(res, data, 'Participants');
     } catch (e) {
@@ -520,17 +415,12 @@ export class SessionController {
   /* ==========================================================================
      🔒 STATISTIQUES — Détail d'une session
      ========================================================================== */
-  static async statistiques(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  static async statistiques(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const stats = await SessionService.getStatistiques(req.params.id);
       return successResponse(res, stats, 'Statistiques');
     } catch (e) {
       next(e);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

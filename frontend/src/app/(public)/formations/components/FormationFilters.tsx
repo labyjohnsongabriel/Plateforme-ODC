@@ -4,18 +4,9 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  X,
-  SlidersHorizontal,
-  Search,
-  Check,
-  ChevronDown,
+  X, SlidersHorizontal, Check, ChevronDown, Award, Sparkles,
 } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,30 +16,28 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useDomainesPublic } from '@/hooks/queries/useDomaines';
 
-/* ============================================================================
-   CONSTANTES
-   ============================================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const NIVEAUX = [
-  { value: 'DEBUTANT', label: 'Débutant', color: 'text-emerald-600' },
-  { value: 'INTERMEDIAIRE', label: 'Intermédiaire', color: 'text-amber-600' },
-  { value: 'AVANCE', label: 'Avancé', color: 'text-rose-600' },
+  { value: 'DEBUTANT', label: 'Débutant', dot: 'bg-emerald-500' },
+  { value: 'INTERMEDIAIRE', label: 'Intermédiaire', dot: 'bg-amber-500' },
+  { value: 'AVANCE', label: 'Avancé', dot: 'bg-rose-500' },
 ] as const;
 
-/* ============================================================================
-   TYPES
-   ============================================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROPS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface FormationFiltersProps {
-  /** Mode mobile (collapse) */
   isMobile?: boolean;
-  /** Callback quand un filtre change (mobile) */
   onFilterChange?: () => void;
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPOSANT
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function FormationFilters({
   isMobile = false,
@@ -63,63 +52,64 @@ export function FormationFilters({
   const selectedNiveaux = searchParams.getAll('niveau');
   const certifianteFilter = searchParams.get('certifiante') === 'true';
 
-  const hasFilters =
-    !!selectedDomaine ||
-    selectedNiveaux.length > 0 ||
-    certifianteFilter;
+  const activeCount =
+    (selectedDomaine ? 1 : 0) +
+    selectedNiveaux.length +
+    (certifianteFilter ? 1 : 0);
+  const hasFilters = activeCount > 0;
 
-  /* -------------------- Helpers -------------------- */
-  const updateParams = (key: string, value: string | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('page');
-    if (value === null) params.delete(key);
-    else params.set(key, value);
-    router.push(`/formations?${params.toString()}`, { scroll: false });
-    onFilterChange?.();
-  };
+  /* ═══════ Navigation ═══════ */
+  const navigate = React.useCallback(
+    (mutate: (p: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('page');
+      mutate(params);
+      router.push(`/formations?${params.toString()}`, { scroll: false });
+      onFilterChange?.();
+    },
+    [router, searchParams, onFilterChange],
+  );
 
-  const toggleNiveau = (niveau: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('page');
-    const current = params.getAll('niveau');
-    params.delete('niveau');
+  const setDomaine = (slug: string | null) =>
+    navigate((p) => (slug ? p.set('domaine', slug) : p.delete('domaine')));
 
-    if (current.includes(niveau)) {
-      current
-        .filter((n) => n !== niveau)
-        .forEach((n) => params.append('niveau', n));
-    } else {
-      [...current, niveau].forEach((n) => params.append('niveau', n));
-    }
-    router.push(`/formations?${params.toString()}`, { scroll: false });
-    onFilterChange?.();
-  };
+  const toggleNiveau = (niveau: string) =>
+    navigate((p) => {
+      const current = p.getAll('niveau');
+      p.delete('niveau');
+      const next = current.includes(niveau)
+        ? current.filter((n) => n !== niveau)
+        : [...current, niveau];
+      next.forEach((n) => p.append('niveau', n));
+    });
 
-  const toggleCertifiante = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('page');
-    if (certifianteFilter) params.delete('certifiante');
-    else params.set('certifiante', 'true');
-    router.push(`/formations?${params.toString()}`, { scroll: false });
-    onFilterChange?.();
-  };
+  const toggleCertifiante = () =>
+    navigate((p) =>
+      certifianteFilter ? p.delete('certifiante') : p.set('certifiante', 'true'),
+    );
 
   const clearAll = () => {
-    router.push('/formations');
+    router.push('/formations', { scroll: false });
     onFilterChange?.();
   };
 
-  /* -------------------- Rendu -------------------- */
   return (
-    <Card className={cn(isMobile && 'border-0 shadow-none')}>
-      <CardHeader>
+    <Card
+      className={cn(
+        'overflow-hidden border-border/60',
+        isMobile && 'border-0 shadow-none',
+      )}
+    >
+      <CardHeader className="border-b border-border bg-muted/30">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
-            <SlidersHorizontal className="h-4 w-4 text-odc-primary" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-sm">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden />
+            </div>
             Filtres
-            {hasFilters && (
-              <Badge variant="secondary" className="ml-1 text-xs">
-                {selectedNiveaux.length + (selectedDomaine ? 1 : 0) + (certifianteFilter ? 1 : 0)}
+            {activeCount > 0 && (
+              <Badge className="ml-1 bg-orange-500 text-white hover:bg-orange-600">
+                {activeCount}
               </Badge>
             )}
           </CardTitle>
@@ -129,135 +119,134 @@ export function FormationFilters({
               variant="ghost"
               size="sm"
               onClick={clearAll}
-              className="text-xs text-odc-text-muted hover:text-odc-error"
+              className="text-xs text-muted-foreground hover:text-destructive"
             >
-              <X className="mr-1 h-3 w-3" />
-              Réinitialiser
+              <X className="mr-1 h-3 w-3" aria-hidden /> Réinitialiser
             </Button>
           )}
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        {/* ================================================================
-            DOMAINES
-            ================================================================ */}
+      <CardContent className="space-y-6 p-5">
+        {/* ═══════ Domaines ═══════ */}
         <div>
           <button
             type="button"
             onClick={() => setDomainesOpen(!domainesOpen)}
-            className="mb-3 flex w-full items-center justify-between text-sm font-semibold text-odc-text-primary"
+            aria-expanded={domainesOpen}
+            className="mb-3 flex w-full items-center justify-between text-sm font-semibold text-foreground"
           >
-            Domaine
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-orange-500" aria-hidden />
+              Domaine
+            </span>
             <ChevronDown
               className={cn(
-                'h-4 w-4 text-odc-text-muted transition-transform',
+                'h-4 w-4 text-muted-foreground transition-transform',
                 domainesOpen && 'rotate-180',
               )}
+              aria-hidden
             />
           </button>
 
-          {domainesOpen && (
-            <>
-              {isLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-8" />
-                  ))}
-                </div>
-              ) : (
-                <div className="max-h-64 space-y-1 overflow-y-auto scrollbar-thin pr-2">
-                  {/* "Tous" */}
-                  <button
-                    type="button"
-                    onClick={() => updateParams('domaine', null)}
-                    className={cn(
-                      'flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors',
-                      !selectedDomaine
-                        ? 'bg-odc-primary-soft font-medium text-odc-primary-active'
-                        : 'hover:bg-odc-surface-hover',
-                    )}
-                  >
-                    <span>Tous les domaines</span>
-                    {!selectedDomaine && (
-                      <Check className="h-3.5 w-3.5" />
-                    )}
-                  </button>
+          {domainesOpen &&
+            (isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-9" />
+                ))}
+              </div>
+            ) : (
+              <div className="max-h-64 space-y-1 overflow-y-auto pr-2 scrollbar-thin">
+                <button
+                  type="button"
+                  onClick={() => setDomaine(null)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                    !selectedDomaine
+                      ? 'bg-orange-50 font-semibold text-orange-700 dark:bg-orange-950/40 dark:text-orange-300'
+                      : 'hover:bg-muted',
+                  )}
+                >
+                  <span>Tous les domaines</span>
+                  {!selectedDomaine && (
+                    <Check className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                </button>
 
-                  {domaines.map((d) => {
-                    const isSelected = selectedDomaine === d.slug;
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => updateParams('domaine', d.slug)}
-                        className={cn(
-                          'flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
-                          isSelected
-                            ? 'bg-odc-primary-soft font-medium text-odc-primary-active'
-                            : 'hover:bg-odc-surface-hover',
+                {domaines.map((d) => {
+                  const isSelected = selectedDomaine === d.slug;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDomaine(d.slug)}
+                      className={cn(
+                        'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                        isSelected
+                          ? 'bg-orange-50 font-semibold text-orange-700 dark:bg-orange-950/40 dark:text-orange-300'
+                          : 'hover:bg-muted',
+                      )}
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        {d.couleur && (
+                          <span
+                            className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white"
+                            style={{ backgroundColor: d.couleur }}
+                            aria-hidden
+                          />
                         )}
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          {d.couleur && (
-                            <span
-                              className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white"
-                              style={{ backgroundColor: d.couleur }}
-                            />
-                          )}
-                          <span className="truncate">{d.nom}</span>
-                        </span>
-                        {isSelected && (
-                          <Check className="h-3.5 w-3.5 shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
+                        <span className="truncate">{d.nom}</span>
+                      </span>
+                      {isSelected && (
+                        <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
         </div>
 
         <Separator />
 
-        {/* ================================================================
-            NIVEAUX
-            ================================================================ */}
+        {/* ═══════ Niveaux ═══════ */}
         <div>
-          <h4 className="mb-3 text-sm font-semibold text-odc-text-primary">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Award className="h-4 w-4 text-orange-500" aria-hidden />
             Niveau
           </h4>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {NIVEAUX.map((n) => {
               const isChecked = selectedNiveaux.includes(n.value);
               return (
                 <label
                   key={n.value}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors',
+                    'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 transition-colors',
                     isChecked
-                      ? 'bg-odc-primary-soft/50'
-                      : 'hover:bg-odc-surface-hover',
+                      ? 'bg-orange-50 dark:bg-orange-950/40'
+                      : 'hover:bg-muted',
                   )}
                 >
                   <Checkbox
                     id={`niveau-${n.value}`}
                     checked={isChecked}
                     onCheckedChange={() => toggleNiveau(n.value)}
+                    className="border-border data-[state=checked]:border-orange-500 data-[state=checked]:bg-orange-500"
                   />
                   <Label
                     htmlFor={`niveau-${n.value}`}
                     className={cn(
                       'flex-1 cursor-pointer text-sm',
-                      isChecked && 'font-medium',
+                      isChecked && 'font-semibold',
                     )}
                   >
                     {n.label}
                   </Label>
                   <span
-                    className={cn('h-2 w-2 rounded-full', n.color)}
-                    style={{ backgroundColor: 'currentColor' }}
+                    className={cn('h-2 w-2 rounded-full', n.dot)}
+                    aria-hidden
                   />
                 </label>
               );
@@ -267,64 +256,60 @@ export function FormationFilters({
 
         <Separator />
 
-        {/* ================================================================
-            FORMATION CERTIFIANTE
-            ================================================================ */}
-        <div>
-          <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-odc-surface-hover">
-            <Checkbox
-              id="certifiante"
-              checked={certifianteFilter}
-              onCheckedChange={toggleCertifiante}
-            />
-            <Label htmlFor="certifiante" className="cursor-pointer text-sm">
-              Formation certifiante uniquement
-            </Label>
-          </label>
-        </div>
+        {/* ═══════ Certifiante ═══════ */}
+        <label
+          className={cn(
+            'flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 transition-colors',
+            certifianteFilter
+              ? 'bg-amber-50 dark:bg-amber-950/40'
+              : 'hover:bg-muted',
+          )}
+        >
+          <Checkbox
+            id="certifiante"
+            checked={certifianteFilter}
+            onCheckedChange={toggleCertifiante}
+            className="border-border data-[state=checked]:border-amber-500 data-[state=checked]:bg-amber-500"
+          />
+          <Label
+            htmlFor="certifiante"
+            className="flex flex-1 cursor-pointer items-center gap-1.5 text-sm"
+          >
+            <Award className="h-4 w-4 text-amber-500" aria-hidden />
+            Formation certifiante
+          </Label>
+        </label>
 
-        {/* ================================================================
-            FILTRES ACTIFS
-            ================================================================ */}
+        {/* ═══════ Filtres actifs ═══════ */}
         {hasFilters && (
           <>
             <Separator />
             <div>
-              <h4 className="mb-3 text-sm font-semibold text-odc-text-primary">
-                Filtres actifs
+              <h4 className="mb-3 text-sm font-semibold text-foreground">
+                Filtres actifs ({activeCount})
               </h4>
               <div className="flex flex-wrap gap-2">
                 {selectedDomaine && (
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer gap-1 text-xs hover:bg-odc-surface-alt"
-                    onClick={() => updateParams('domaine', null)}
-                  >
-                    {domaines.find((d) => d.slug === selectedDomaine)?.nom ??
-                      selectedDomaine}
-                    <X className="h-3 w-3" />
-                  </Badge>
+                  <FilterChip
+                    label={
+                      domaines.find((d) => d.slug === selectedDomaine)?.nom ??
+                      selectedDomaine
+                    }
+                    onRemove={() => setDomaine(null)}
+                  />
                 )}
                 {selectedNiveaux.map((n) => (
-                  <Badge
+                  <FilterChip
                     key={n}
-                    variant="secondary"
-                    className="cursor-pointer gap-1 text-xs hover:bg-odc-surface-alt"
-                    onClick={() => toggleNiveau(n)}
-                  >
-                    {NIVEAUX.find((x) => x.value === n)?.label ?? n}
-                    <X className="h-3 w-3" />
-                  </Badge>
+                    label={NIVEAUX.find((x) => x.value === n)?.label ?? n}
+                    onRemove={() => toggleNiveau(n)}
+                  />
                 ))}
                 {certifianteFilter && (
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer gap-1 text-xs hover:bg-odc-surface-alt"
-                    onClick={toggleCertifiante}
-                  >
-                    Certifiante
-                    <X className="h-3 w-3" />
-                  </Badge>
+                  <FilterChip
+                    label="Certifiante"
+                    onRemove={toggleCertifiante}
+                  />
                 )}
               </div>
             </div>
@@ -332,5 +317,36 @@ export function FormationFilters({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHIP DE FILTRE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function FilterChip({
+  label,
+  onRemove,
+}: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <Badge
+      className="cursor-pointer gap-1 border-orange-200 bg-orange-50 text-xs text-orange-700 transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300"
+      role="button"
+      tabIndex={0}
+      onClick={onRemove}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onRemove();
+        }
+      }}
+      aria-label={`Retirer le filtre ${label}`}
+    >
+      {label}
+      <X className="h-3 w-3" aria-hidden />
+    </Badge>
   );
 }

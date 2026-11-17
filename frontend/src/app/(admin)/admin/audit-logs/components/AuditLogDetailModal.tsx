@@ -5,7 +5,6 @@ import {
   Activity,
   Clock,
   Globe,
-  User,
   Database,
   FileJson,
   Monitor,
@@ -17,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/formatters';
@@ -41,24 +39,24 @@ export function AuditLogDetailModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[92vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         {/* En-tête */}
-        <DialogHeader className="shrink-0 border-b border-odc-border bg-odc-surface px-6 py-5">
+        <DialogHeader className="shrink-0 border-b border-border bg-card px-6 py-5">
           <div className="flex items-start gap-4">
             <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-odc-500 to-odc-700 shadow-odc-md"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-md ring-1 ring-primary/20"
               aria-hidden="true"
             >
-              <Activity className="h-6 w-6 text-white" />
+              <Activity className="h-6 w-6 text-primary-foreground" />
             </div>
 
             <div className="min-w-0 flex-1">
-              <DialogTitle className="font-display text-lg font-bold">
+              <DialogTitle className="font-display text-lg font-bold text-foreground">
                 Détail du log
               </DialogTitle>
-              <DialogDescription className="mt-0.5 text-sm">
+              <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
                 {log?.action ? (
                   <>
                     Action{' '}
-                    <code className="rounded bg-odc-surface-alt px-1.5 py-0.5 font-mono text-xs">
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                       {log.action}
                     </code>
                   </>
@@ -75,7 +73,7 @@ export function AuditLogDetailModal({
           {isLoading ? (
             <DetailSkeleton />
           ) : !log ? (
-            <p className="text-sm italic text-odc-text-muted">
+            <p className="text-sm italic text-muted-foreground">
               Log introuvable.
             </p>
           ) : (
@@ -134,77 +132,58 @@ export function AuditLogDetailModal({
 
               {/* Utilisateur */}
               {log.user && (
-                <div className="rounded-lg border border-odc-border p-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
-                    Utilisateur
-                  </p>
+                <SectionCard title="Utilisateur">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-odc-primary-soft text-sm font-bold text-odc-primary">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary dark:bg-primary/15">
                       {log.user.prenom?.charAt(0)}
                       {log.user.nom?.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-odc-text-primary">
+                      <p className="truncate text-sm font-semibold text-foreground">
                         {log.user.prenom} {log.user.nom}
                       </p>
-                      <p className="truncate text-xs text-odc-text-muted">
+                      <p className="truncate text-xs text-muted-foreground">
                         {log.user.email}
                       </p>
                     </div>
                   </div>
-                </div>
+                </SectionCard>
               )}
 
               {/* URL */}
               {log.url && (
-                <div className="rounded-lg border border-odc-border p-4">
-                  <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
-                    <Globe className="h-3.5 w-3.5" />
-                    URL
-                  </p>
-                  <code className="block break-all font-mono text-xs text-odc-text-primary">
+                <SectionCard title="URL" icon={Globe}>
+                  <code className="block break-all font-mono text-xs text-foreground">
                     {log.url}
                   </code>
-                </div>
+                </SectionCard>
               )}
 
               {/* User-Agent */}
               {log.userAgent && (
-                <div className="rounded-lg border border-odc-border p-4">
-                  <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
-                    <Monitor className="h-3.5 w-3.5" />
-                    User-Agent
-                  </p>
-                  <p className="break-all text-xs text-odc-text-secondary">
+                <SectionCard title="User-Agent" icon={Monitor}>
+                  <p className="break-all text-xs text-muted-foreground">
                     {log.userAgent}
                   </p>
-                </div>
+                </SectionCard>
               )}
 
               {/* Payload */}
               {log.payload && Object.keys(log.payload).length > 0 && (
-                <div className="rounded-lg border border-odc-border p-4">
-                  <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
-                    <FileJson className="h-3.5 w-3.5" />
-                    Payload
-                  </p>
-                  <pre className="scrollbar-thin overflow-x-auto rounded-md bg-odc-surface-alt p-3 font-mono text-xs text-odc-text-primary">
+                <SectionCard title="Payload" icon={FileJson}>
+                  <pre className="scrollbar-thin overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs text-foreground">
                     {JSON.stringify(log.payload, null, 2)}
                   </pre>
-                </div>
+                </SectionCard>
               )}
 
               {/* Changes */}
               {log.changes && Object.keys(log.changes).length > 0 && (
-                <div className="rounded-lg border border-odc-border p-4">
-                  <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
-                    <FileJson className="h-3.5 w-3.5" />
-                    Modifications
-                  </p>
-                  <pre className="scrollbar-thin overflow-x-auto rounded-md bg-odc-surface-alt p-3 font-mono text-xs text-odc-text-primary">
+                <SectionCard title="Modifications" icon={FileJson}>
+                  <pre className="scrollbar-thin overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs text-foreground">
                     {JSON.stringify(log.changes, null, 2)}
                   </pre>
-                </div>
+                </SectionCard>
               )}
             </div>
           )}
@@ -214,9 +193,29 @@ export function AuditLogDetailModal({
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    SOUS-COMPOSANTS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function SectionCard({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon?: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
+        {title}
+      </p>
+      {children}
+    </div>
+  );
+}
 
 interface InfoItemProps {
   icon: React.ElementType;
@@ -234,14 +233,17 @@ function InfoItem({
   truncate,
 }: InfoItemProps) {
   return (
-    <div className="rounded-lg border border-odc-border p-3">
+    <div className="rounded-lg border border-border p-3">
       <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-odc-text-muted" />
-        <p className="text-xs font-medium text-odc-text-muted">{label}</p>
+        <Icon
+          className="h-3.5 w-3.5 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
       </div>
       <p
         className={cn(
-          'mt-1 text-sm font-semibold text-odc-text-primary',
+          'mt-1 text-sm font-semibold text-foreground',
           mono && 'font-mono text-xs',
           truncate && 'truncate',
         )}

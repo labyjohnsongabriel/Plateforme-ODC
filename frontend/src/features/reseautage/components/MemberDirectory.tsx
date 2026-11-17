@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Users } from 'lucide-react';
 
 import { Card } from '@/components/common/Card';
@@ -43,23 +43,24 @@ export function MemberDirectory({
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
 
-  // Callback de recherche
   const handleSearchChange = (value: string) => {
     setSearch(value);
-    onSearch?.(debouncedSearch);
   };
+
+  useEffect(() => {
+    onSearch?.(debouncedSearch);
+  }, [debouncedSearch, onSearch]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-odc-text-light dark:text-odc-text-dark mb-1">
+          <h1 className="mb-1 font-heading text-2xl font-bold text-odc-text-light dark:text-odc-text-dark">
             Réseau
           </h1>
           <p className="text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark">
-            {members.length} membre{members.length > 1 ? 's' : ''} dans la
-            communauté ODC
+            {members.length} membre{members.length > 1 ? 's' : ''} dans la communauté ODC
           </p>
         </div>
       </div>
@@ -84,7 +85,7 @@ export function MemberDirectory({
           description="Essayez de modifier votre recherche ou revenez plus tard"
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {members.map((member) => (
             <MemberCard
               key={member.id}

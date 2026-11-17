@@ -15,6 +15,7 @@ import { Card } from '@/components/common/Card';
 import { Badge } from '@/components/common/Badge';
 import { IconButton } from '@/components/common/IconButton';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/common/Dropdown';
+import { getMediaUrl } from '@/lib/media';
 
 interface PartenaireCardProps {
   partenaire: Partenaire;
@@ -32,14 +33,10 @@ export function PartenaireCard({
   return (
     <Card hover className="group relative">
       {/* Actions dropdown */}
-      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      <div className="absolute right-3 top-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
         <Dropdown
           trigger={
-            <IconButton
-              icon={<MoreVertical size={16} />}
-              variant="ghost"
-              size="sm"
-            />
+            <IconButton icon={<MoreVertical size={16} />} variant="ghost" size="sm" />
           }
         >
           <DropdownItem icon={<Edit size={14} />} onClick={onEdit}>
@@ -54,14 +51,14 @@ export function PartenaireCard({
 
       {/* Header */}
       <div onClick={onClick} className="cursor-pointer">
-        <div className="flex items-start gap-4 mb-4">
+        <div className="mb-4 flex items-start gap-4">
           {/* Logo */}
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-odc-primary to-odc-primary-dark flex items-center justify-center text-white flex-shrink-0 overflow-hidden shadow-odc-md">
+          <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-odc-primary to-odc-primary-dark text-white shadow-odc-md">
             {partenaire.logoUrl ? (
               <img
-                src={partenaire.logoUrl}
+                src={getMediaUrl(partenaire.logoUrl)}
                 alt={partenaire.nom}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
             ) : (
               <Building2 size={26} />
@@ -69,12 +66,12 @@ export function PartenaireCard({
           </div>
 
           {/* Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-heading font-semibold text-odc-text-light dark:text-odc-text-dark truncate">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-heading font-semibold text-odc-text-light dark:text-odc-text-dark">
               {partenaire.nom}
             </h3>
 
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               {partenaire.secteur && (
                 <Badge variant="primary" size="xs">
                   {partenaire.secteur}
@@ -89,7 +86,7 @@ export function PartenaireCard({
 
         {/* Description */}
         {partenaire.description && (
-          <p className="text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark line-clamp-2 mb-4">
+          <p className="mb-4 line-clamp-2 text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark">
             {partenaire.description}
           </p>
         )}
@@ -128,13 +125,13 @@ export function PartenaireCard({
 
       {/* Site web */}
       {partenaire.siteWeb && (
-        <div className="mt-4 pt-4 border-t border-odc-border-light dark:border-odc-border-dark">
+        <div className="mt-4 border-t border-odc-border-light pt-4 dark:border-odc-border-dark">
           <a
             href={partenaire.siteWeb}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2 text-xs text-odc-primary hover:underline font-medium"
+            className="flex items-center gap-2 text-xs font-medium text-odc-primary hover:underline"
           >
             <Globe size={12} />
             Visiter le site web

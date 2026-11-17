@@ -36,6 +36,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils';
+import { getMediaUrl } from '@/lib/media';
 import {
   usePartenaires,
   useTogglePublishPartenaire,
@@ -51,7 +52,7 @@ import { DeletePartnerDialog } from './DeletePartnerDialog';
 function TableSkeleton() {
   return (
     <Card className="overflow-hidden">
-      <div className="divide-y divide-odc-border">
+      <div className="divide-odc-border divide-y">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 p-4">
             <Skeleton className="h-12 w-12 rounded-lg" />
@@ -78,17 +79,18 @@ export function PartnersTable() {
   const filters = {
     page: Number(searchParams.get('page')) || 1,
     limit: 10,
-    statut:
-      (searchParams.get('statut') as 'all' | 'published' | 'draft') ?? 'all',
+    statut: (searchParams.get('statut') as 'all' | 'published' | 'draft') ?? 'all',
   };
 
   const { data, isLoading, isError } = usePartenaires(filters);
   const togglePublish = useTogglePublishPartenaire();
 
-  const [editingPartenaire, setEditingPartenaire] =
-    React.useState<Partenaire | null>(null);
-  const [deletingPartenaire, setDeletingPartenaire] =
-    React.useState<Partenaire | null>(null);
+  const [editingPartenaire, setEditingPartenaire] = React.useState<Partenaire | null>(
+    null,
+  );
+  const [deletingPartenaire, setDeletingPartenaire] = React.useState<Partenaire | null>(
+    null,
+  );
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
 
   if (isLoading) return <TableSkeleton />;
@@ -156,16 +158,16 @@ export function PartnersTable() {
             {partenaires.map((p) => (
               <TableRow
                 key={p.id}
-                className="group transition-colors hover:bg-odc-surface-hover"
+                className="hover:bg-odc-surface-hover group transition-colors"
               >
                 {/* Partenaire */}
                 <TableCell>
                   <div className="flex items-center gap-3">
                     {p.logoUrl ? (
                       <img
-                        src={p.logoUrl}
+                        src={getMediaUrl(p.logoUrl)}
                         alt=""
-                        className="h-11 w-11 shrink-0 rounded-lg bg-odc-surface-alt object-contain ring-1 ring-odc-border"
+                        className="bg-odc-surface-alt ring-odc-border h-11 w-11 shrink-0 rounded-lg object-contain ring-1"
                       />
                     ) : (
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-odc-primary-soft">
@@ -173,10 +175,10 @@ export function PartnersTable() {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-odc-text-primary">
+                      <p className="text-odc-text-primary truncate text-sm font-semibold">
                         {p.nom}
                       </p>
-                      <p className="truncate font-mono text-xs text-odc-text-muted">
+                      <p className="text-odc-text-muted truncate font-mono text-xs">
                         {p.slug}
                       </p>
                     </div>
@@ -184,13 +186,13 @@ export function PartnersTable() {
                 </TableCell>
 
                 {/* Secteur */}
-                <TableCell className="hidden md:table-cell text-sm">
+                <TableCell className="hidden text-sm md:table-cell">
                   {p.secteur ? (
-                    <span className="inline-flex items-center rounded-full bg-odc-surface-alt px-2.5 py-0.5 text-xs font-medium text-odc-text-secondary">
+                    <span className="bg-odc-surface-alt text-odc-text-secondary inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
                       {p.secteur}
                     </span>
                   ) : (
-                    <span className="text-xs text-odc-text-muted">—</span>
+                    <span className="text-odc-text-muted text-xs">—</span>
                   )}
                 </TableCell>
 
@@ -198,14 +200,14 @@ export function PartnersTable() {
                 <TableCell className="hidden lg:table-cell">
                   <div className="space-y-1 text-xs">
                     {p.contactEmail && (
-                      <div className="flex items-center gap-1.5 text-odc-text-secondary">
-                        <Mail className="h-3 w-3 shrink-0 text-odc-text-muted" />
+                      <div className="text-odc-text-secondary flex items-center gap-1.5">
+                        <Mail className="text-odc-text-muted h-3 w-3 shrink-0" />
                         <span className="truncate">{p.contactEmail}</span>
                       </div>
                     )}
                     {p.contactTel && (
-                      <div className="flex items-center gap-1.5 text-odc-text-secondary">
-                        <Phone className="h-3 w-3 shrink-0 text-odc-text-muted" />
+                      <div className="text-odc-text-secondary flex items-center gap-1.5">
+                        <Phone className="text-odc-text-muted h-3 w-3 shrink-0" />
                         <span className="truncate">{p.contactTel}</span>
                       </div>
                     )}
@@ -225,7 +227,7 @@ export function PartnersTable() {
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-odc-text-muted">
-                        <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-odc-text-muted" />
+                        <span className="bg-odc-text-muted mr-1.5 h-1.5 w-1.5 rounded-full" />
                         Brouillon
                       </Badge>
                     )}
@@ -252,9 +254,7 @@ export function PartnersTable() {
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem
-                        onClick={() => setEditingPartenaire(p)}
-                      >
+                      <DropdownMenuItem onClick={() => setEditingPartenaire(p)}>
                         <Edit className="mr-2 h-4 w-4" />
                         Modifier
                       </DropdownMenuItem>
@@ -283,9 +283,7 @@ export function PartnersTable() {
 
                       {p.siteWeb && (
                         <DropdownMenuItem
-                          onClick={() =>
-                            window.open(p.siteWeb, '_blank', 'noopener')
-                          }
+                          onClick={() => window.open(p.siteWeb, '_blank', 'noopener')}
                         >
                           <Globe className="mr-2 h-4 w-4" />
                           Visiter le site
@@ -296,7 +294,7 @@ export function PartnersTable() {
                       <DropdownMenuSeparator />
 
                       <DropdownMenuItem
-                        className="text-odc-error focus:bg-odc-error-soft focus:text-odc-error"
+                        className="focus:bg-odc-error-soft text-odc-error focus:text-odc-error"
                         onClick={() => setDeletingPartenaire(p)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />

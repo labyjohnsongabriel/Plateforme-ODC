@@ -1,16 +1,13 @@
+// src/app/(staff)/staff/notes/page.tsx
 import type { Metadata } from 'next';
-import { NotesTable } from './components/NotesTable';
+import { StaffNotesContent } from './components/StaffNotesContent';
 
-export const metadata: Metadata = { title: 'Notes' };
+export const metadata: Metadata = { title: 'Notes — Staff' };
 
-export default function NotesPage() {
+export default function StaffNotesPage() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <header>
-        <h1 className="font-display text-2xl md:text-3xl font-bold">Notes</h1>
-        <p className="text-odc-muted mt-1">Consultez les notes des participants</p>
-      </header>
-      <NotesTable />
+      <StaffNotesContent />
     </div>
   );
 }

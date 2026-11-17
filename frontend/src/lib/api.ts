@@ -1,93 +1,29 @@
-<<<<<<< HEAD
-import axios from 'axios';
-import type { AxiosError, AxiosInstance } from 'axios';
-import { tokenStorage } from '@/services/api';
-
-const API_URL = import.meta.env.VITE_API_URL ?? '/api';
-
-// ============================================================================
-//  AXIOS INSTANCE
-// ============================================================================
-
-export const api: AxiosInstance = axios.create({
-    baseURL: API_URL,
-    withCredentials: true,
-    headers: { 'Content-Type': 'application/json' },
-});
-
-// ============================================================================
-//  TOKEN STORAGE
-// ============================================================================
-
-export { tokenStorage };
-
-// ============================================================================
-//  INTERCEPTEUR REQUÊTE — Ajoute le token Bearer
-// ============================================================================
-
-api.interceptors.request.use(
-    (config) => {
-        const token = tokenStorage.getAccessToken();
-        console.log('[API] Token envoyé :', token ? 'OUI' : 'NON');
-
-        if (token && config.headers) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
-
-// ============================================================================
-//  INTERCEPTEUR RÉPONSE — Refresh token sur 401
-// ============================================================================
-
-api.interceptors.response.use(
-    (response) => response.data,
-    async (err: AxiosError) => {
-        const original: any = err.config;
-
-        if (err.response?.status === 401 && !original._retry) {
-            original._retry = true;
-            const refreshToken = tokenStorage.getRefreshToken();
-
-            if (refreshToken) {
-                try {
-                    const { data } = await axios.post(`${API_URL}/auth/refresh`, {
-                        refreshToken,
-                    });
-                    tokenStorage.setTokens(data.data.accessToken, data.data.refreshToken);
-                    original.headers.Authorization = `Bearer ${data.data.accessToken}`;
-                    return api(original);
-                } catch {
-                    localStorage.clear();
-                    window.location.href = '/login';
-                }
-            }
-        }
-        return Promise.reject(err.response?.data ?? err);
-    }
-);
-
-=======
 // src/lib/api.ts
-import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  type AxiosError,
+  type AxiosInstance,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 
-/* ============================================================================
-   CONFIGURATION
-   ============================================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-const API_TIMEOUT = 30_000;
+const API_BASE_URL = `${API_URL}/api`;
 
-/* ============================================================================
-   INSTANCE AXIOS
-   ============================================================================ */
+interface RetryConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INSTANCE
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const api: AxiosInstance = axios.create({
-  baseURL: `${API_URL}/api`,
-  timeout: API_TIMEOUT,
+  baseURL: API_BASE_URL,
+  timeout: 30_000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -95,21 +31,67 @@ export const api: AxiosInstance = axios.create({
   },
 });
 
-/* ============================================================================
-   INTERCEPTEUR — REQUÊTE (⭐ LECTURE DEPUIS ZUSTAND)
-   ============================================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ VERROU GLOBAL DE REFRESH + FILE D'ATTENTE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let isRefreshing = false;
+
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null) => {
+  failedQueue.forEach((p) => {
+    if (error) p.reject(error);
+    else if (token) p.resolve(token);
+  });
+  failedQueue = [];
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ ROUTES À NE PAS RETENTER (évite la boucle)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const NO_REFRESH_ROUTES = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+];
+
+// ⭐ `/auth/me` est la route qui CONFIRME l'auth.
+// Si elle renvoie 401, on déconnecte directement (pas de refresh).
+const AUTH_CHECK_ROUTE = '/auth/me';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERCEPTEUR REQUEST — ajout du token
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    // ⭐ Lire le token depuis Zustand (source de vérité unique)
-    const token = useAuthStore.getState().accessToken;
+  (config) => {
+    const state = useAuthStore.getState();
+    const token = state.accessToken;
 
-    if (token && config.headers) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[API REQUEST]', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        hasToken: !!token,
+        tokenPreview: token ? `${token.slice(0, 30)}...` : null,
+        isAuthenticated: state.isAuthenticated,
+        isHydrated: state.isHydrated,
+      });
+    }
+
+    if (token) {
+      config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Identifiant unique pour le traçage
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      config.headers = config.headers ?? {};
       config.headers['X-Request-Id'] = crypto.randomUUID();
     }
 
@@ -118,176 +100,170 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-/* ============================================================================
-   QUEUE DE REFRESH
-   ============================================================================ */
-
-interface RetryConfig extends InternalAxiosRequestConfig {
-  _retry?: boolean;
-  _retryCount?: number;
-}
-
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: any) => void;
-}> = [];
-
-function processQueue(error: any, token: string | null = null) {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else if (token) {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-}
-
-/* ============================================================================
-   INTERCEPTEUR — RÉPONSE (refresh auto + retry 5xx)
-   ============================================================================ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERCEPTEUR RESPONSE — refresh unique + anti-boucle
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetryConfig | undefined;
+    const request = error.config as RetryConfig | undefined;
+    const status = error.response?.status;
+    const url = request?.url ?? '';
 
-    /* -------------------- Pas de config ou pas de réponse -------------------- */
-    if (!originalRequest || !error.response) {
-      // Erreur réseau ou timeout
-      if (error.code === 'ECONNABORTED') {
-        console.warn('[API] Timeout dépassé');
-      }
+    /* ---------- Log ---------- */
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[API ERROR]', {
+        method: request?.method?.toUpperCase(),
+        url,
+        status,
+        message:
+          (error.response?.data as { message?: string })?.message ??
+          error.message,
+      });
+    }
+
+    /* ---------- 1. Pas 401 → abandon ---------- */
+    if (status !== 401 || !request) {
       return Promise.reject(error);
     }
 
-    const { status } = error.response;
-
-    /* ==================== 401 — Refresh automatique ==================== */
-    if (status === 401 && !originalRequest._retry) {
-      // Ne pas boucler sur les endpoints d'auth
-      const url = originalRequest.url ?? '';
-      if (
-        url.includes('/auth/refresh') ||
-        url.includes('/auth/login') ||
-        url.includes('/auth/register')
-      ) {
-        return Promise.reject(error);
-      }
-
-      const { refreshToken, setTokens, clearAuth } = useAuthStore.getState();
-
-      // Pas de refresh token → déconnexion
-      if (!refreshToken) {
-        console.warn('[API] 401 sans refresh token → déconnexion');
-        clearAuth();
-        redirectToLogin();
-        return Promise.reject(error);
-      }
-
-      // Si un refresh est déjà en cours, mettre en file d'attente
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({
-            resolve: (token: string) => {
-              if (originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-              }
-              resolve(api(originalRequest));
-            },
-            reject,
-          });
-        });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // ⭐ Appel direct avec axios (pas l'instance `api`) pour éviter la boucle
-        const { data } = await axios.post<{
-          data: { accessToken: string; refreshToken: string };
-        }>(
-          `${API_URL}/api/auth/refresh`,
-          { refreshToken },
-          { withCredentials: true },
-        );
-
-        const { accessToken, refreshToken: newRefreshToken } = data.data;
-
-        // ⭐ Mettre à jour Zustand (source de vérité)
-        setTokens(accessToken, newRefreshToken);
-
-        // Traiter la file d'attente
-        processQueue(null, accessToken);
-
-        // Rejouer la requête originale
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        }
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Échec du refresh → déconnexion
-        processQueue(refreshError, null);
-        clearAuth();
-        redirectToLogin();
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    /* ---------- 2. Route de login/register/refresh → abandon ---------- */
+    if (NO_REFRESH_ROUTES.some((r) => url.includes(r))) {
+      return Promise.reject(error);
     }
 
-    /* ==================== 403 — Accès refusé ==================== */
-    if (status === 403) {
-      console.warn('[API] 403 Accès refusé :', originalRequest.url);
+    /* ---------- 3. ⭐ /auth/me 401 → logout direct (anti-boucle) ---------- */
+    if (url.includes(AUTH_CHECK_ROUTE)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[API] /auth/me 401 → logout direct');
+      }
+      useAuthStore.getState().clearAuth();
+      redirectToLogin();
+      return Promise.reject(error);
     }
 
-    /* ==================== 429 — Rate limit ==================== */
-    if (status === 429) {
-      console.warn('[API] 429 Trop de requêtes');
+    /* ---------- 4. Déjà tenté → abandon (anti-boucle) ---------- */
+    if (request._retry) {
+      useAuthStore.getState().clearAuth();
+      redirectToLogin();
+      return Promise.reject(error);
     }
 
-    /* ==================== 5xx — Retry automatique ==================== */
-    if (status >= 500 && (originalRequest._retryCount ?? 0) < 2) {
-      originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1;
-      const delay = Math.pow(2, originalRequest._retryCount) * 1000;
+    /* ---------- 5. Pas de refresh token → logout ---------- */
+    const { refreshToken, setTokens, clearAuth } = useAuthStore.getState();
+    if (!refreshToken) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[API] 401 sans refresh token → logout');
+      }
+      clearAuth();
+      redirectToLogin();
+      return Promise.reject(error);
+    }
 
-      console.warn(
-        `[API] ${status} — Retry ${originalRequest._retryCount}/2 dans ${delay}ms`,
+    /* ---------- 6. ⭐ Un refresh est déjà en cours → file d'attente ---------- */
+    if (isRefreshing) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Refresh déjà en cours, mise en file…', url);
+      }
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then((newToken) => {
+          request.headers = request.headers ?? {};
+          request.headers.Authorization = `Bearer ${newToken}`;
+          return api(request);
+        })
+        .catch((err) => Promise.reject(err));
+    }
+
+    /* ---------- 7. Lancer le refresh ---------- */
+    request._retry = true;
+    isRefreshing = true;
+
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Tentative de refresh…');
+      }
+
+      const { data } = await axios.post<{
+        data: { accessToken: string; refreshToken: string };
+      }>(
+        `${API_BASE_URL}/auth/refresh`,
+        { refreshToken },
+        { withCredentials: true },
       );
 
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      return api(originalRequest);
-    }
+      const newAccessToken = data?.data?.accessToken;
+      const newRefreshToken = data?.data?.refreshToken;
 
-    return Promise.reject(error);
+      if (!newAccessToken) {
+        throw new Error('Refresh : token manquant dans la réponse');
+      }
+
+      /* ---------- Sauvegarder les nouveaux tokens ---------- */
+      setTokens(newAccessToken, newRefreshToken ?? refreshToken);
+
+      /* ---------- Libérer les requêtes en attente ---------- */
+      processQueue(null, newAccessToken);
+
+      /* ---------- Rejouer la requête initiale ---------- */
+      request.headers = request.headers ?? {};
+      request.headers.Authorization = `Bearer ${newAccessToken}`;
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Refresh OK, retry:', url);
+      }
+
+      return api(request);
+    } catch (refreshError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[API] Refresh échoué → logout');
+      }
+
+      /* ---------- Libérer la file avec erreur ---------- */
+      processQueue(refreshError, null);
+
+      /* ---------- Déconnecter ---------- */
+      clearAuth();
+      redirectToLogin();
+
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * Redirige vers la page de connexion (une seule fois).
- */
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return;
 
-  const currentPath = window.location.pathname;
-  if (currentPath.startsWith('/connexion')) return;
+  /* ---------- Éviter la boucle sur la page de login ---------- */
+  const loginPaths = ['/connexion', '/login', '/signin'];
+  if (loginPaths.some((p) => window.location.pathname.startsWith(p))) return;
 
-  const next = encodeURIComponent(currentPath + window.location.search);
+  /* ---------- ⭐ Éviter les redirections en boucle ---------- */
+  const redirectKey = '__auth_redirect_at';
+  const lastRedirect = sessionStorage.getItem(redirectKey);
+  const now = Date.now();
+  if (lastRedirect && now - Number(lastRedirect) < 5000) {
+    // déjà redirigé dans les 5 dernières secondes → ne pas boucler
+    return;
+  }
+  sessionStorage.setItem(redirectKey, String(now));
+
+  const next = encodeURIComponent(
+    window.location.pathname + window.location.search,
+  );
   window.location.href = `/connexion?next=${next}`;
 }
 
-/* ============================================================================
-   HELPERS PUBLICS
-   ============================================================================ */
-
 export function getApiUrl(path = ''): string {
-  return `${API_URL}/api${path.startsWith('/') ? path : `/${path}`}`;
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 export function isNetworkError(error: unknown): boolean {
@@ -305,5 +281,4 @@ export function getStatusCode(error: unknown): number | null {
   return axios.isAxiosError(error) ? error.response?.status ?? null : null;
 }
 
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 export default api;

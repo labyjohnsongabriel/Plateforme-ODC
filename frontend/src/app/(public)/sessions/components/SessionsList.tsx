@@ -14,7 +14,6 @@ import {
   Filter,
   Search,
   X,
-  Sparkles,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSessionsPublic } from '@/hooks/queries/useSessions';
 import { formatDate } from '@/lib/formatters';
+import { StatutSession, type Session } from '@/types/session.types';
 
 /* ============================================================================
    CONFIGURATION
@@ -51,14 +51,6 @@ const STATUT_CONFIG = {
     label: 'En cours',
     className: 'bg-amber-50 text-amber-700 ring-amber-200',
   },
-  TERMINEE: {
-    label: 'Terminée',
-    className: 'bg-odc-surface-alt text-odc-text-secondary ring-odc-border',
-  },
-  ANNULEE: {
-    label: 'Annulée',
-    className: 'bg-red-50 text-red-700 ring-red-200',
-  },
 } as const;
 
 /* ============================================================================
@@ -67,13 +59,14 @@ const STATUT_CONFIG = {
 
 export function SessionsList() {
   const [search, setSearch] = React.useState('');
-  const [statutFilter, setStatutFilter] = React.useState('all');
+  const [statutFilter, setStatutFilter] = React.useState<'all' | StatutSession>('all');
+  const [page, setPage] = React.useState(1);
   const debouncedSearch = useDebounce(search, 400);
 
-  const { data, isLoading } = useSessionsPublic({
-    page: 1,
-    limit: 20,
-    search: debouncedSearch || undefined,
+  const { data, isLoading, isError } = useSessionsPublic({
+    page,
+    limit: 12,
+    q: debouncedSearch || undefined,
     statut: statutFilter !== 'all' ? statutFilter : undefined,
   });
 
@@ -83,6 +76,7 @@ export function SessionsList() {
   const clearFilters = () => {
     setSearch('');
     setStatutFilter('all');
+    setPage(1);
   };
 
   const hasFilters = !!search || statutFilter !== 'all';
@@ -98,17 +92,29 @@ export function SessionsList() {
           <div className="flex flex-wrap items-center gap-3">
             {/* Recherche */}
             <div className="relative min-w-[220px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-odc-text-muted" />
+              <Search className="text-odc-text-muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
               <Input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Rechercher une session, une formation..."
                 className="pl-9"
               />
             </div>
 
             {/* Statut */}
-            <Select value={statutFilter} onValueChange={setStatutFilter}>
+            <Select
+              value={statutFilter}
+              onValueChange={(value) => {
+                const status = Object.values(StatutSession).find(
+                  (item) => item === value,
+                );
+                setStatutFilter(status ?? 'all');
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Tous les statuts" />
               </SelectTrigger>
@@ -117,7 +123,6 @@ export function SessionsList() {
                 <SelectItem value="OUVERTE">Inscriptions ouvertes</SelectItem>
                 <SelectItem value="PLANIFIEE">Planifiées</SelectItem>
                 <SelectItem value="EN_COURS">En cours</SelectItem>
-                <SelectItem value="TERMINEE">Terminées</SelectItem>
               </SelectContent>
             </Select>
 
@@ -143,10 +148,18 @@ export function SessionsList() {
         </div>
       )}
 
+      {isError && (
+        <Card>
+          <CardContent className="text-odc-text-muted p-8 text-center text-sm">
+            Impossible de charger les sessions. Veuillez réessayer dans un instant.
+          </CardContent>
+        </Card>
+      )}
+
       {/* ================================================================
           VIDE
           ================================================================ */}
-      {!isLoading && sessions.length === 0 && (
+      {!isLoading && !isError && sessions.length === 0 && (
         <Card className="p-12">
           <EmptyState
             icon={CalendarX}
@@ -170,11 +183,37 @@ export function SessionsList() {
       {/* ================================================================
           LISTE
           ================================================================ */}
-      {!isLoading && sessions.length > 0 && (
-        <div className="space-y-4">
-          {sessions.map((s) => (
-            <SessionCard key={s.id} session={s} />
-          ))}
+      {!isLoading && !isError && sessions.length > 0 && (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            {sessions.map((s) => (
+              <SessionCard key={s.id} session={s} />
+            ))}
+          </div>
+          {data?.pagination && data.pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-odc-text-muted text-sm">
+                Page {data.pagination.page} sur {data.pagination.totalPages} ·{' '}
+                {data.pagination.total} sessions
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!data.pagination.hasPrev}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Précédent
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!data.pagination.hasNext}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Suivant
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -186,7 +225,7 @@ export function SessionsList() {
    ============================================================================ */
 
 interface SessionCardProps {
-  session: any;
+  session: Session;
 }
 
 function SessionCard({ session }: SessionCardProps) {
@@ -205,7 +244,7 @@ function SessionCard({ session }: SessionCardProps) {
   return (
     <Card
       className={cn(
-        'group overflow-hidden transition-all duration-odc-base',
+        'duration-odc-base group overflow-hidden transition-all',
         'hover:shadow-odc-md',
         canRegister && 'border-odc-success/30 hover:border-odc-success',
       )}
@@ -216,7 +255,7 @@ function SessionCard({ session }: SessionCardProps) {
           <div className="min-w-0 space-y-4">
             {/* Badges haut */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs font-semibold text-odc-text-primary">
+              <span className="text-odc-text-primary font-mono text-xs font-semibold">
                 {session.codeSession}
               </span>
               <span
@@ -227,34 +266,26 @@ function SessionCard({ session }: SessionCardProps) {
               >
                 {config.label}
               </span>
-              {session.formation?.certifiante && (
-                <Badge className="gap-1 bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-50">
-                  <Sparkles className="h-3 w-3" />
-                  Certifiante
-                </Badge>
-              )}
             </div>
 
             {/* Titre */}
             <div>
-              <h3 className="font-display text-lg font-semibold leading-tight text-odc-text-primary transition-colors group-hover:text-odc-primary">
+              <h3 className="font-display text-odc-text-primary text-lg font-semibold leading-tight transition-colors group-hover:text-odc-primary">
                 {session.formation?.titre ?? 'Formation'}
               </h3>
               {session.formateur && (
-                <p className="mt-1 text-xs text-odc-text-muted">
-                  Formateur : {session.formateur.prenom}{' '}
-                  {session.formateur.nom}
+                <p className="text-odc-text-muted mt-1 text-xs">
+                  Formateur : {session.formateur.prenom} {session.formateur.nom}
                 </p>
               )}
             </div>
 
             {/* Métadonnées */}
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-odc-text-secondary">
+            <div className="text-odc-text-secondary flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4 shrink-0 text-odc-primary" />
                 <span className="whitespace-nowrap">
-                  {formatDate(session.dateDebut)} →{' '}
-                  {formatDate(session.dateFin)}
+                  {formatDate(session.dateDebut)} → {formatDate(session.dateFin)}
                 </span>
               </div>
 
@@ -274,11 +305,7 @@ function SessionCard({ session }: SessionCardProps) {
 
               <div className="flex items-center gap-1.5">
                 <Users className="h-4 w-4 shrink-0 text-odc-primary" />
-                <span
-                  className={cn(
-                    isFull && 'font-semibold text-odc-error',
-                  )}
-                >
+                <span className={cn(isFull && 'font-semibold text-odc-error')}>
                   {isFull
                     ? 'Complet'
                     : `${placesRestantes} place${placesRestantes > 1 ? 's' : ''} restante${placesRestantes > 1 ? 's' : ''}`}
@@ -289,14 +316,13 @@ function SessionCard({ session }: SessionCardProps) {
             {/* Barre de remplissage */}
             {session.capacite > 0 && (
               <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs text-odc-text-muted">
+                <div className="text-odc-text-muted flex items-center justify-between text-xs">
                   <span>
-                    {session.inscriptionsCount ?? 0} / {session.capacite}{' '}
-                    inscrit(s)
+                    {session.inscriptionsCount ?? 0} / {session.capacite} inscrit(s)
                   </span>
                   <span>{Math.round(fillPercent)}%</span>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-odc-surface-alt">
+                <div className="bg-odc-surface-alt h-1.5 w-full overflow-hidden rounded-full">
                   <div
                     className={cn(
                       'h-full rounded-full transition-all',
@@ -336,9 +362,7 @@ function SessionCard({ session }: SessionCardProps) {
             )}
 
             <Button variant="outline" asChild>
-              <Link href={`/sessions/${session.codeSession}`}>
-                Voir les détails
-              </Link>
+              <Link href={`/sessions/${session.codeSession}`}>Voir les détails</Link>
             </Button>
           </div>
         </div>

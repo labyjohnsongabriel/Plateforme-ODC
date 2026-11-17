@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { formatDate, formatDateTime } from '@/lib/formatters';
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
 
 /* ============================================================================
    CONFIGURATION
@@ -63,7 +64,7 @@ const STATUT_CONFIG = {
    ============================================================================ */
 
 export function MyPresencesList() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['participant', 'presences'],
     queryFn: async () => {
       const { data } = await api.get('/participant/presences');
@@ -99,18 +100,10 @@ export function MyPresencesList() {
   if (isError) {
     return (
       <Card>
-        <EmptyState
-          icon={AlertCircle}
-          title="Erreur de chargement"
+        <QueryErrorState
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
           description="Impossible de charger vos présences."
-          action={
-            <Button
-              variant="outline"
-              onClick={() => window.location.reload()}
-            >
-              Réessayer
-            </Button>
-          }
         />
       </Card>
     );

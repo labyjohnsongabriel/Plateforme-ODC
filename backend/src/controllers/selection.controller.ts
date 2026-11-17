@@ -1,77 +1,82 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { AppDataSource } from '../config/database';
-import { Inscription, StatutInscription } from '../models/Inscription.entity';
-import { Session, StatutSession } from '../models/Session.entity';
-import { User } from '../models/User.entity';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-import { getPagination } from '../utils/pagination.util';
-import { NotFoundError, ConflictError } from '../errors/AppError';
-import { NotificationService } from '../services/notification.service';
-import { TypeNotification } from '../models/Notification.entity';
-import { logger } from '../config/logger';
-import { In } from 'typeorm';
-
-export class SelectionController {
-  /**
-   * GET /api/selections/session/:sessionId/candidats
-   * Liste les candidats d'une session (staff ODC)
-   */
-  static async candidatsParSession(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const { sessionId } = req.params;
-      const { page, limit, skip } = getPagination(req.query.page, req.query.limit);
-
-      // Vérifier la session
-      const session = await AppDataSource.getRepository(Session).findOne({
-        where: { id: sessionId },
-        relations: ['formation'],
-      });
-      if (!session) throw new NotFoundError('Session introuvable');
-
-      const qb = AppDataSource.getRepository(Inscription)
-        .createQueryBuilder('i')
-        .leftJoinAndSelect('i.participant', 'p')
-        .leftJoinAndSelect('p.role', 'r')
-        .where('i.session_id = :sid', { sid: sessionId });
-
-=======
-// src/controllers/SelectionController.ts
+// src/controllers/selection.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Inscription } from '../entities/Inscription.entity';
 import { Session } from '../entities/Session.entity';
-import { User } from '../entities/User.entity';
 import {
   StatutInscription,
   TypeNotification,
-} from '../entities/enums'; // ⭐ Importer depuis enums
+  RoleName,
+} from '../entities/enums';
 import { successResponse } from '../utils/response.util';
 import { getPagination } from '../utils/pagination.util';
 import {
   NotFoundError,
   ConflictError,
   BadRequestError,
+  ForbiddenError,
 } from '../errors/AppError';
 import { NotificationService } from '../services/notification.service';
 import { logger } from '../config/logger';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const inscriptionRepo = () => AppDataSource.getRepository(Inscription);
 const sessionRepo = () => AppDataSource.getRepository(Session);
 
+function getUserId(req: Request): string {
+  const userId = (req as any).user?.sub ?? (req as any).userId;
+  if (!userId) throw new BadRequestError('Utilisateur non authentifié');
+  return userId;
+}
+
+function getUserRole(req: Request): RoleName {
+  const role = (req as any).userRole ?? (req as any).user?.role?.nom;
+  if (!role) throw new ForbiddenError('Rôle utilisateur introuvable');
+  return role;
+}
+
+function validateUuid(value: string, field: string): void {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw new BadRequestError(`${field} doit être un UUID valide`);
+  }
+}
+
+function canManageSession(
+  session: { formateurId?: string | null },
+  userId: string,
+  userRole: RoleName,
+): boolean {
+  return (
+    userRole === RoleName.ADMINISTRATEUR ||
+    userRole === RoleName.STAFF_ODC ||
+    (userRole === RoleName.FORMATEUR && session.formateurId === userId)
+  );
+}
+
 /**
- * Récupère le nombre de places disponibles d'une session.
+ * ⭐ Récupère la capacité avec fallback multiple
+ */
+function getCapacite(session: Session): number {
+  const s = session as any;
+  const cap =
+    s.placesMax ?? s.capacite ?? s.places_max ?? 0;
+  return Math.max(0, Number(cap) || 0);
+}
+
+/**
+ * ⭐ Récupère les places disponibles (avec fallback illimité si 0)
  */
 async function getPlacesDisponibles(session: Session): Promise<number> {
+  const capacite = getCapacite(session);
+
   const acceptedCount = await inscriptionRepo().count({
     where: {
       sessionId: session.id,
@@ -79,21 +84,28 @@ async function getPlacesDisponibles(session: Session): Promise<number> {
     },
   });
 
-  // ⭐ Utilise placesMax (propriété TS), pas capacite
-  const capacite = session.placesMax ?? 0;
+  /* ⭐ Si capacité = 0 → illimité (permet quand même d'accepter) */
+  if (capacite <= 0) {
+    logger.warn('[Selection] Session sans capacité → illimité', {
+      sessionId: session.id,
+      codeSession: session.codeSession,
+      placesMax: (session as any).placesMax,
+      capacite: (session as any).capacite,
+    });
+    return 999;
+  }
+
   return Math.max(0, capacite - acceptedCount);
 }
 
-/**
- * Valide que le statut est modifiable manuellement.
- */
-function validateStatutSelection(statut: unknown): asserts statut is StatutInscription {
+function validateStatutSelection(
+  statut: unknown,
+): asserts statut is StatutInscription {
   const allowed = [
     StatutInscription.ACCEPTEE,
     StatutInscription.REFUSEE,
     StatutInscription.LISTE_ATTENTE,
   ];
-
   if (!statut || !allowed.includes(statut as StatutInscription)) {
     throw new BadRequestError(
       `Statut invalide. Valeurs autorisées : ${allowed.join(', ')}`,
@@ -101,28 +113,27 @@ function validateStatutSelection(statut: unknown): asserts statut is StatutInscr
   }
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    CONTROLLER
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export class SelectionController {
-  /* ==========================================================================
-     GET /api/selections/session/:sessionId/candidats
-     Liste des candidats d'une session (staff ODC)
-     ========================================================================== */
-  static async candidatsParSession(
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 LISTER LES CANDIDATS
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async findCandidats(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
       const { sessionId } = req.params;
-      const { page, limit, skip } = getPagination(
-        req.query.page,
-        req.query.limit,
-      );
+      validateUuid(sessionId, 'sessionId');
 
-      /* -------------------- Vérifier la session -------------------- */
+      const userId = getUserId(req);
+      const userRole = getUserRole(req);
+
+      /* 1. Session */
       const session = await sessionRepo().findOne({
         where: { id: sessionId },
         relations: ['formation'],
@@ -132,54 +143,68 @@ export class SelectionController {
         throw new NotFoundError('Session introuvable');
       }
 
-      /* -------------------- QueryBuilder -------------------- */
+      /* 2. Vérifier droits */
+      if (
+        !canManageSession(
+          { formateurId: session.formateurId },
+          userId,
+          userRole,
+        )
+      ) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas consulter les candidats de cette session',
+        );
+      }
+
+      /* 3. QueryBuilder */
       const qb = inscriptionRepo()
         .createQueryBuilder('i')
         .leftJoinAndSelect('i.participant', 'p')
-        .leftJoinAndSelect('p.role', 'r')
-        // ⭐ CORRECTION : i.sessionId (propriété TS), pas i.session_id (colonne DB)
         .where('i.sessionId = :sid', { sid: sessionId });
 
-      /* -------------------- Filtre statut -------------------- */
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-      if (req.query.statut) {
-        qb.andWhere('i.statut = :st', { st: req.query.statut });
+      const statutFilter = req.query.statut as string | undefined;
+      if (
+        statutFilter &&
+        ['EN_ATTENTE', 'ACCEPTEE', 'REFUSEE', 'LISTE_ATTENTE'].includes(
+          statutFilter,
+        )
+      ) {
+        qb.andWhere('i.statut = :st', { st: statutFilter });
       }
 
-<<<<<<< HEAD
-      qb.orderBy('i.date_inscription', 'ASC').skip(skip).take(limit);
+      const limit = Math.min(Number(req.query.limit) || 200, 500);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
 
-      const [data, total] = await qb.getManyAndCount();
+      qb.orderBy('i.createdAt', 'ASC').skip(offset).take(limit);
 
-      // Statistiques de la session
-      const stats = {
-        total,
-        enAttente: await AppDataSource.getRepository(Inscription).count({
-          where: { sessionId, statut: StatutInscription.EN_ATTENTE },
-        }),
-        acceptees: await AppDataSource.getRepository(Inscription).count({
-          where: { sessionId, statut: StatutInscription.ACCEPTEE },
-        }),
-        refusees: await AppDataSource.getRepository(Inscription).count({
-          where: { sessionId, statut: StatutInscription.REFUSEE },
-        }),
-        capacite: session.capacite,
-        placesRestantes: Math.max(
-          0,
-          session.capacite -
-            (await AppDataSource.getRepository(Inscription).count({
-              where: { sessionId, statut: StatutInscription.ACCEPTEE },
-            }))
-        ),
-      };
-=======
-      /* -------------------- Tri + Pagination -------------------- */
-      // ⭐ CORRECTION : i.createdAt (propriété TS), pas i.date_inscription
-      qb.orderBy('i.createdAt', 'ASC').skip(skip).take(limit);
+      const [inscriptions, total] = await qb.getManyAndCount();
 
-      const [data, total] = await qb.getManyAndCount();
+      /* ⭐ Transformer en candidats (format attendu par le front) */
+      const candidats = inscriptions
+        .filter((i) => i.participant)
+        .map((i) => ({
+          id: i.id,
+          inscriptionId: i.id,
+          statut: i.statut,
+          dateInscription: i.createdAt,
+          participantId: i.participant?.id,
+          prenom: i.participant?.prenom ?? '',
+          nom: i.participant?.nom ?? '',
+          email: i.participant?.email ?? '',
+          telephone: i.participant?.telephone ?? null,
+          photoUrl: i.participant?.photoUrl ?? null,
+          motivation: i.motivation ?? null,
+          /* ⭐ Aussi en objet imbriqué pour compatibilité */
+          participant: {
+            id: i.participant?.id,
+            prenom: i.participant?.prenom ?? '',
+            nom: i.participant?.nom ?? '',
+            email: i.participant?.email ?? '',
+            telephone: i.participant?.telephone ?? null,
+          },
+        }));
 
-      /* -------------------- Statistiques -------------------- */
+      /* ⭐ Stats */
       const [enAttente, acceptees, refusees, listeAttente] = await Promise.all([
         inscriptionRepo().count({
           where: { sessionId, statut: StatutInscription.EN_ATTENTE },
@@ -195,60 +220,263 @@ export class SelectionController {
         }),
       ]);
 
-      // ⭐ Utilise placesMax
-      const capacite = session.placesMax ?? 0;
-      const placesRestantes = Math.max(0, capacite - acceptees);
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+      const capacite = getCapacite(session);
+      const placesRestantes =
+        capacite > 0 ? Math.max(0, capacite - acceptees) : 999;
 
-      return res.json({
-        success: true,
-        data,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-<<<<<<< HEAD
-        stats,
-=======
-        stats: {
-          total,
-          enAttente,
-          acceptees,
-          refusees,
-          listeAttente,
-          capacite,
-          placesRestantes,
-        },
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+      logger.info('[SELECTION] Candidats récupérés', {
+        sessionId,
+        codeSession: session.codeSession,
+        total,
+        enAttente,
+        acceptees,
+        refusees,
+        capacite,
+        placesRestantes,
+        userId,
+        userRole,
       });
+
+      successResponse(
+        res,
+        {
+          sessionId,
+          codeSession: session.codeSession,
+          session: {
+            id: session.id,
+            codeSession: session.codeSession,
+            placesMax: capacite,
+            capacite,
+            placesRestantes,
+            formation: session.formation
+              ? {
+                  id: session.formation.id,
+                  titre: session.formation.titre,
+                }
+              : null,
+          },
+          candidats,
+          stats: {
+            total,
+            enAttente,
+            acceptes: acceptees,
+            acceptees,
+            refuses: refusees,
+            refusees,
+            listeAttente,
+            capacite,
+            placesRestantes,
+            tauxRemplissage:
+              capacite > 0
+                ? Math.round((acceptees / capacite) * 100)
+                : 0,
+          },
+          pagination: {
+            limit,
+            offset,
+            count: candidats.length,
+            total,
+          },
+        },
+        'Candidats de la session',
+      );
+    } catch (e) {
+      logger.error('[SELECTION] findCandidats failed', {
+        error: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack?.split('\n').slice(0, 3) : undefined,
+      });
+      next(e);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     ✅ ACCEPTER UN CANDIDAT (individuel)
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async accepter(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { inscriptionId } = req.params;
+      validateUuid(inscriptionId, 'inscriptionId');
+
+      const userId = getUserId(req);
+      const userRole = getUserRole(req);
+
+      const inscription = await inscriptionRepo().findOne({
+        where: { id: inscriptionId },
+        relations: ['participant', 'session', 'session.formation'],
+      });
+
+      if (!inscription) {
+        throw new NotFoundError('Inscription introuvable');
+      }
+
+      if (
+        !canManageSession(
+          { formateurId: inscription.session?.formateurId },
+          userId,
+          userRole,
+        )
+      ) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas accepter cette inscription',
+        );
+      }
+
+      if (inscription.statut === StatutInscription.ACCEPTEE) {
+        successResponse(
+          res,
+          { inscriptionId, statut: 'ACCEPTEE' },
+          'Déjà acceptée',
+        );
+        return;
+      }
+
+      if (inscription.session) {
+        const placesDisponibles = await getPlacesDisponibles(
+          inscription.session,
+        );
+        if (placesDisponibles <= 0) {
+          throw new ConflictError('Aucune place disponible');
+        }
+      }
+
+      inscription.statut = StatutInscription.ACCEPTEE;
+      inscription.motifRefus = null;
+      await inscriptionRepo().save(inscription);
+
+      try {
+        const formationTitre =
+          inscription.session?.formation?.titre ?? 'la formation';
+        await NotificationService.create({
+          userId: inscription.participantId,
+          titre: '🎉 Inscription acceptée',
+          message: `Vous êtes accepté(e) pour « ${formationTitre} »`,
+          type: TypeNotification.SUCCESS,
+          metadata: {
+            sessionId: inscription.sessionId,
+            inscriptionId: inscription.id,
+          },
+        });
+      } catch (notifError) {
+        logger.warn(
+          `[Selection] Notification échouée pour ${inscription.id}:`,
+          notifError,
+        );
+      }
+
+      logger.info(
+        `✅ Candidat accepté : inscription=${inscriptionId} session=${inscription.session?.codeSession} par=${userId}`,
+      );
+
+      successResponse(
+        res,
+        { inscriptionId, statut: 'ACCEPTEE' },
+        'Candidat accepté',
+      );
     } catch (e) {
       next(e);
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * POST /api/selections/session/:sessionId/selectionner
-   * Sélection en masse (accepter/refuser plusieurs candidats)
-   */
-  static async selectionnerEnMasse(
+  /* ══════════════════════════════════════════════════════════════════════════
+     ❌ REFUSER UN CANDIDAT (individuel)
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async refuser(
     req: Request,
     res: Response,
-    next: NextFunction
-  ) {
-=======
-  /* ==========================================================================
-     POST /api/selections/session/:sessionId/selectionner
-     Sélection en masse
-     ========================================================================== */
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { inscriptionId } = req.params;
+      validateUuid(inscriptionId, 'inscriptionId');
+
+      const userId = getUserId(req);
+      const userRole = getUserRole(req);
+      const motifRefus =
+        (req.body?.motif as string | undefined) ??
+        (req.body?.motifRefus as string | undefined);
+
+      const inscription = await inscriptionRepo().findOne({
+        where: { id: inscriptionId },
+        relations: ['participant', 'session', 'session.formation'],
+      });
+
+      if (!inscription) {
+        throw new NotFoundError('Inscription introuvable');
+      }
+
+      if (
+        !canManageSession(
+          { formateurId: inscription.session?.formateurId },
+          userId,
+          userRole,
+        )
+      ) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas refuser cette inscription',
+        );
+      }
+
+      if (inscription.statut === StatutInscription.REFUSEE) {
+        successResponse(
+          res,
+          { inscriptionId, statut: 'REFUSEE' },
+          'Déjà refusée',
+        );
+        return;
+      }
+
+      inscription.statut = StatutInscription.REFUSEE;
+      if (motifRefus) inscription.motifRefus = motifRefus;
+      await inscriptionRepo().save(inscription);
+
+      try {
+        const formationTitre =
+          inscription.session?.formation?.titre ?? 'la formation';
+        await NotificationService.create({
+          userId: inscription.participantId,
+          titre: '❌ Inscription refusée',
+          message: `Votre inscription à « ${formationTitre} » a été refusée.${
+            motifRefus ? ` Motif : ${motifRefus}` : ''
+          }`,
+          type: TypeNotification.ERROR,
+          metadata: {
+            sessionId: inscription.sessionId,
+            inscriptionId: inscription.id,
+          },
+        });
+      } catch (notifError) {
+        logger.warn(
+          `[Selection] Notification échouée pour ${inscription.id}:`,
+          notifError,
+        );
+      }
+
+      logger.info(
+        `❌ Candidat refusé : inscription=${inscriptionId} session=${inscription.session?.codeSession} par=${userId}`,
+      );
+
+      successResponse(
+        res,
+        { inscriptionId, statut: 'REFUSEE' },
+        'Candidat refusé',
+      );
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 SÉLECTION EN MASSE
+     ══════════════════════════════════════════════════════════════════════════ */
   static async selectionnerEnMasse(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     try {
       const { sessionId } = req.params;
       const {
@@ -261,34 +489,12 @@ export class SelectionController {
         motifRefus?: string;
       } = req.body;
 
-<<<<<<< HEAD
-      if (!Array.isArray(inscriptionIds) || inscriptionIds.length === 0) {
-        throw new ConflictError('Aucun candidat sélectionné');
-      }
-
-      if (![StatutInscription.ACCEPTEE, StatutInscription.REFUSEE, StatutInscription.LISTE_ATTENTE].includes(statut)) {
-        throw new ConflictError('Statut invalide');
-      }
-
-      // Vérifier la session
-      const session = await AppDataSource.getRepository(Session).findOne({
-        where: { id: sessionId },
-        relations: ['formation'],
-      });
-      if (!session) throw new NotFoundError('Session introuvable');
-
-      // Récupérer les inscriptions
-      const repo = AppDataSource.getRepository(Inscription);
-      const inscriptions = await repo.find({
-=======
-      /* -------------------- Validation -------------------- */
       if (!Array.isArray(inscriptionIds) || inscriptionIds.length === 0) {
         throw new BadRequestError('Aucun candidat sélectionné');
       }
 
       validateStatutSelection(statut);
 
-      /* -------------------- Vérifier la session -------------------- */
       const session = await sessionRepo().findOne({
         where: { id: sessionId },
         relations: ['formation'],
@@ -298,84 +504,55 @@ export class SelectionController {
         throw new NotFoundError('Session introuvable');
       }
 
-      /* -------------------- Récupérer les inscriptions -------------------- */
+      const userId = getUserId(req);
+      const userRole = getUserRole(req);
+
+      if (
+        !canManageSession(
+          { formateurId: session.formateurId },
+          userId,
+          userRole,
+        )
+      ) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas gérer les candidats de cette session',
+        );
+      }
+
       const inscriptions = await inscriptionRepo().find({
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         where: { id: In(inscriptionIds), sessionId },
         relations: ['participant', 'session', 'session.formation'],
       });
 
       if (inscriptions.length !== inscriptionIds.length) {
-<<<<<<< HEAD
-        throw new NotFoundError('Certaines inscriptions sont introuvables');
-      }
-
-      // Vérifier la capacité si on accepte
-      if (statut === StatutInscription.ACCEPTEE) {
-        const acceptedCount = await repo.count({
-          where: { sessionId, statut: StatutInscription.ACCEPTEE },
-        });
-        const newTotal = acceptedCount + inscriptions.length;
-
-        if (newTotal > session.capacite) {
-          throw new ConflictError(
-            `Capacité dépassée. Capacité: ${session.capacite}, Total demandé: ${newTotal}`
-=======
         throw new NotFoundError(
-          `Certaines inscriptions sont introuvables (${inscriptions.length}/${inscriptionIds.length} trouvées)`,
+          `Certaines inscriptions sont introuvables (${inscriptions.length}/${inscriptionIds.length})`,
         );
       }
 
-      /* -------------------- Vérifier la capacité si acceptation -------------------- */
+      /* ⭐ Vérification capacité relâchée */
       if (statut === StatutInscription.ACCEPTEE) {
         const placesDisponibles = await getPlacesDisponibles(session);
 
-        if (inscriptions.length > placesDisponibles) {
+        logger.info('[Selection] Vérification capacité', {
+          sessionId,
+          placesDisponibles,
+          demandees: inscriptions.length,
+          placesMax: (session as any).placesMax,
+          capacite: (session as any).capacite,
+        });
+
+        /* ⭐ Rejeter SEULEMENT si placesDisponibles < demandées ET capacité > 0 */
+        if (
+          placesDisponibles < inscriptions.length &&
+          placesDisponibles !== 999
+        ) {
           throw new ConflictError(
             `Places insuffisantes. Disponibles : ${placesDisponibles}, Demandées : ${inscriptions.length}`,
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
           );
         }
       }
 
-<<<<<<< HEAD
-      // Mettre à jour
-      const updated: any[] = [];
-      for (const inscription of inscriptions) {
-        inscription.statut = statut;
-        if (motifRefus) inscription.motifRefus = motifRefus;
-        await repo.save(inscription);
-
-        // Notification
-        await NotificationService.create({
-          userId: inscription.participantId,
-          titre:
-            statut === StatutInscription.ACCEPTEE
-              ? '🎉 Inscription acceptée'
-              : statut === StatutInscription.REFUSEE
-              ? '❌ Inscription refusée'
-              : '⏳ Liste d\'attente',
-          message:
-            statut === StatutInscription.ACCEPTEE
-              ? `Vous êtes accepté pour « ${session.formation.titre} »`
-              : statut === StatutInscription.REFUSEE
-              ? `Votre inscription a été refusée. Motif: ${motifRefus || 'Non précisé'}`
-              : `Vous êtes en liste d'attente pour « ${session.formation.titre} »`,
-          type:
-            statut === StatutInscription.ACCEPTEE
-              ? TypeNotification.SUCCESS
-              : statut === StatutInscription.REFUSEE
-              ? TypeNotification.ERROR
-              : TypeNotification.WARNING,
-          metadata: { sessionId, inscriptionId: inscription.id },
-        });
-
-        updated.push({
-          inscriptionId: inscription.id,
-          participant: `${inscription.participant.prenom} ${inscription.participant.nom}`,
-          email: inscription.participant.email,
-=======
-      /* -------------------- Mise à jour + notifications -------------------- */
       const updated: any[] = [];
 
       for (const inscription of inscriptions) {
@@ -389,10 +566,9 @@ export class SelectionController {
 
         await inscriptionRepo().save(inscription);
 
-        /* -------------------- Notification -------------------- */
         try {
-          const participant = inscription.participant;
-          const formationTitre = session.formation?.titre ?? 'la formation';
+          const formationTitre =
+            session.formation?.titre ?? 'la formation';
 
           let titre = '';
           let message = '';
@@ -404,7 +580,6 @@ export class SelectionController {
               message = `Vous êtes accepté(e) pour « ${formationTitre} »`;
               type = TypeNotification.SUCCESS;
               break;
-
             case StatutInscription.REFUSEE:
               titre = '❌ Inscription refusée';
               message = `Votre inscription à « ${formationTitre} » a été refusée.${
@@ -412,7 +587,6 @@ export class SelectionController {
               }`;
               type = TypeNotification.ERROR;
               break;
-
             case StatutInscription.LISTE_ATTENTE:
               titre = '⏳ Liste d\'attente';
               message = `Vous êtes en liste d'attente pour « ${formationTitre} »`;
@@ -428,7 +602,6 @@ export class SelectionController {
             metadata: { sessionId, inscriptionId: inscription.id },
           });
         } catch (notifError) {
-          // ⚠️ Ne pas bloquer si la notif échoue
           logger.warn(
             `[Selection] Notification échouée pour ${inscription.id}:`,
             notifError,
@@ -441,76 +614,31 @@ export class SelectionController {
             inscription.participant?.nom ?? ''
           }`.trim(),
           email: inscription.participant?.email ?? '',
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
           statut,
         });
       }
 
-<<<<<<< HEAD
-      logger.info(`✅ ${inscriptions.length} inscriptions → ${statut}`);
-=======
       logger.info(
         `✅ ${inscriptions.length} inscription(s) → ${statut} (session ${sessionId})`,
       );
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
-      return successResponse(
+      successResponse(
         res,
         {
           traites: inscriptions.length,
           statut,
           details: updated,
         },
-<<<<<<< HEAD
-        `${inscriptions.length} candidat(s) traité(s)`
-=======
         `${inscriptions.length} candidat(s) traité(s)`,
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       );
     } catch (e) {
       next(e);
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * POST /api/selections/auto/:sessionId
-   * Sélection automatique selon critères (ordre d'inscription, motivation, etc.)
-   */
-  static async selectionAutomatique(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const { sessionId } = req.params;
-      const { criteres } = req.body;
-
-      const session = await AppDataSource.getRepository(Session).findOne({
-        where: { id: sessionId },
-        relations: ['formation'],
-      });
-      if (!session) throw new NotFoundError('Session introuvable');
-
-      const repo = AppDataSource.getRepository(Inscription);
-
-      // Candidats en attente, triés par date d'inscription
-      const candidats = await repo.find({
-        where: { sessionId, statut: StatutInscription.EN_ATTENTE },
-        relations: ['participant', 'session', 'session.formation'],
-        order: { dateInscription: 'ASC' },
-      });
-
-      // Places disponibles
-      const acceptedCount = await repo.count({
-        where: { sessionId, statut: StatutInscription.ACCEPTEE },
-      });
-      const placesDisponibles = Math.max(0, session.capacite - acceptedCount);
-=======
-  /* ==========================================================================
-     POST /api/selections/auto/:sessionId
-     Sélection automatique selon critères
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     🤖 SÉLECTION AUTOMATIQUE
+     ══════════════════════════════════════════════════════════════════════════ */
   static async selectionAutomatique(
     req: Request,
     res: Response,
@@ -519,7 +647,6 @@ export class SelectionController {
     try {
       const { sessionId } = req.params;
 
-      /* -------------------- Vérifier la session -------------------- */
       const session = await sessionRepo().findOne({
         where: { id: sessionId },
         relations: ['formation'],
@@ -529,69 +656,54 @@ export class SelectionController {
         throw new NotFoundError('Session introuvable');
       }
 
-      /* -------------------- Candidats en attente -------------------- */
+      const userId = getUserId(req);
+      const userRole = getUserRole(req);
+
+      if (
+        !canManageSession(
+          { formateurId: session.formateurId },
+          userId,
+          userRole,
+        )
+      ) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas gérer les candidats de cette session',
+        );
+      }
+
       const candidats = await inscriptionRepo().find({
         where: {
           sessionId,
           statut: StatutInscription.EN_ATTENTE,
         },
         relations: ['participant', 'session', 'session.formation'],
-        order: { createdAt: 'ASC' }, // ⭐ Propriété TS
+        order: { createdAt: 'ASC' },
       });
 
-      /* -------------------- Places disponibles -------------------- */
       const placesDisponibles = await getPlacesDisponibles(session);
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 
       if (placesDisponibles === 0) {
-        return successResponse(
+        successResponse(
           res,
           { acceptes: 0, refuses: 0, enAttente: candidats.length },
-<<<<<<< HEAD
-          'Aucune place disponible'
-=======
           'Aucune place disponible',
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         );
+        return;
       }
 
-      const aAccepter = candidats.slice(0, placesDisponibles);
-      const aRefuser = candidats.slice(placesDisponibles);
+      /* ⭐ Si illimité, accepter tout */
+      const aAccepter =
+        placesDisponibles === 999
+          ? candidats
+          : candidats.slice(0, placesDisponibles);
 
-<<<<<<< HEAD
-      // Accepter les premiers
-      for (const c of aAccepter) {
-        c.statut = StatutInscription.ACCEPTEE;
-        await repo.save(c);
+      const aRefuser =
+        placesDisponibles === 999
+          ? []
+          : candidats.slice(placesDisponibles);
 
-        await NotificationService.create({
-          userId: c.participantId,
-          titre: '🎉 Inscription acceptée',
-          message: `Vous êtes accepté pour « ${session.formation.titre} »`,
-          type: TypeNotification.SUCCESS,
-        });
-      }
-
-      // Refuser le reste
-      for (const c of aRefuser) {
-        c.statut = StatutInscription.REFUSEE;
-        c.motifRefus = 'Capacité atteinte';
-        await repo.save(c);
-
-        await NotificationService.create({
-          userId: c.participantId,
-          titre: '❌ Inscription refusée',
-          message: `Votre inscription à « ${session.formation.titre} » n'a pas été retenue (capacité atteinte)`,
-          type: TypeNotification.WARNING,
-        });
-      }
-
-      logger.info(
-        `🤖 Sélection auto session ${sessionId} : ${aAccepter.length} acceptés, ${aRefuser.length} refusés`
-=======
       const formationTitre = session.formation?.titre ?? 'la formation';
 
-      /* -------------------- Accepter les premiers -------------------- */
       for (const c of aAccepter) {
         c.statut = StatutInscription.ACCEPTEE;
         c.motifRefus = null;
@@ -610,7 +722,6 @@ export class SelectionController {
         }
       }
 
-      /* -------------------- Refuser le reste -------------------- */
       for (const c of aRefuser) {
         c.statut = StatutInscription.REFUSEE;
         c.motifRefus = 'Capacité atteinte';
@@ -631,57 +742,25 @@ export class SelectionController {
 
       logger.info(
         `🤖 Sélection auto session ${sessionId} : ${aAccepter.length} acceptés, ${aRefuser.length} refusés`,
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       );
 
-      return successResponse(
+      successResponse(
         res,
         {
           acceptes: aAccepter.length,
           refuses: aRefuser.length,
           placesDisponibles,
         },
-<<<<<<< HEAD
-        'Sélection automatique terminée'
-=======
         'Sélection automatique terminée',
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       );
     } catch (e) {
       next(e);
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * GET /api/selections/stats/:sessionId
-   * Statistiques de sélection d'une session
-   */
-  static async stats(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { sessionId } = req.params;
-
-      const session = await AppDataSource.getRepository(Session).findOne({
-        where: { id: sessionId },
-      });
-      if (!session) throw new NotFoundError('Session introuvable');
-
-      const repo = AppDataSource.getRepository(Inscription);
-
-      const [total, enAttente, acceptees, refusees, listeAttente] =
-        await Promise.all([
-          repo.count({ where: { sessionId } }),
-          repo.count({ where: { sessionId, statut: StatutInscription.EN_ATTENTE } }),
-          repo.count({ where: { sessionId, statut: StatutInscription.ACCEPTEE } }),
-          repo.count({ where: { sessionId, statut: StatutInscription.REFUSEE } }),
-          repo.count({ where: { sessionId, statut: StatutInscription.LISTE_ATTENTE } }),
-        ]);
-
-=======
-  /* ==========================================================================
-     GET /api/selections/stats/:sessionId
-     Statistiques de sélection
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     📊 STATISTIQUES
+     ══════════════════════════════════════════════════════════════════════════ */
   static async stats(
     req: Request,
     res: Response,
@@ -698,7 +777,6 @@ export class SelectionController {
         throw new NotFoundError('Session introuvable');
       }
 
-      /* -------------------- Compter par statut -------------------- */
       const [total, enAttente, acceptees, refusees, listeAttente] =
         await Promise.all([
           inscriptionRepo().count({ where: { sessionId } }),
@@ -716,55 +794,30 @@ export class SelectionController {
           }),
         ]);
 
-      // ⭐ Utilise placesMax
-      const capacite = session.placesMax ?? 0;
-      const placesRestantes = Math.max(0, capacite - acceptees);
+      const capacite = getCapacite(session);
+      const placesRestantes =
+        capacite > 0 ? Math.max(0, capacite - acceptees) : 999;
       const tauxRemplissage =
         capacite > 0 ? Math.round((acceptees / capacite) * 100) : 0;
 
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-      return successResponse(res, {
+      successResponse(res, {
         total,
         enAttente,
         acceptees,
         refusees,
         listeAttente,
-<<<<<<< HEAD
-        capacite: session.capacite,
-        placesRestantes: Math.max(0, session.capacite - acceptees),
-        tauxRemplissage: Math.round((acceptees / session.capacite) * 100),
-=======
         capacite,
         placesRestantes,
         tauxRemplissage,
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
       });
     } catch (e) {
       next(e);
     }
   }
 
-<<<<<<< HEAD
-  /**
-   * DELETE /api/selections/session/:sessionId/reset
-   * Réinitialiser toutes les sélections
-   */
-  static async reset(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { sessionId } = req.params;
-
-      const result = await AppDataSource.getRepository(Inscription)
-        .createQueryBuilder()
-        .update(Inscription)
-        .set({ statut: StatutInscription.EN_ATTENTE, motifRefus: null })
-        .where('session_id = :sid', { sid: sessionId })
-        .andWhere('statut IN (:...statuts)', {
-          statuts: [StatutInscription.ACCEPTEE, StatutInscription.REFUSEE],
-=======
-  /* ==========================================================================
-     DELETE /api/selections/session/:sessionId/reset
-     Réinitialiser toutes les sélections
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     🔄 RESET
+     ══════════════════════════════════════════════════════════════════════════ */
   static async reset(
     req: Request,
     res: Response,
@@ -773,7 +826,6 @@ export class SelectionController {
     try {
       const { sessionId } = req.params;
 
-      // Vérifier la session
       const session = await sessionRepo().findOne({
         where: { id: sessionId },
       });
@@ -781,7 +833,6 @@ export class SelectionController {
         throw new NotFoundError('Session introuvable');
       }
 
-      // ⭐ Utilise la propriété TS sessionId (pas session_id)
       const result = await inscriptionRepo()
         .createQueryBuilder()
         .update(Inscription)
@@ -789,25 +840,20 @@ export class SelectionController {
           statut: StatutInscription.EN_ATTENTE,
           motifRefus: null,
         })
-        .where('sessionId = :sid', { sid: sessionId }) // ⭐ sessionId
+        .where('sessionId = :sid', { sid: sessionId })
         .andWhere('statut IN (:...statuts)', {
           statuts: [
             StatutInscription.ACCEPTEE,
             StatutInscription.REFUSEE,
             StatutInscription.LISTE_ATTENTE,
           ],
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
         })
         .execute();
 
       logger.info(`🔄 Reset sélections session ${sessionId}`);
 
-      return successResponse(
+      successResponse(
         res,
-<<<<<<< HEAD
-        { reset: result.affected || 0 },
-        'Sélections réinitialisées'
-=======
         { reset: result.affected ?? 0 },
         'Sélections réinitialisées',
       );
@@ -816,10 +862,9 @@ export class SelectionController {
     }
   }
 
-  /* ==========================================================================
-     POST /api/selections/session/:sessionId/candidat/:inscriptionId
-     Sélectionner un seul candidat (raccourci)
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 SÉLECTIONNER UN SEUL
+     ══════════════════════════════════════════════════════════════════════════ */
   static async selectionnerUn(
     req: Request,
     res: Response,
@@ -840,7 +885,6 @@ export class SelectionController {
         throw new NotFoundError('Inscription introuvable');
       }
 
-      /* -------------------- Vérifier capacité -------------------- */
       if (statut === StatutInscription.ACCEPTEE) {
         const session = inscription.session;
         const placesDisponibles = await getPlacesDisponibles(session);
@@ -850,7 +894,6 @@ export class SelectionController {
         }
       }
 
-      /* -------------------- Mise à jour -------------------- */
       inscription.statut = statut;
       if (statut === StatutInscription.REFUSEE && motifRefus) {
         inscription.motifRefus = motifRefus;
@@ -860,14 +903,20 @@ export class SelectionController {
 
       await inscriptionRepo().save(inscription);
 
-      return successResponse(
-        res,
-        inscription,
-        'Candidat mis à jour',
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-      );
+      successResponse(res, inscription, 'Candidat mis à jour');
     } catch (e) {
       next(e);
     }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 ALIAS
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async candidatsParSession(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    return SelectionController.findCandidats(req, res, next);
   }
 }

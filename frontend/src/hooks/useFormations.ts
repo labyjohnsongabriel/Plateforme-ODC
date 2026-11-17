@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TYPES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export type Niveau = 'DEBUTANT' | 'INTERMEDIAIRE' | 'AVANCE';
 
@@ -76,14 +76,10 @@ export interface FormationFilters {
   sortOrder?: 'asc' | 'desc';
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS DE NORMALISATION
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * Convertit une valeur quelconque en tableau de chaînes non vides.
- * Tolère : tableau, string JSON, string séparée par virgules/points-virgules/sauts de ligne.
- */
 export function toArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
@@ -91,11 +87,9 @@ export function toArray(value: unknown): string[] {
       .map((s) => s.trim())
       .filter(Boolean);
   }
-
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (!trimmed) return [];
-
     if (trimmed.startsWith('[')) {
       try {
         const parsed = JSON.parse(trimmed);
@@ -105,21 +99,16 @@ export function toArray(value: unknown): string[] {
             .map((s) => s.trim())
             .filter(Boolean);
         }
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
     }
-
     return trimmed
       .split(/[,;\n\r]+/)
       .map((s) => s.trim())
       .filter(Boolean);
   }
-
   return [];
 }
 
-/** Extrait une liste depuis différentes formes de réponse API. */
 function extractList<T>(response: any): T[] {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.data)) return response.data;
@@ -129,52 +118,28 @@ function extractList<T>(response: any): T[] {
   return [];
 }
 
-/** Extrait un objet unique depuis différentes formes de réponse API. */
 function extractItem<T>(response: any): T {
   if (response?.data?.data) return response.data.data;
   if (response?.data) return response.data;
   return response;
 }
 
-/**
- * Extrait un compteur depuis différentes formes possibles.
- */
 function extractCount(raw: any, field: 'sessions' | 'inscriptions'): number {
   if (!raw) return 0;
-
   const countKeys =
     field === 'sessions'
       ? ['sessionsCount', 'nbSessions', 'totalSessions', 'sessions_count']
-      : [
-          'inscriptionsCount',
-          'nbInscriptions',
-          'totalInscriptions',
-          'inscriptions_count',
-        ];
-
+      : ['inscriptionsCount', 'nbInscriptions', 'totalInscriptions', 'inscriptions_count'];
   for (const key of countKeys) {
     if (typeof raw[key] === 'number') return raw[key];
-    if (typeof raw[key] === 'string' && !isNaN(Number(raw[key]))) {
-      return Number(raw[key]);
-    }
+    if (typeof raw[key] === 'string' && !isNaN(Number(raw[key]))) return Number(raw[key]);
   }
-
-  if (raw?._count && typeof raw._count[field] === 'number') {
-    return raw._count[field];
-  }
-
-  if (Array.isArray(raw?.[field])) {
-    return raw[field].length;
-  }
-
-  if (raw?.stats && typeof raw.stats[field] === 'number') {
-    return raw.stats[field];
-  }
-
+  if (raw?._count && typeof raw._count[field] === 'number') return raw._count[field];
+  if (Array.isArray(raw?.[field])) return raw[field].length;
+  if (raw?.stats && typeof raw.stats[field] === 'number') return raw.stats[field];
   return 0;
 }
 
-/** Normalise une formation. */
 function normalizeFormation(raw: any): Formation {
   const domaine = raw?.domaine
     ? {
@@ -196,9 +161,7 @@ function normalizeFormation(raw: any): Formation {
     dureeHeures: Number(raw?.dureeHeures ?? raw?.duree ?? 0),
     prix: raw?.prix !== undefined ? Number(raw.prix) : undefined,
     nbParticipantsMax:
-      raw?.nbParticipantsMax !== undefined
-        ? Number(raw.nbParticipantsMax)
-        : undefined,
+      raw?.nbParticipantsMax !== undefined ? Number(raw.nbParticipantsMax) : undefined,
     objectifs: toArray(raw?.objectifs),
     prerequis: toArray(raw?.prerequis),
     programme: raw?.programme ?? '',
@@ -213,9 +176,47 @@ function normalizeFormation(raw: any): Formation {
   };
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ NORMALISATION DES STATS (robuste)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function pickNumber(obj: any, ...keys: string[]): number {
+  if (!obj) return 0;
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))) {
+      return Number(v);
+    }
+  }
+  return 0;
+}
+
+function normalizeStats(raw: any): FormationsStats {
+  // Déballer les wrappers
+  let root = raw;
+  if (root && typeof root === 'object') {
+    if (root.data && typeof root.data === 'object') root = root.data;
+    else if (root.stats && typeof root.stats === 'object') root = root.stats;
+  }
+
+  return {
+    total: pickNumber(root, 'total', 'totalFormations', 'total_formations'),
+    published: pickNumber(root, 'published', 'publiees', 'estPubliee'),
+    draft: pickNumber(root, 'draft', 'brouillons', 'drafts'),
+    totalSessions: pickNumber(root, 'totalSessions', 'total_sessions', 'sessions'),
+    totalInscriptions: pickNumber(
+      root,
+      'totalInscriptions',
+      'total_inscriptions',
+      'inscriptions',
+    ),
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    CLÉS DE REQUÊTES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const formationKeys = {
   all: ['admin', 'formations'] as const,
@@ -227,9 +228,9 @@ export const formationKeys = {
   stats: () => [...formationKeys.all, 'stats'] as const,
 };
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    QUERIES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useFormations(filters?: FormationFilters) {
   return useQuery({
@@ -255,26 +256,52 @@ export function useFormation(id: string | undefined) {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ STATS — avec fallback intelligent
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export function useFormationsStats() {
-  return useQuery({
+  return useQuery<FormationsStats>({
     queryKey: formationKeys.stats(),
     queryFn: async (): Promise<FormationsStats> => {
+      // ⭐ Tentative 1 : endpoint dédié /admin/formations/stats
       try {
         const response = await api.get('/admin/formations/stats');
-        const raw = extractItem<any>(response) ?? {};
-        return {
-          total: Number(raw?.total ?? 0),
-          published: Number(raw?.published ?? raw?.publiees ?? 0),
-          draft: Number(raw?.draft ?? raw?.brouillons ?? 0),
-          totalInscriptions: Number(
-            raw?.totalInscriptions ?? raw?.inscriptions ?? 0,
-          ),
-          totalSessions: Number(raw?.totalSessions ?? raw?.sessions ?? 0),
-        };
-      } catch {
-        const response = await api.get('/admin/formations');
+        console.log('[useFormationsStats] Réponse brute:', response.data);
+
+        const stats = normalizeStats(response.data);
+        console.log('[useFormationsStats] Stats normalisées:', stats);
+
+        // ⭐ Si le backend renvoie 0 partout, on essaie le fallback
+        const allZero =
+          stats.total === 0 &&
+          stats.published === 0 &&
+          stats.draft === 0 &&
+          stats.totalSessions === 0 &&
+          stats.totalInscriptions === 0;
+
+        if (!allZero) {
+          return stats;
+        }
+
+        console.warn(
+          '[useFormationsStats] Backend renvoie 0 partout, fallback sur la liste',
+        );
+      } catch (err: any) {
+        console.warn(
+          '[useFormationsStats] Endpoint stats indisponible:',
+          err.message,
+        );
+      }
+
+      // ⭐ Fallback : calculer à partir de la liste des formations
+      try {
+        const response = await api.get('/admin/formations', {
+          params: { limit: 1000 },
+        });
         const list = extractList<any>(response).map(normalizeFormation);
-        return {
+
+        const stats: FormationsStats = {
           total: list.length,
           published: list.filter((f) => f.estPubliee).length,
           draft: list.filter((f) => !f.estPubliee).length,
@@ -287,16 +314,33 @@ export function useFormationsStats() {
             0,
           ),
         };
+
+        console.log('[useFormationsStats] Stats calculées depuis la liste:', stats);
+        return stats;
+      } catch (fallbackErr: any) {
+        console.error(
+          '[useFormationsStats] Fallback échoué:',
+          fallbackErr.message,
+        );
+        return {
+          total: 0,
+          published: 0,
+          draft: 0,
+          totalSessions: 0,
+          totalInscriptions: 0,
+        };
       }
     },
     staleTime: 60_000,
     retry: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    MUTATIONS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useCreateFormation() {
   const qc = useQueryClient();

@@ -45,6 +45,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getMediaUrl } from '@/lib/media';
 import {
   useFormations,
   useTogglePublishFormation,
@@ -108,22 +109,16 @@ interface CounterBadgeProps {
 }
 
 const TONES = {
-  primary:
-    'bg-odc-primary-soft text-odc-primary-active ring-odc-primary-light/40',
+  primary: 'bg-odc-primary-soft text-odc-primary-active ring-odc-primary-light/40',
   success: 'bg-odc-success-soft text-odc-success-dark ring-odc-success/30',
   info: 'bg-odc-info-soft text-odc-info-dark ring-odc-info/30',
   warning: 'bg-odc-warning-soft text-odc-warning-dark ring-odc-warning/30',
 } as const;
 
-function CounterBadge({
-  count,
-  icon: Icon,
-  label,
-  tone = 'primary',
-}: CounterBadgeProps) {
+function CounterBadge({ count, icon: Icon, label, tone = 'primary' }: CounterBadgeProps) {
   if (count === 0) {
     return (
-      <span className="text-xs text-odc-text-muted" aria-label={`Aucune ${label}`}>
+      <span className="text-odc-text-muted text-xs" aria-label={`Aucune ${label}`}>
         —
       </span>
     );
@@ -160,10 +155,10 @@ function CounterBadge({
 function TableSkeleton() {
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-odc-border bg-odc-surface-alt/50 p-4">
+      <div className="border-odc-border bg-odc-surface-alt/50 border-b p-4">
         <Skeleton className="h-5 w-40" />
       </div>
-      <div className="divide-y divide-odc-border">
+      <div className="divide-odc-border divide-y">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 p-4">
             <Skeleton className="h-12 w-12 rounded-lg" />
@@ -189,10 +184,10 @@ export function FormationsTable({ filters }: FormationsTableProps) {
   const { data: formations = [], isLoading, isError } = useFormations(filters);
   const togglePublish = useTogglePublishFormation();
 
-  const [editingFormation, setEditingFormation] =
-    React.useState<Formation | null>(null);
-  const [deletingFormation, setDeletingFormation] =
-    React.useState<Formation | null>(null);
+  const [editingFormation, setEditingFormation] = React.useState<Formation | null>(null);
+  const [deletingFormation, setDeletingFormation] = React.useState<Formation | null>(
+    null,
+  );
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
 
   const handleEdit = React.useCallback((f: Formation) => {
@@ -265,12 +260,8 @@ export function FormationsTable({ filters }: FormationsTableProps) {
               <TableHead className="hidden md:table-cell">Domaine</TableHead>
               <TableHead className="hidden lg:table-cell">Niveau</TableHead>
               <TableHead className="hidden lg:table-cell">Durée</TableHead>
-              <TableHead className="hidden md:table-cell text-center">
-                Sessions
-              </TableHead>
-              <TableHead className="hidden md:table-cell text-center">
-                Inscrits
-              </TableHead>
+              <TableHead className="hidden text-center md:table-cell">Sessions</TableHead>
+              <TableHead className="hidden text-center md:table-cell">Inscrits</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead className="w-[80px] text-right">Actions</TableHead>
             </TableRow>
@@ -280,16 +271,16 @@ export function FormationsTable({ filters }: FormationsTableProps) {
             {formations.map((f) => (
               <TableRow
                 key={f.id}
-                className="group cursor-pointer transition-colors hover:bg-odc-surface-hover"
+                className="hover:bg-odc-surface-hover group cursor-pointer transition-colors"
                 onClick={() => router.push(`/admin/formations/${f.id}`)}
               >
                 <TableCell>
                   <div className="flex items-center gap-3">
                     {f.imageUrl ? (
                       <img
-                        src={f.imageUrl}
+                        src={getMediaUrl(f.imageUrl)}
                         alt=""
-                        className="h-11 w-11 shrink-0 rounded-lg object-cover ring-1 ring-odc-border"
+                        className="ring-odc-border h-11 w-11 shrink-0 rounded-lg object-cover ring-1"
                       />
                     ) : (
                       <div
@@ -304,11 +295,11 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-odc-text-primary">
+                      <p className="text-odc-text-primary truncate text-sm font-semibold">
                         {f.titre}
                       </p>
                       <div className="flex items-center gap-2">
-                        <p className="truncate font-mono text-xs text-odc-text-muted">
+                        <p className="text-odc-text-muted truncate font-mono text-xs">
                           {f.slug}
                         </p>
                         {f.miseEnAvant && (
@@ -336,12 +327,10 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                       title={f.domaine.nom}
                     >
                       <FolderTree className="h-3 w-3" aria-hidden="true" />
-                      <span className="max-w-[120px] truncate">
-                        {f.domaine.nom}
-                      </span>
+                      <span className="max-w-[120px] truncate">{f.domaine.nom}</span>
                     </span>
                   ) : (
-                    <span className="text-xs text-odc-text-muted">—</span>
+                    <span className="text-odc-text-muted text-xs">—</span>
                   )}
                 </TableCell>
 
@@ -350,13 +339,13 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                 </TableCell>
 
                 <TableCell className="hidden lg:table-cell">
-                  <span className="inline-flex items-center gap-1.5 text-xs text-odc-text-secondary">
+                  <span className="text-odc-text-secondary inline-flex items-center gap-1.5 text-xs">
                     <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                     <span className="tabular-nums">{f.dureeHeures}h</span>
                   </span>
                 </TableCell>
 
-                <TableCell className="hidden md:table-cell text-center">
+                <TableCell className="hidden text-center md:table-cell">
                   <CounterBadge
                     count={f.sessionsCount}
                     icon={Calendar}
@@ -365,7 +354,7 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                   />
                 </TableCell>
 
-                <TableCell className="hidden md:table-cell text-center">
+                <TableCell className="hidden text-center md:table-cell">
                   <CounterBadge
                     count={f.inscriptionsCount}
                     icon={Users}
@@ -382,16 +371,13 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-odc-text-muted">
-                      <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-odc-text-muted" />
+                      <span className="bg-odc-text-muted mr-1.5 h-1.5 w-1.5 rounded-full" />
                       Brouillon
                     </Badge>
                   )}
                 </TableCell>
 
-                <TableCell
-                  className="text-right"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -428,9 +414,7 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                       </DropdownMenuItem>
 
                       <DropdownMenuItem
-                        onClick={() =>
-                          window.open(`/formations/${f.slug}`, '_blank')
-                        }
+                        onClick={() => window.open(`/formations/${f.slug}`, '_blank')}
                       >
                         <ExternalLink className="mr-2 h-4 w-4" />
                         Voir la page
@@ -439,7 +423,7 @@ export function FormationsTable({ filters }: FormationsTableProps) {
                       <DropdownMenuSeparator />
 
                       <DropdownMenuItem
-                        className="text-odc-error focus:bg-odc-error-soft focus:text-odc-error"
+                        className="focus:bg-odc-error-soft text-odc-error focus:text-odc-error"
                         onClick={() => handleDelete(f)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />

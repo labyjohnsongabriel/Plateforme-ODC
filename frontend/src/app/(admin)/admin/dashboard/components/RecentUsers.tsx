@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { UserPlus, ArrowRight, Shield } from 'lucide-react';
+import { UserPlus, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,11 +12,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { api } from '@/lib/api';
 import { getInitials, cn } from '@/lib/utils';
-import { formatRelativeTime } from '@/lib/formatters';
 import { getRoleLabel, getRoleClasses } from '@/types/role.types';
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
+
+interface RecentUser {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string;
+  photoUrl?: string | null;
+  role?: { nom: string } | null;
+}
 
 export function RecentUsers() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery<RecentUser[]>({
     queryKey: ['admin', 'dashboard', 'recent-users'],
     queryFn: async () => {
       const { data } = await api.get('/admin/users', {
@@ -41,17 +50,36 @@ export function RecentUsers() {
     );
   }
 
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Nouveaux utilisateurs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <QueryErrorState
+            onRetry={() => { void refetch(); }}
+            isRetrying={isFetching}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   const users = data ?? [];
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div className="flex items-center gap-2">
-          <UserPlus className="h-4 w-4 text-odc-primary" />
+          <UserPlus className="h-4 w-4 text-primary" />
           <CardTitle className="text-base">Nouveaux utilisateurs</CardTitle>
         </div>
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/admin/utilisateurs">
+          <Link
+            href="/admin/utilisateurs"
+            className="text-muted-foreground hover:text-foreground"
+          >
             Voir tout
             <ArrowRight className="h-3.5 w-3.5 ml-1" />
           </Link>
@@ -67,33 +95,38 @@ export function RecentUsers() {
           />
         ) : (
           <ul className="space-y-2">
-            {users.map((u: any) => {
+            {users.map((u) => {
               const roleClasses = getRoleClasses(u.role?.nom);
               return (
                 <li key={u.id}>
                   <Link
                     href={`/admin/utilisateurs/${u.id}`}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-odc-border bg-odc-surface hover:border-odc-primary hover:bg-odc-primary-soft/30 transition-all"
+                    className={cn(
+                      'group flex items-center gap-3 p-3 rounded-lg border transition-all',
+                      'border-border bg-card',
+                      'hover:border-primary/40 hover:bg-accent/50',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    )}
                   >
-                    <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarImage src={u.photoUrl} />
-                      <AvatarFallback className="text-[10px] bg-odc-primary-soft text-odc-primary">
+                    <Avatar className="h-9 w-9 shrink-0 ring-2 ring-background">
+                      <AvatarImage src={u.photoUrl ?? undefined} />
+                      <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">
                         {getInitials(u.nom, u.prenom)}
                       </AvatarFallback>
                     </Avatar>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">
+                      <p className="truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                         {u.prenom} {u.nom}
                       </p>
-                      <p className="text-xs text-odc-muted truncate">
+                      <p className="truncate text-xs text-muted-foreground">
                         {u.email}
                       </p>
                     </div>
 
                     <Badge
                       className={cn(
-                        'text-[10px] shrink-0',
+                        'shrink-0 text-[10px] font-medium border',
                         roleClasses.bg,
                         roleClasses.text,
                       )}

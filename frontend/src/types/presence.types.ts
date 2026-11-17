@@ -1,7 +1,13 @@
-<<<<<<< HEAD
-import { ID, Timestamp, PaginationParams } from './common.types';
-import { User } from './user.types';
-import { Session } from './session.types';
+import type { ID, PaginationParams, Timestamp } from './common.types';
+import type { User } from './user.types';
+import type { Session } from './session.types';
+
+export enum StatutPresence {
+  PRESENT = 'PRESENT',
+  ABSENT = 'ABSENT',
+  RETARD = 'RETARD',
+  EXCUSE = 'EXCUSE',
+}
 
 export enum MethodePresence {
   QR_CODE = 'QR_CODE',
@@ -15,16 +21,18 @@ export interface Presence {
   sessionId: ID;
   participant: User;
   participantId: ID;
-  datePresence: string;
+  datePresence: Timestamp;
   heureScan?: string;
+  scanneLe?: Timestamp;
   present: boolean;
-  justifiee: boolean;
+  statut?: StatutPresence;
+  justifiee?: boolean;
   methode: MethodePresence;
   qrToken?: string;
   commentaire?: string;
   ipAddress?: string;
   createdAt: Timestamp;
-  updatedAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface PresenceStats {
@@ -57,7 +65,7 @@ export interface GenerateQrPayload {
 export interface GeneratedQrCode {
   token: string;
   dataUrl: string;
-  expiresAt: string;
+  expiresAt: Timestamp;
 }
 
 export interface TauxPresence {
@@ -72,6 +80,7 @@ export interface PresenceFilters extends PaginationParams {
   participantId?: ID;
   date?: string;
   present?: boolean;
+  statut?: StatutPresence;
 }
 
 export interface ParticipantAttendance {
@@ -83,28 +92,4 @@ export interface ParticipantAttendance {
   presences: number;
   absences: number;
   tauxPresence: number;
-=======
-import type { User } from './user.types';
-import type { Session } from './session.types';
-
-export type StatutPresence = 'PRESENT' | 'ABSENT' | 'RETARD' | 'EXCUSE';
-export type MethodePresence = 'QR_CODE' | 'MANUEL';
-
-export interface Presence {
-  id: string;
-  statut: StatutPresence;
-  methode: MethodePresence;
-  datePresence: string;
-  heureScan?: string;
-  scanneLe: string;
-  qrToken?: string;
-  ipAddress?: string;
-  commentaire?: string;
-  present: boolean;
-  participant: User;
-  participantId: string;
-  session: Session;
-  sessionId: string;
-  createdAt: string;
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
 }

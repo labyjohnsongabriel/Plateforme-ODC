@@ -1,20 +1,15 @@
-// src/app/(admin)/admin/domaines/[id]/page.tsx
 import type { Metadata } from 'next';
-import { DomaineForm } from '../components/DomaineForm';
+import { DomaineDetailsClient } from './DomaineDetailsClient';
 
 interface Props {
   params: { id: string };
 }
 
-export const metadata: Metadata = { title: 'Modifier domaine' };
+export const metadata: Metadata = {
+  title: 'Détails du domaine',
+  description: 'Consulter les informations d’un domaine de formation ODC',
+};
 
-export default function EditDomainePage({ params }: Props) {
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <h1 className="font-display text-2xl md:text-3xl font-bold">
-        Modifier le domaine
-      </h1>
-      <DomaineForm mode="edit" id={params.id} />
-    </div>
-  );
+export default function DomaineDetailPage({ params }: Props) {
+  return <DomaineDetailsClient id={params.id} />;
 }

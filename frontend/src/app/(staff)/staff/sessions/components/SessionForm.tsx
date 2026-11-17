@@ -1,324 +1,416 @@
+// src/app/(staff)/staff/sessions/components/SessionForm.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Loader2, Save, ArrowLeft } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import { getErrorMessage } from '@/lib/error-handler';
 
-interface Props {
-  mode: 'create' | 'edit';
-  id?: string;
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCHÉMA ZOD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const sessionSchema = z
+  .object({
+    formationId: z.string().min(1, 'Sélectionnez une formation'),
+    formateurId: z.string().optional().or(z.literal('')),
+    codeSession: z.string().max(50).optional().or(z.literal('')),
+    dateDebut: z.string().min(1, 'Date de début requise'),
+    dateFin: z.string().min(1, 'Date de fin requise'),
+    lieu: z.string().max(200).optional().or(z.literal('')),
+    lienVisio: z.string().url('URL invalide').optional().or(z.literal('')),
+    capacite: z.coerce.number().min(1, 'Minimum 1').max(500),
+    statut: z.enum(['PLANIFIEE', 'OUVERTE', 'EN_COURS', 'TERMINEE', 'ANNULEE']),
+    notes: z.string().optional().or(z.literal('')),
+    estPubliee: z.boolean().default(true),
+    dateOuvertureInscriptions: z.string().optional().or(z.literal('')),
+    dateFermetureInscriptions: z.string().optional().or(z.literal('')),
+  })
+  .refine(
+    (d) => !d.dateFin || !d.dateDebut || new Date(d.dateFin) >= new Date(d.dateDebut),
+    {
+      message: 'La date de fin doit être après la date de début',
+      path: ['dateFin'],
+    },
+  );
+
+export type SessionFormValues = z.infer<typeof sessionSchema>;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function extractFormations(data: unknown): Array<{ id: string; titre: string }> {
+  if (!data) return [];
+  if (Array.isArray(data)) return data as Array<{ id: string; titre: string }>;
+  if (typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    for (const key of ['formations', 'data', 'items']) {
+      if (Array.isArray(obj[key])) return obj[key] as Array<{ id: string; titre: string }>;
+    }
+  }
+  return [];
 }
 
-const STATUTS = ['PLANIFIEE', 'OUVERTE', 'EN_COURS', 'TERMINEE', 'ANNULEE'];
+function extractUsers(data: unknown): Array<{ id: string; prenom: string; nom: string }> {
+  if (!data) return [];
+  if (Array.isArray(data)) return data as Array<{ id: string; prenom: string; nom: string }>;
+  if (typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    for (const key of ['users', 'data', 'items']) {
+      if (Array.isArray(obj[key])) return obj[key] as Array<{ id: string; prenom: string; nom: string }>;
+    }
+  }
+  return [];
+}
 
-export function SessionForm({ mode, id }: Props) {
-  const router = useRouter();
-  const qc = useQueryClient();
-  const isEdit = mode === 'edit';
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROPS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  const [form, setForm] = useState({
-    formationId: '',
-    formateurId: '',
-    codeSession: '',
-    dateDebut: '',
-    dateFin: '',
-    lieu: '',
-    lienVisio: '',
-    capacite: 30,
-    statut: 'PLANIFIEE',
-    notes: '',
-    estPubliee: true,
-    dateOuvertureInscriptions: '',
-    dateFermetureInscriptions: '',
+interface SessionFormProps {
+  mode: 'create' | 'edit';
+  defaultValues?: Partial<SessionFormValues>;
+  onSubmit: (values: SessionFormValues) => void | Promise<void>;
+  onCancel: () => void;
+  isPending?: boolean;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSANT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export function SessionForm({
+  mode,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isPending,
+}: SessionFormProps) {
+  const form = useForm<SessionFormValues>({
+    resolver: zodResolver(sessionSchema),
+    defaultValues: {
+      formationId: '',
+      formateurId: '',
+      codeSession: '',
+      dateDebut: '',
+      dateFin: '',
+      lieu: '',
+      lienVisio: '',
+      capacite: 30,
+      statut: 'PLANIFIEE',
+      notes: '',
+      estPubliee: true,
+      dateOuvertureInscriptions: '',
+      dateFermetureInscriptions: '',
+      ...defaultValues,
+    },
   });
 
-  const { data: formations } = useQuery({
+  const { data: formations = [] } = useQuery({
     queryKey: ['staff', 'formations', 'all'],
     queryFn: async () => {
-      const { data } = await api.get('/staff/formations', { params: { limit: 100 } });
-      return data.data;
+      const response = await api.get('/staff/formations', { params: { limit: 100 } });
+      return extractFormations(response.data?.data ?? response.data);
     },
+    staleTime: 5 * 60_000,
   });
 
-  const { data: formateurs } = useQuery({
+  const { data: formateurs = [] } = useQuery({
     queryKey: ['staff', 'formateurs'],
     queryFn: async () => {
-      const { data } = await api.get('/admin/users', {
+      const response = await api.get('/admin/users', {
         params: { role: 'FORMATEUR', limit: 100 },
       });
-      return data.data;
+      return extractUsers(response.data?.data ?? response.data);
     },
-  });
-
-  const { data: existing } = useQuery({
-    queryKey: ['staff', 'session', id],
-    queryFn: async () => {
-      const { data } = await api.get(`/staff/sessions/${id}`);
-      return data.data;
-    },
-    enabled: isEdit && !!id,
-  });
-
-  useEffect(() => {
-    if (existing) {
-      setForm({
-        formationId: existing.formationId ?? '',
-        formateurId: existing.formateurId ?? '',
-        codeSession: existing.codeSession ?? '',
-        dateDebut: existing.dateDebut?.slice(0, 10) ?? '',
-        dateFin: existing.dateFin?.slice(0, 10) ?? '',
-        lieu: existing.lieu ?? '',
-        lienVisio: existing.lienVisio ?? '',
-        capacite: existing.capacite ?? 30,
-        statut: existing.statut ?? 'PLANIFIEE',
-        notes: existing.notes ?? '',
-        estPubliee: existing.estPubliee ?? true,
-        dateOuvertureInscriptions: existing.dateOuvertureInscriptions?.slice(0, 16) ?? '',
-        dateFermetureInscriptions: existing.dateFermetureInscriptions?.slice(0, 16) ?? '',
-      });
-    }
-  }, [existing]);
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        ...form,
-        formateurId: form.formateurId || undefined,
-        codeSession: form.codeSession || undefined,
-        dateOuvertureInscriptions: form.dateOuvertureInscriptions || undefined,
-        dateFermetureInscriptions: form.dateFermetureInscriptions || undefined,
-      };
-      if (isEdit) {
-        await api.put(`/staff/sessions/${id}`, payload);
-      } else {
-        await api.post('/staff/sessions', payload);
-      }
-    },
-    onSuccess: () => {
-      toast.success(isEdit ? 'Session mise à jour' : 'Session créée');
-      qc.invalidateQueries({ queryKey: ['staff', 'sessions'] });
-      router.push('/staff/sessions');
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
+    staleTime: 5 * 60_000,
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        mutation.mutate();
-      }}
-      className="space-y-6"
-    >
-      <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-        <ArrowLeft className="h-4 w-4 mr-2" /> Retour
-      </Button>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Formation + Formateur */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="formationId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Formation *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner…" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {formations.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.titre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Informations générales</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="formationId">Formation *</Label>
-              <Select
-                value={form.formationId}
-                onValueChange={(v) => setForm({ ...form, formationId: v })}
-              >
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder="Sélectionnez" />
-                </SelectTrigger>
-                <SelectContent>
-                  {formations?.map((f: any) => (
-                    <SelectItem key={f.id} value={f.id}>{f.titre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="formateurId">Formateur</Label>
-              <Select
-                value={form.formateurId}
-                onValueChange={(v) => setForm({ ...form, formateurId: v })}
-              >
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder="Optionnel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {formateurs?.map((u: any) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.prenom} {u.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <FormField
+            control={form.control}
+            name="formateurId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Formateur</FormLabel>
+                <Select
+                  onValueChange={(v) => field.onChange(v === 'none' ? '' : v)}
+                  value={field.value || 'none'}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Optionnel" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun</SelectItem>
+                    {formateurs.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.prenom} {u.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-          <div>
-            <Label htmlFor="codeSession">Code session</Label>
-            <Input
-              id="codeSession"
-              value={form.codeSession}
-              onChange={(e) => setForm({ ...form, codeSession: e.target.value })}
-              placeholder="Auto-généré si vide"
-              className="mt-1.5 font-mono"
-            />
-          </div>
+        {/* Code session */}
+        <FormField
+          control={form.control}
+          name="codeSession"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Code session</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Auto-généré si vide"
+                  className="font-mono"
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                Laisser vide pour auto-génération par le serveur.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="dateDebut">Date de début *</Label>
-              <Input
-                id="dateDebut"
-                type="date"
-                value={form.dateDebut}
-                onChange={(e) => setForm({ ...form, dateDebut: e.target.value })}
-                required
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="dateFin">Date de fin *</Label>
-              <Input
-                id="dateFin"
-                type="date"
-                value={form.dateFin}
-                onChange={(e) => setForm({ ...form, dateFin: e.target.value })}
-                required
-                className="mt-1.5"
-              />
-            </div>
-          </div>
+        {/* Dates */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="dateDebut"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Date de début *</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dateFin"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Date de fin *</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="lieu">Lieu</Label>
-              <Input
-                id="lieu"
-                value={form.lieu}
-                onChange={(e) => setForm({ ...form, lieu: e.target.value })}
-                placeholder="Ex: ODC Antananarivo"
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="lienVisio">Lien visio</Label>
-              <Input
-                id="lienVisio"
-                value={form.lienVisio}
-                onChange={(e) => setForm({ ...form, lienVisio: e.target.value })}
-                className="mt-1.5"
-              />
-            </div>
-          </div>
+        {/* Lieu + Visio */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="lieu"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Lieu</FormLabel>
+                <FormControl>
+                  <Input placeholder="Ex. ODC Antananarivo" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lienVisio"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Lien visio</FormLabel>
+                <FormControl>
+                  <Input type="url" placeholder="https://..." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="capacite">Capacité *</Label>
-              <Input
-                id="capacite"
-                type="number"
-                value={form.capacite}
-                onChange={(e) => setForm({ ...form, capacite: Number(e.target.value) })}
-                min={1}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="statut">Statut</Label>
-              <Select
-                value={form.statut}
-                onValueChange={(v) => setForm({ ...form, statut: v })}
-              >
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUTS.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        {/* Capacité + Statut */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="capacite"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Capacité *</FormLabel>
+                <FormControl>
+                  <Input type="number" min={1} max={500} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="statut"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Statut *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="PLANIFIEE">Planifiée</SelectItem>
+                    <SelectItem value="OUVERTE">Ouverte</SelectItem>
+                    <SelectItem value="EN_COURS">En cours</SelectItem>
+                    <SelectItem value="TERMINEE">Terminée</SelectItem>
+                    <SelectItem value="ANNULEE">Annulée</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-          <div>
-            <Label htmlFor="notes">Notes internes</Label>
-            <Textarea
-              id="notes"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              rows={3}
-              className="mt-1.5"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        {/* Notes */}
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes internes</FormLabel>
+              <FormControl>
+                <Textarea rows={3} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Inscriptions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="dateOuverture">Ouverture</Label>
-              <Input
-                id="dateOuverture"
-                type="datetime-local"
-                value={form.dateOuvertureInscriptions}
-                onChange={(e) => setForm({ ...form, dateOuvertureInscriptions: e.target.value })}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="dateFermeture">Fermeture</Label>
-              <Input
-                id="dateFermeture"
-                type="datetime-local"
-                value={form.dateFermetureInscriptions}
-                onChange={(e) => setForm({ ...form, dateFermetureInscriptions: e.target.value })}
-                className="mt-1.5"
-              />
-            </div>
-          </div>
+        {/* Inscriptions */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="dateOuvertureInscriptions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ouverture inscriptions</FormLabel>
+                <FormControl>
+                  <Input type="datetime-local" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dateFermetureInscriptions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Fermeture inscriptions</FormLabel>
+                <FormControl>
+                  <Input type="datetime-local" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-          <div className="flex items-center justify-between">
-            <Label htmlFor="publiee">Publier la session</Label>
-            <Switch
-              id="publiee"
-              checked={form.estPubliee}
-              onCheckedChange={(v) => setForm({ ...form, estPubliee: v })}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        {/* Publier */}
+        <FormField
+          control={form.control}
+          name="estPubliee"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <FormLabel className="cursor-pointer">Publier la session</FormLabel>
+                <FormDescription>
+                  Si désactivé, la session sera en brouillon.
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
 
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
-          Annuler
-        </Button>
-        <Button type="submit" variant="odc" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <Save className="h-4 w-4 mr-2" />
-          {isEdit ? 'Mettre à jour' : 'Créer'}
-        </Button>
-      </div>
-    </form>
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
+            Annuler
+          </Button>
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            {mode === 'create' ? 'Créer la session' : 'Enregistrer'}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

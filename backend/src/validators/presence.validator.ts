@@ -1,10 +1,6 @@
 // src/validators/presence.validator.ts
 import { z } from 'zod';
-import {
-  uuidSchema,
-  methodePresenceSchema,
-  statutPresenceSchema,
-} from './common.validator';
+import { uuidSchema } from './common.validator';
 
 /* ============================================================
  *  SCAN QR (participant)
@@ -27,15 +23,9 @@ export const marquerManuelSchema = z.object({
       sessionId: uuidSchema,
       participantId: uuidSchema,
       present: z.boolean(),
-      statut: statutPresenceSchema.optional(),
-      methode: methodePresenceSchema.optional().default('MANUEL'),
       commentaire: z.string().trim().max(500).optional(),
     })
-    .strict()
-    .refine((d) => d.present === true || d.statut !== undefined, {
-      message: 'Précisez un statut en cas d\'absence',
-      path: ['statut'],
-    }),
+    .strict(),
 });
 
 /* ============================================================

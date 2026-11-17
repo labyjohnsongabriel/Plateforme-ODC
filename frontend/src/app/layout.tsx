@@ -1,51 +1,23 @@
 // src/app/layout.tsx
 import type { Metadata, Viewport } from 'next';
-import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
+import { Suspense } from 'react';
 import { Providers } from './providers';
+import { InscriptionModalProvider } from '@/components/inscription/InscriptionModalProvider';
+import { MessagerieProvider } from '@/components/messagerie/MessagerieProvider';
 import { APP_DESCRIPTION, APP_NAME, APP_URL } from '@/lib/constants';
 import './globals.css';
-
-/* ============================================================================
-   FONTS — Google Fonts optimisées (self-hosted par Next.js)
-   ============================================================================ */
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-  preload: true,
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-display',
-  display: 'swap',
-  weight: ['400', '500', '600', '700', '800'],
-  preload: true,
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-  display: 'swap',
-  weight: ['400', '500', '600'],
-  preload: false,
-});
 
 /* ============================================================================
    METADATA — SEO & Open Graph
    ============================================================================ */
 
 export const metadata: Metadata = {
-  /* -------------------- Base -------------------- */
   metadataBase: new URL(APP_URL),
   title: {
     default: `${APP_NAME} — Formations & innovation numérique`,
     template: `%s | ${APP_NAME}`,
   },
   description: APP_DESCRIPTION,
-
-  /* -------------------- Mots-clés -------------------- */
   keywords: [
     'ODC',
     'Orange Digital Center',
@@ -58,18 +30,9 @@ export const metadata: Metadata = {
     'entrepreneuriat',
     'innovation',
   ],
-
-  /* -------------------- Auteurs -------------------- */
-  authors: [
-    {
-      name: 'Orange Digital Center Madagascar',
-      url: APP_URL,
-    },
-  ],
+  authors: [{ name: 'Orange Digital Center Madagascar', url: APP_URL }],
   creator: 'Orange Digital Center Madagascar',
   publisher: 'Orange Digital Center Madagascar',
-
-  /* -------------------- Open Graph -------------------- */
   openGraph: {
     type: 'website',
     locale: 'fr_MG',
@@ -86,8 +49,6 @@ export const metadata: Metadata = {
       },
     ],
   },
-
-  /* -------------------- Twitter -------------------- */
   twitter: {
     card: 'summary_large_image',
     title: `${APP_NAME} — Formations & innovation numérique`,
@@ -95,26 +56,12 @@ export const metadata: Metadata = {
     images: ['/images/og-default.png'],
     creator: '@odc_madagascar',
   },
-
-  /* -------------------- Icons -------------------- */
   icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icons/icon-16.png', type: 'image/png', sizes: '16x16' },
-      { url: '/icons/icon-32.png', type: 'image/png', sizes: '32x32' },
-    ],
-    apple: [
-      { url: '/icons/apple-touch-icon.png', sizes: '180x180' },
-    ],
-    other: [
-      { rel: 'mask-icon', url: '/icons/safari-pinned-tab.svg', color: '#FF7900' },
-    ],
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml', sizes: 'any' }],
+    shortcut: ['/favicon.svg'],
+    apple: [{ url: '/favicon.svg' }],
   },
-
-  /* -------------------- Manifest PWA -------------------- */
   manifest: '/manifest.webmanifest',
-
-  /* -------------------- Robots -------------------- */
   robots: {
     index: true,
     follow: true,
@@ -127,8 +74,6 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-
-  /* -------------------- Divers -------------------- */
   applicationName: APP_NAME,
   category: 'education',
   formatDetection: {
@@ -164,18 +109,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="fr"
-      dir="ltr"
-      suppressHydrationWarning
-      className={`${inter.variable} ${jakarta.variable} ${jetbrainsMono.variable}`}
-    >
+    <html lang="fr" dir="ltr" suppressHydrationWarning>
       <head>
-        {/* DNS prefetch pour les domaines externes */}
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href={APP_URL} />
-
-        {/* Meta sécurité */}
         <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
         <meta name="referrer" content="strict-origin-when-cross-origin" />
       </head>
@@ -191,7 +128,17 @@ export default function RootLayout({
           selection:text-odc-primary
         "
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {/* ⭐ Provider du modal d'inscription — englobe TOUT */}
+          <InscriptionModalProvider>
+            {children}
+          </InscriptionModalProvider>
+
+          {/* ⭐ Modale messagerie globale — accessible partout */}
+          <Suspense fallback={null}>
+            <MessagerieProvider />
+          </Suspense>
+        </Providers>
       </body>
     </html>
   );

@@ -7,7 +7,7 @@ interface Props {
 }
 
 export const metadata: Metadata = {
-  title: 'Vérification d\'attestation',
+  title: "Vérification d'attestation",
 };
 
 export default function VerifierNumeroPage({ params }: Props) {
@@ -15,15 +15,15 @@ export default function VerifierNumeroPage({ params }: Props) {
     <>
       <PageHero
         title={`Attestation ${params.numero}`}
-        subtitle="Résultat de la vérification"
+        description="Résultat de la vérification de l'authenticité et du statut."
         breadcrumbs={[
           { label: 'Accueil', href: '/' },
           { label: 'Vérifier', href: '/verifier-attestation' },
           { label: params.numero },
         ]}
       />
-      <div className="container-page py-12 max-w-3xl">
-        <AttestationVerifier />
+      <div className="container-page max-w-3xl py-12">
+        <AttestationVerifier numero={params.numero} />
       </div>
     </>
   );

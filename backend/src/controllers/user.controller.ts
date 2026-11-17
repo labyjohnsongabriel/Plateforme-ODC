@@ -1,92 +1,3 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { AppDataSource } from '../config/database';
-import { User } from '../models/User.entity';
-import { Role, RoleName } from '../models/Role.entity';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-import { getPagination } from '../utils/pagination.util';
-import { NotFoundError, ConflictError } from '../errors/AppError';
-import bcrypt from 'bcrypt';
-
-export class UserController {
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const repo = AppDataSource.getRepository(User);
-      const existing = await repo.findOne({ where: { email: req.body.email } });
-      if (existing) throw new ConflictError('Email deja utilise');
-      const role = await AppDataSource.getRepository(Role).findOne({ where: { nom: req.body.roleNom as RoleName } });
-      if (!role) throw new NotFoundError('Role introuvable');
-      const user = repo.create({
-        ...req.body,
-        motDePasse: await bcrypt.hash(req.body.motDePasse, 12),
-        roleId: role.id,
-      });
-      await repo.save(user);
-      return successResponse(res, user, 'Utilisateur cree', 201);
-    } catch (e) { next(e); }
-  }
-  static async findAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { page, limit, skip } = getPagination(req.query.page, req.query.limit);
-      const [data, total] = await AppDataSource.getRepository(User).findAndCount({
-        relations: ['role'], skip, take: limit, order: { createdAt: 'DESC' },
-      });
-      return paginatedResponse(res, data, total, page, limit);
-    } catch (e) { next(e); }
-  }
-  static async findOne(req: Request, res: Response, next: NextFunction) {
-    try {
-      const u = await AppDataSource.getRepository(User).findOne({ where: { id: req.params.id }, relations: ['role'] });
-      if (!u) throw new NotFoundError('Utilisateur introuvable');
-      return successResponse(res, u);
-    } catch (e) { next(e); }
-  }
-  static async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const repo = AppDataSource.getRepository(User);
-      const u = await repo.findOne({ where: { id: req.params.id } });
-      if (!u) throw new NotFoundError('Utilisateur introuvable');
-      Object.assign(u, req.body);
-      await repo.save(u);
-      return successResponse(res, u, 'Utilisateur mis a jour');
-    } catch (e) { next(e); }
-  }
-  static async changeRole(req: Request, res: Response, next: NextFunction) {
-    try {
-      const repo = AppDataSource.getRepository(User);
-      const u = await repo.findOne({ where: { id: req.params.id } });
-      if (!u) throw new NotFoundError('Utilisateur introuvable');
-      const role = await AppDataSource.getRepository(Role).findOne({ where: { nom: req.body.roleNom as RoleName } });
-      if (!role) throw new NotFoundError('Role introuvable');
-      u.roleId = role.id;
-      await repo.save(u);
-      return successResponse(res, u, 'Role modifie');
-    } catch (e) { next(e); }
-  }
-  static async toggleActif(req: Request, res: Response, next: NextFunction) {
-    try {
-      const repo = AppDataSource.getRepository(User);
-      const u = await repo.findOne({ where: { id: req.params.id } });
-      if (!u) throw new NotFoundError('Utilisateur introuvable');
-      u.actif = req.body.actif;
-      await repo.save(u);
-      return successResponse(res, u, 'Statut modifie');
-    } catch (e) { next(e); }
-  }
-  static async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      await AppDataSource.getRepository(User).softDelete(req.params.id);
-      return successResponse(res, null, 'Utilisateur supprime');
-    } catch (e) { next(e); }
-  }
-  static async stats(req: Request, res: Response, next: NextFunction) {
-    try {
-      const roles = await AppDataSource.getRepository(User).createQueryBuilder('u')
-        .leftJoin('u.role', 'r').select('r.nom', 'role').addSelect('COUNT(u.id)', 'count')
-        .where('u.actif = true').groupBy('r.nom').getRawMany();
-      return successResponse(res, roles);
-    } catch (e) { next(e); }
-=======
 // src/controllers/UserController.ts
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
@@ -99,31 +10,34 @@ import {
   NotFoundError,
   ConflictError,
   BadRequestError,
-  ForbiddenError,
 } from '../errors/AppError';
+import { logger } from '../config/logger';
 import bcrypt from 'bcrypt';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const userRepo = () => AppDataSource.getRepository(User);
 const roleRepo = () => AppDataSource.getRepository(Role);
+
+/**
+ * Extrait l'ID utilisateur de manière robuste.
+ * Ton authMiddleware attache `req.user` (entité User) + `req.userId`.
+ * On supporte aussi `req.user.sub` (si un jour tu changes le middleware).
+ */
+function getAuthUserId(req: Request): string {
+  const anyReq = req as any;
+  return anyReq.user?.id ?? anyReq.userId ?? anyReq.user?.sub;
+}
 
 /**
  * Retire les champs sensibles d'un user.
  */
 function sanitizeUser(user: User | null): any {
   if (!user) return null;
-
-  const {
-    motDePasse,
-    resetToken,
-    resetTokenExpires,
-    deletedAt,
-    ...safe
-  } = user;
-
+  const { motDePasse, resetToken, resetTokenExpires, deletedAt, ...safe } =
+    user;
   return safe;
 }
 
@@ -148,7 +62,7 @@ function validatePasswordStrength(password: string): void {
 }
 
 /**
- * ⭐ NEW : Vérifie qu'il reste au moins un administrateur actif.
+ * Vérifie qu'il reste au moins un administrateur actif.
  */
 async function ensureNotLastAdmin(excludeUserId?: string): Promise<void> {
   const qb = userRepo()
@@ -163,7 +77,6 @@ async function ensureNotLastAdmin(excludeUserId?: string): Promise<void> {
   }
 
   const count = await qb.getCount();
-
   if (count === 0) {
     throw new BadRequestError(
       'Impossible : il doit rester au moins un administrateur actif',
@@ -171,11 +84,10 @@ async function ensureNotLastAdmin(excludeUserId?: string): Promise<void> {
   }
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    CHAMPS AUTORISÉS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/** Champs qu'un ADMIN peut modifier sur un autre utilisateur */
 const ADMIN_UPDATABLE_FIELDS = [
   'nom',
   'prenom',
@@ -191,7 +103,6 @@ const ADMIN_UPDATABLE_FIELDS = [
   'emailVerifie',
 ] as const;
 
-/** Champs qu'un utilisateur peut modifier sur SON PROPRE profil */
 const SELF_UPDATABLE_FIELDS = [
   'prenom',
   'nom',
@@ -204,14 +115,14 @@ const SELF_UPDATABLE_FIELDS = [
   'linkedin',
 ] as const;
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    CONTROLLER
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export class UserController {
-  /* ==========================================================================
-     POST /api/admin/users — Admin — Créer un utilisateur
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     POST /api/admin/users — Créer un utilisateur
+     ══════════════════════════════════════════════════════════════════════════ */
   static async create(
     req: Request,
     res: Response,
@@ -220,16 +131,16 @@ export class UserController {
     try {
       const { email, motDePasse, nom, prenom, telephone, roleNom } = req.body;
 
-      /* -------------------- Validation -------------------- */
       if (!email || !motDePasse || !nom || !prenom) {
-        throw new BadRequestError('Email, mot de passe, nom et prénom requis');
+        throw new BadRequestError(
+          'Email, mot de passe, nom et prénom requis',
+        );
       }
 
       validatePasswordStrength(motDePasse);
 
       const normalizedEmail = email.toLowerCase().trim();
 
-      /* -------------------- Email unique -------------------- */
       const existing = await userRepo().findOne({
         where: { email: normalizedEmail },
       });
@@ -237,7 +148,6 @@ export class UserController {
         throw new ConflictError('Cet email est déjà utilisé');
       }
 
-      /* -------------------- Rôle -------------------- */
       const role = await roleRepo().findOne({
         where: { nom: (roleNom as RoleName) || RoleName.PARTICIPANT },
       });
@@ -245,7 +155,6 @@ export class UserController {
         throw new NotFoundError('Rôle introuvable');
       }
 
-      /* -------------------- Création -------------------- */
       const user = userRepo().create({
         nom: nom.trim(),
         prenom: prenom.trim(),
@@ -258,7 +167,6 @@ export class UserController {
 
       await userRepo().save(user);
 
-      /* -------------------- Recharger avec relations -------------------- */
       const fullUser = await userRepo().findOne({
         where: { id: user.id },
         relations: ['role'],
@@ -275,9 +183,9 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     GET /api/admin/users — Admin — Liste paginée
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     GET /api/admin/users — Liste paginée
+     ══════════════════════════════════════════════════════════════════════════ */
   static async findAll(
     req: Request,
     res: Response,
@@ -288,7 +196,6 @@ export class UserController {
         req.query.page,
         req.query.limit,
       );
-
       const { role, roleId, actif, q } = req.query;
 
       const qb = userRepo()
@@ -299,16 +206,13 @@ export class UserController {
       if (role && typeof role === 'string') {
         qb.andWhere('r.nom = :role', { role });
       }
-
       if (roleId && typeof roleId === 'string') {
         qb.andWhere('u.roleId = :rid', { rid: roleId });
       }
-
       if (actif !== undefined) {
         const actifBool = actif === 'true' || actif === true;
         qb.andWhere('u.actif = :a', { a: actifBool });
       }
-
       if (q && typeof q === 'string') {
         qb.andWhere(
           '(u.nom ILIKE :q OR u.prenom ILIKE :q OR u.email ILIKE :q)',
@@ -327,9 +231,9 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     GET /api/admin/users/:id — Admin — Détail
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     GET /api/admin/users/:id — Détail
+     ══════════════════════════════════════════════════════════════════════════ */
   static async findOne(
     req: Request,
     res: Response,
@@ -349,9 +253,9 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     PUT /api/admin/users/:id — Admin — Mise à jour
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     PUT /api/admin/users/:id — Mise à jour
+     ══════════════════════════════════════════════════════════════════════════ */
   static async update(
     req: Request,
     res: Response,
@@ -365,17 +269,13 @@ export class UserController {
 
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- ⭐ Whitelist des champs -------------------- */
       const updates: Partial<User> = {};
-
       for (const field of ADMIN_UPDATABLE_FIELDS) {
         if (req.body[field] !== undefined) {
           (updates as any)[field] = req.body[field];
         }
       }
 
-      /* -------------------- Protection dernier admin -------------------- */
-      // Si on désactive un admin, vérifier qu'il en reste un autre
       if (
         updates.actif === false &&
         user.role?.nom === RoleName.ADMINISTRATEUR
@@ -401,21 +301,26 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     PUT /api/admin/users/:id/role — Admin — Changer le rôle
-     ⭐ CORRIGÉ : recharge les permissions + protection dernier admin
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     PUT /api/admin/users/:id/role — Changer le rôle
+     ══════════════════════════════════════════════════════════════════════════ */
   static async changeRole(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const { roleNom, roleId } = req.body;
+      const { roleNom, roleId, role: roleBody } = req.body;
+      const targetRole = roleNom ?? roleBody ?? roleId;
 
-      /* -------------------- Validation -------------------- */
-      if (!roleNom && !roleId) {
-        throw new BadRequestError('roleNom ou roleId est requis');
+      logger.info('[changeRole] Début', {
+        userId: req.params.id,
+        body: req.body,
+        targetRole,
+      });
+
+      if (!targetRole) {
+        throw new BadRequestError('roleNom, role ou roleId est requis');
       }
 
       const user = await userRepo().findOne({
@@ -423,44 +328,46 @@ export class UserController {
         relations: ['role'],
       });
 
-      if (!user) throw new NotFoundError('Utilisateur introuvable');
+      if (!user) {
+        throw new NotFoundError('Utilisateur introuvable');
+      }
 
-      /* -------------------- Trouver le rôle -------------------- */
       let role: Role | null = null;
 
-      if (roleId) {
-        role = await roleRepo().findOne({ where: { id: roleId } });
+      const isUuid =
+        typeof targetRole === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          targetRole,
+        );
+
+      if (isUuid) {
+        role = await roleRepo().findOne({ where: { id: targetRole } });
       } else {
-        if (!Object.values(RoleName).includes(roleNom as RoleName)) {
+        if (!Object.values(RoleName).includes(targetRole as RoleName)) {
           throw new BadRequestError(
-            `Rôle invalide : "${roleNom}". Valeurs autorisées : ${Object.values(RoleName).join(', ')}`,
+            `Rôle invalide : "${targetRole}". Valeurs : ${Object.values(RoleName).join(', ')}`,
           );
         }
         role = await roleRepo().findOne({
-          where: { nom: roleNom as RoleName },
+          where: { nom: targetRole as RoleName },
         });
       }
 
       if (!role) {
-        throw new NotFoundError(
-          `Rôle "${roleNom ?? roleId}" introuvable`,
-        );
+        throw new NotFoundError(`Rôle "${targetRole}" introuvable`);
       }
 
-      /* -------------------- Protection dernier admin -------------------- */
-      const isRemovingAdmin =
-        user.role?.nom === RoleName.ADMINISTRATEUR &&
-        role.nom !== RoleName.ADMINISTRATEUR;
+      const wasAdmin = user.role?.nom === RoleName.ADMINISTRATEUR;
+      const willBeAdmin = role.nom === RoleName.ADMINISTRATEUR;
 
-      if (isRemovingAdmin) {
+      if (wasAdmin && !willBeAdmin) {
         await ensureNotLastAdmin(user.id);
       }
 
-      /* -------------------- Appliquer -------------------- */
       user.roleId = role.id;
+      user.role = role;
       await userRepo().save(user);
 
-      /* -------------------- ⭐ Recharger avec permissions -------------------- */
       const updated = await userRepo().findOne({
         where: { id: user.id },
         relations: ['role', 'role.permissions'],
@@ -469,17 +376,17 @@ export class UserController {
       return successResponse(
         res,
         sanitizeUser(updated),
-        `Rôle modifié en "${role.libelle}"`,
+        `Rôle modifié en "${role.libelle ?? role.nom}"`,
       );
     } catch (e) {
+      logger.error('[changeRole] Erreur', e);
       next(e);
     }
   }
 
-  /* ==========================================================================
-     PUT /api/admin/users/:id/actif — Admin — Activer/Désactiver
-     ⭐ CORRIGÉ : protection dernier admin
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     PUT /api/admin/users/:id/actif — Activer/Désactiver
+     ══════════════════════════════════════════════════════════════════════════ */
   static async toggleActif(
     req: Request,
     res: Response,
@@ -499,13 +406,11 @@ export class UserController {
 
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- Protection dernier admin -------------------- */
       if (actif === false && user.role?.nom === RoleName.ADMINISTRATEUR) {
         await ensureNotLastAdmin(user.id);
       }
 
-      /* -------------------- ⭐ Protection auto-désactivation -------------------- */
-      const currentUserId = (req as any).user?.sub;
+      const currentUserId = getAuthUserId(req);
       if (currentUserId === user.id && actif === false) {
         throw new BadRequestError(
           'Vous ne pouvez pas désactiver votre propre compte',
@@ -525,10 +430,9 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     DELETE /api/admin/users/:id — Admin — Supprimer (soft delete)
-     ⭐ CORRIGÉ : protection dernier admin
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     DELETE /api/admin/users/:id — Supprimer (soft delete)
+     ══════════════════════════════════════════════════════════════════════════ */
   static async delete(
     req: Request,
     res: Response,
@@ -542,15 +446,13 @@ export class UserController {
 
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- Auto-suppression interdite -------------------- */
-      const currentUserId = (req as any).user?.sub;
+      const currentUserId = getAuthUserId(req);
       if (currentUserId === user.id) {
         throw new BadRequestError(
           'Vous ne pouvez pas supprimer votre propre compte',
         );
       }
 
-      /* -------------------- Protection dernier admin -------------------- */
       if (user.role?.nom === RoleName.ADMINISTRATEUR) {
         await ensureNotLastAdmin(user.id);
       }
@@ -563,17 +465,15 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     GET /api/admin/users/stats/roles — Admin — Statistiques par rôle
-     ⭐ CORRIGÉ : inclut les inactifs
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     GET /api/admin/users/stats/roles — Statistiques par rôle
+     ══════════════════════════════════════════════════════════════════════════ */
   static async stats(
     _req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      /* -------------------- Total & actifs -------------------- */
       const total = await userRepo()
         .createQueryBuilder('u')
         .where('u.deletedAt IS NULL')
@@ -587,7 +487,6 @@ export class UserController {
 
       const inactifs = total - actifs;
 
-      /* -------------------- Répartition par rôle -------------------- */
       const parRole = await userRepo()
         .createQueryBuilder('u')
         .leftJoin('u.role', 'r')
@@ -614,9 +513,9 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     POST /api/admin/users/:id/reset-password — Admin
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     POST /api/admin/users/:id/reset-password — Reset mot de passe
+     ══════════════════════════════════════════════════════════════════════════ */
   static async resetPassword(
     req: Request,
     res: Response,
@@ -648,16 +547,16 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
+  /* ══════════════════════════════════════════════════════════════════════════
      GET /api/users/me — Utilisateur connecté
-     ========================================================================== */
+     ══════════════════════════════════════════════════════════════════════════ */
   static async getMe(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = getAuthUserId(req);
       if (!userId) throw new BadRequestError('Non authentifié');
 
       const user = await userRepo().findOne({
@@ -673,23 +572,21 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
+  /* ══════════════════════════════════════════════════════════════════════════
      PUT /api/users/me — Mettre à jour son propre profil
-     ⭐ CORRIGÉ : whitelist stricte
-     ========================================================================== */
+     ══════════════════════════════════════════════════════════════════════════ */
   static async updateMe(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = getAuthUserId(req);
       if (!userId) throw new BadRequestError('Non authentifié');
 
       const user = await userRepo().findOne({ where: { id: userId } });
       if (!user) throw new NotFoundError('Utilisateur introuvable');
 
-      /* -------------------- ⭐ Whitelist stricte -------------------- */
       for (const field of SELF_UPDATABLE_FIELDS) {
         if (req.body[field] !== undefined) {
           (user as any)[field] = req.body[field];
@@ -709,24 +606,22 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
-     POST /api/users/me/avatar — Upload photo de profil
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     POST /api/users/me/avatar — Upload photo
+     ══════════════════════════════════════════════════════════════════════════ */
   static async uploadAvatar(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = getAuthUserId(req);
       if (!userId) throw new BadRequestError('Non authentifié');
 
       const file = (req as any).file;
       if (!file) throw new BadRequestError('Aucun fichier fourni');
 
-      // TODO : uploader vers Cloudinary
-      const photoUrl = `/uploads/avatars/${userId}-${Date.now()}-${file.originalname}`;
-
+      const photoUrl = `/uploads/avatars/${file.filename}`;
       await userRepo().update(userId, { photoUrl });
 
       return successResponse(res, { photoUrl }, 'Photo mise à jour');
@@ -735,16 +630,38 @@ export class UserController {
     }
   }
 
-  /* ==========================================================================
+  
+  static async uploadAvatar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = getAuthUserId(req);
+    if (!userId) throw new BadRequestError('Non authentifié');
+
+    const file = (req as any).file;
+    if (!file) throw new BadRequestError('Aucun fichier fourni');
+
+    const photoUrl = `/uploads/avatars/${file.filename}`;
+    await userRepo().update(userId, { photoUrl });
+
+    return successResponse(res, { photoUrl }, 'Photo mise à jour');
+  } catch (e) {
+    next(e);
+  }
+}
+
+  /* ══════════════════════════════════════════════════════════════════════════
      PUT /api/users/me/password — Changer son mot de passe
-     ========================================================================== */
+     ══════════════════════════════════════════════════════════════════════════ */
   static async changeMyPassword(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const userId = (req as any).user?.sub;
+      const userId = getAuthUserId(req);
       if (!userId) throw new BadRequestError('Non authentifié');
 
       const { ancienMotDePasse, nouveauMotDePasse } = req.body;
@@ -775,6 +692,5 @@ export class UserController {
     } catch (e) {
       next(e);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

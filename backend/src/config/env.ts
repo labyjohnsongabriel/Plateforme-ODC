@@ -1,306 +1,381 @@
+// src/config/env.ts
 import dotenv from 'dotenv';
 import path from 'path';
-import { z } from 'zod';   // ⬅️ IMPORT MANQUANT
+import { z } from 'zod';
 
-// Charger .env
+const NODE_ENV = process.env.NODE_ENV ?? 'development';
+
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-
-/**
- * Schéma de validation des variables d'environnement
- */
-const envSchema = z.object({
-  // ==========================================================================
-  // APPLICATION
-  // ==========================================================================
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  APP_NAME: z.string().default('ODC Platform'),
-  APP_VERSION: z.string().default('1.0.0'),
-  PORT: z.string().default('5000'),
-  API_PREFIX: z.string().default('/api'),
-  CLIENT_URL: z.string().default('http://localhost:5173'),
-  HOST: z.string().default('0.0.0.0'),
-
-  // ==========================================================================
-  // DATABASE PostgreSQL
-  // ==========================================================================
-  DB_CONNECTION: z.enum(['url', 'fields']).default('fields'),
-  DATABASE_URL: z.string().optional(),
-
-  DB_TYPE: z.string().default('postgres'),
-  DB_HOST: z.string().default('localhost'),
-  DB_PORT: z.string().default('5432'),
-  DB_USERNAME: z.string(),
-  DB_PASSWORD: z.string(),
-  DB_NAME: z.string(),
-  DB_SCHEMA: z.string().default('public'),
-
-  DB_SSL: z.string().default('false'),
-  DB_SSL_REJECT_UNAUTHORIZED: z.string().default('false'),
-  DB_SSL_CA: z.string().optional(),
-  DB_SSL_CERT: z.string().optional(),
-  DB_SSL_KEY: z.string().optional(),
-
-  DB_POOL_MIN: z.string().default('2'),
-  DB_POOL_MAX: z.string().default('20'),
-  DB_POOL_IDLE_TIMEOUT: z.string().default('30000'),
-  DB_POOL_ACQUIRE_TIMEOUT: z.string().default('60000'),
-  DB_STATEMENT_TIMEOUT: z.string().default('30000'),
-  DB_QUERY_TIMEOUT: z.string().default('30000'),
-  DB_CONNECTION_TIMEOUT: z.string().default('5000'),
-
-  DB_LOGGING: z.string().default('false'),
-  DB_SYNCHRONIZE: z.string().default('false'),
-  DB_MIGRATIONS_RUN: z.string().default('true'),
-  DB_MIGRATIONS_TABLE: z.string().default('migrations_history'),
-  DB_DROP_SCHEMA: z.string().default('false'),
-
-  DB_REPLICA_HOST: z.string().optional(),
-  DB_REPLICA_PORT: z.string().optional(),
-
-  // ==========================================================================
-  // JWT
-  // ==========================================================================
-  JWT_SECRET: z.string().min(16),
-  JWT_REFRESH_SECRET: z.string().min(16),
-  JWT_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-  JWT_ISSUER: z.string().default('odc-platform'),
-  JWT_AUDIENCE: z.string().default('odc-client'),
-
-  // ==========================================================================
-  // EMAIL SMTP
-  // ==========================================================================
-  SMTP_HOST: z.string().default('smtp.gmail.com'),
-  SMTP_PORT: z.string().default('587'),
-  SMTP_SECURE: z.string().default('false'),
-  SMTP_USER: z.string().default(''),
-  SMTP_PASS: z.string().default(''),
-  SMTP_FROM: z.string().default('Orange Digital Center <noreply@odc.mg>'),
-  SMTP_REPLY_TO: z.string().default('contact@odc.mg'),
-  SMTP_POOL: z.string().default('true'),
-  SMTP_MAX_CONNECTIONS: z.string().default('5'),
-  SMTP_MAX_MESSAGES: z.string().default('100'),
-
-  // ==========================================================================
-  // UPLOAD
-  // ==========================================================================
-  UPLOAD_DIR: z.string().default('./uploads'),
-  UPLOAD_MAX_FILE_SIZE: z.string().default('10485760'),
-  UPLOAD_MAX_FILES: z.string().default('10'),
-  UPLOAD_ALLOWED_MIMES: z.string().optional(),
-  UPLOAD_ALLOWED_EXTENSIONS: z.string().optional(),
-  UPLOAD_KEEP_TEMP_HOURS: z.string().default('24'),
-
-  // ==========================================================================
-  // REDIS
-  // ==========================================================================
-  REDIS_ENABLED: z.string().default('false'),
-  REDIS_HOST: z.string().default('localhost'),
-  REDIS_PORT: z.string().default('6379'),
-  REDIS_PASSWORD: z.string().default(''),
-  REDIS_DB: z.string().default('0'),
-  REDIS_TTL: z.string().default('300'),
-
-  // ==========================================================================
-  // RATE LIMITING
-  // ==========================================================================
-  RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
-  RATE_LIMIT_MAX: z.string().default('500'),
-  AUTH_RATE_LIMIT_MAX: z.string().default('20'),
-  HEAVY_RATE_LIMIT_MAX: z.string().default('5'),
-
-  // ==========================================================================
-  // CORS
-  // ==========================================================================
-  CORS_ORIGINS: z.string().default('http://localhost:5173,http://localhost:3000'),
-  CORS_CREDENTIALS: z.string().default('true'),
-  CORS_MAX_AGE: z.string().default('86400'),
-
-  // ==========================================================================
-  // LOGS
-  // ==========================================================================
-  LOG_LEVEL: z.string().default('info'),
-  LOG_DIR: z.string().default('./logs'),
-  LOG_MAX_SIZE: z.string().default('5242880'),
-  LOG_MAX_FILES: z.string().default('5'),
-  LOG_CONSOLE: z.string().default('true'),
-  LOG_FILE: z.string().default('true'),
-
-  // ==========================================================================
-  // SÉCURITÉ
-  // ==========================================================================
-  BCRYPT_ROUNDS: z.string().default('12'),
-  HELMET_ENABLED: z.string().default('true'),
-  TRUST_PROXY: z.string().default('false'),
-  REQUEST_TIMEOUT_MS: z.string().default('30000'),
-
-  // ==========================================================================
-  // CERTIFICATS & SIGNATURE
-  // ==========================================================================
-  KEYS_DIR: z.string().default('./keys'),
-  ATTESTATION_CRITERIA_PRESENCE_MIN: z.string().default('75'),
-  ATTESTATION_CRITERIA_NOTE_MIN: z.string().default('10'),
-  ATTESTATION_DELAY_HOURS: z.string().default('24'),
-
-  // ==========================================================================
-  // SOCKET.IO
-  // ==========================================================================
-  SOCKET_CORS_ORIGINS: z.string().default('http://localhost:5173'),
-  SOCKET_PING_TIMEOUT: z.string().default('60000'),
-  SOCKET_PING_INTERVAL: z.string().default('25000'),
-  SOCKET_MAX_HTTP_BUFFER_SIZE: z.string().default('1000000'),
-
-  // ==========================================================================
-  // JOBS CRON
-  // ==========================================================================
-  CRON_ENABLED: z.string().default('true'),
-  CRON_TIMEZONE: z.string().default('Indian/Antananarivo'),
-
-  // ==========================================================================
-  // BACKUP
-  // ==========================================================================
-  BACKUP_ENABLED: z.string().default('true'),
-  BACKUP_DIR: z.string().default('./backups'),
-  BACKUP_RETENTION_DAYS: z.string().default('30'),
-  PG_DUMP_PATH: z.string().default('pg_dump'),
-
-  // ==========================================================================
-  // SWAGGER
-  // ==========================================================================
-  SWAGGER_ENABLED: z.string().default('true'),
-  SWAGGER_PATH: z.string().default('/api-docs'),
-
-  // ==========================================================================
-  // MONITORING
-  // ==========================================================================
-  SENTRY_DSN: z.string().optional(),
-  NEW_RELIC_LICENSE_KEY: z.string().optional(),
+dotenv.config({
+  path: path.resolve(process.cwd(), '.env.local'),
+  override: true,
+});
+dotenv.config({
+  path: path.resolve(process.cwd(), `.env.${NODE_ENV}`),
+  override: true,
 });
 
-/**
- * Parse + validation
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCHÉMA ZOD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    APP_NAME: z.string().default('ODC Platform'),
+    APP_VERSION: z.string().default('1.0.0'),
+    PORT: z.coerce.number().int().positive().default(5000),
+    API_PREFIX: z.string().default('/api'),
+    CLIENT_URL: z.string().url().default('http://localhost:3000'),
+    HOST: z.string().default('0.0.0.0'),
+
+    DB_CONNECTION: z.enum(['url', 'fields']).default('fields'),
+    DATABASE_URL: z.string().url().optional(),
+    DB_TYPE: z.string().default('postgres'),
+    DB_HOST: z.string().default('localhost'),
+    DB_PORT: z.coerce.number().int().positive().default(5432),
+    DB_USERNAME: z.string().optional(),
+    DB_PASSWORD: z.string().optional(),
+    DB_NAME: z.string().optional(),
+    DB_SCHEMA: z.string().default('public'),
+    DB_SSL: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    DB_SSL_REJECT_UNAUTHORIZED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    DB_SSL_CA: z.string().optional(),
+    DB_SSL_CERT: z.string().optional(),
+    DB_SSL_KEY: z.string().optional(),
+    DB_POOL_MIN: z.coerce.number().int().min(0).default(2),
+    DB_POOL_MAX: z.coerce.number().int().min(1).default(20),
+    DB_POOL_IDLE_TIMEOUT: z.coerce.number().int().default(30000),
+    DB_POOL_ACQUIRE_TIMEOUT: z.coerce.number().int().default(60000),
+    DB_STATEMENT_TIMEOUT: z.coerce.number().int().default(30000),
+    DB_QUERY_TIMEOUT: z.coerce.number().int().default(30000),
+    DB_CONNECTION_TIMEOUT: z.coerce.number().int().default(5000),
+    DB_LOGGING: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    DB_SYNCHRONIZE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    DB_MIGRATIONS_RUN: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    DB_MIGRATIONS_TABLE: z.string().default('migrations_history'),
+    DB_DROP_SCHEMA: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    DB_REPLICA_HOST: z.string().optional(),
+    DB_REPLICA_PORT: z.coerce.number().int().positive().optional(),
+
+    JWT_SECRET: z.string().min(32, 'JWT_SECRET doit faire au moins 32 caractères'),
+    JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET doit faire au moins 32 caractères'),
+    JWT_EXPIRES_IN: z.string().default('1h'),
+    JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+    JWT_ISSUER: z.string().default('odc-platform'),
+    JWT_AUDIENCE: z.string().default('odc-client'),
+
+    QR_TOKEN_SECRET: z.string().min(32, 'QR_TOKEN_SECRET doit faire au moins 32 caractères'),
+    QR_TOKEN_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
+    QR_TOKEN_CLOCK_SKEW_SECONDS: z.coerce.number().int().min(0).max(120).default(30),
+
+    // ⭐ NOUVEAU — bypass de la fenêtre temporelle en dev
+    QR_SKIP_TIME_WINDOW: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+
+    SMTP_HOST: z.string().default('smtp.gmail.com'),
+    SMTP_PORT: z.coerce.number().int().positive().default(587),
+    SMTP_SECURE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    SMTP_USER: z.string().default(''),
+    SMTP_PASS: z.string().default(''),
+    SMTP_FROM: z.string().default('Orange Digital Center <noreply@odc.mg>'),
+    SMTP_REPLY_TO: z.string().default('contact@odc.mg'),
+    SMTP_POOL: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    SMTP_MAX_CONNECTIONS: z.coerce.number().int().positive().default(5),
+    SMTP_MAX_MESSAGES: z.coerce.number().int().positive().default(100),
+
+    UPLOAD_DIR: z.string().default('./uploads'),
+    UPLOAD_MAX_FILE_SIZE: z.coerce.number().int().positive().default(10485760),
+    UPLOAD_MAX_FILES: z.coerce.number().int().positive().default(10),
+    UPLOAD_ALLOWED_MIMES: z.string().optional(),
+    UPLOAD_ALLOWED_EXTENSIONS: z.string().optional(),
+    UPLOAD_KEEP_TEMP_HOURS: z.coerce.number().int().positive().default(24),
+
+    REDIS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    REDIS_HOST: z.string().default('localhost'),
+    REDIS_PORT: z.coerce.number().int().positive().default(6379),
+    REDIS_PASSWORD: z.string().default(''),
+    REDIS_DB: z.coerce.number().int().min(0).default(0),
+    REDIS_TTL: z.coerce.number().int().positive().default(300),
+
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(500),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+    HEAVY_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+
+    CORS_ORIGINS: z.string().default('http://localhost:5173,http://localhost:3000'),
+    CORS_CREDENTIALS: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    CORS_MAX_AGE: z.coerce.number().int().positive().default(86400),
+
+    LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
+    LOG_DIR: z.string().default('./logs'),
+    LOG_MAX_SIZE: z.coerce.number().int().positive().default(5242880),
+    LOG_MAX_FILES: z.coerce.number().int().positive().default(5),
+    LOG_CONSOLE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    LOG_FILE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+
+    BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(20).default(12),
+    HELMET_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    TRUST_PROXY: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+    REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+
+    KEYS_DIR: z.string().default('./keys'),
+    ATTESTATION_CRITERIA_PRESENCE_MIN: z.coerce.number().int().min(0).max(100).default(75),
+    ATTESTATION_CRITERIA_NOTE_MIN: z.coerce.number().int().min(0).default(10),
+    ATTESTATION_DELAY_HOURS: z.coerce.number().int().positive().default(24),
+
+    SOCKET_CORS_ORIGINS: z.string().default('http://localhost:5173'),
+    SOCKET_PING_TIMEOUT: z.coerce.number().int().positive().default(60000),
+    SOCKET_PING_INTERVAL: z.coerce.number().int().positive().default(25000),
+    SOCKET_MAX_HTTP_BUFFER_SIZE: z.coerce.number().int().positive().default(1000000),
+
+    CRON_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    CRON_TIMEZONE: z.string().default('Indian/Fianarantsoa'),
+
+    BACKUP_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    BACKUP_DIR: z.string().default('./backups'),
+    BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+    PG_DUMP_PATH: z.string().default('pg_dump'),
+
+    SWAGGER_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+    SWAGGER_PATH: z.string().default('/api-docs'),
+
+    SENTRY_DSN: z.string().optional().transform((v) => (v?.trim() ? v : undefined)).pipe(z.string().url().optional()),
+    NEW_RELIC_LICENSE_KEY: z.string().optional().transform((v) => (v?.trim() ? v : undefined)),
+  })
+  .superRefine((data, ctx) => {
+    if (data.DB_CONNECTION === 'url') {
+      if (!data.DATABASE_URL) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DATABASE_URL'],
+          message: 'DATABASE_URL requis quand DB_CONNECTION=url',
+        });
+      }
+    } else {
+      if (!data.DB_USERNAME) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DB_USERNAME'],
+          message: 'DB_USERNAME requis quand DB_CONNECTION=fields',
+        });
+      }
+      if (!data.DB_PASSWORD) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DB_PASSWORD'],
+          message: 'DB_PASSWORD requis quand DB_CONNECTION=fields',
+        });
+      }
+      if (!data.DB_NAME) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DB_NAME'],
+          message: 'DB_NAME requis quand DB_CONNECTION=fields',
+        });
+      }
+    }
+
+    if (data.NODE_ENV === 'production') {
+      const weakSecrets = ['changeme', 'secret', 'default', 'your-secret'];
+      const secretsToCheck: Array<[string, string]> = [
+        ['JWT_SECRET', data.JWT_SECRET],
+        ['JWT_REFRESH_SECRET', data.JWT_REFRESH_SECRET],
+        ['QR_TOKEN_SECRET', data.QR_TOKEN_SECRET],
+      ];
+      for (const [key, value] of secretsToCheck) {
+        if (weakSecrets.some((w) => value.toLowerCase().includes(w))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} contient un secret faible. Utilise : openssl rand -base64 48`,
+          });
+        }
+      }
+    }
+  });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PARSING + FALLBACK
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error('❌ Erreur de configuration .env :');
-  console.error(JSON.stringify(parsed.error.format(), null, 2));
-  process.exit(1);
+  console.error('\n❌ Erreur de configuration .env :\n');
+  const errors = parsed.error.flatten().fieldErrors;
+  for (const [key, messages] of Object.entries(errors)) {
+    console.error(`  • ${key}:`);
+    for (const msg of messages ?? []) {
+      console.error(`      - ${msg}`);
+    }
+  }
+  console.error('\n👉 Vérifie ton fichier .env (ou .env.local)\n');
+
+  // ⭐ En DEV, continuer avec des valeurs par défaut au lieu de crasher
+  if (NODE_ENV === 'production') {
+    process.exit(1);
+  }
+  console.warn('⚠️  Utilisation des valeurs par défaut en dev...\n');
 }
 
-/**
- * Helper conversion booléen
- */
-const bool = (v: string) => v === 'true';
+const list = (v: string) =>
+  v.split(',').map((s) => s.trim()).filter(Boolean);
 
-/**
- * Helper conversion nombre
- */
-const num = (v: string) => Number(v);
+const data: any = parsed.success ? parsed.data : {};
 
-/**
- * Helper conversion liste séparée par virgules
- */
-const list = (v: string) => v.split(',').map((s) => s.trim()).filter(Boolean);
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXPORT — avec valeurs par défaut garanties
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * Configuration typée et validée
- */
 export const env = {
-  // Application
-  ...parsed.data,
+  // App
+  NODE_ENV: data.NODE_ENV ?? NODE_ENV,
+  APP_NAME: data.APP_NAME ?? 'ODC Platform',
+  APP_VERSION: data.APP_VERSION ?? '1.0.0',
+  PORT: data.PORT ?? 5000,
+  API_PREFIX: data.API_PREFIX ?? '/api',
+  CLIENT_URL: data.CLIENT_URL ?? 'http://localhost:3000',
+  HOST: data.HOST ?? '0.0.0.0',
 
-  // Conversions
-  PORT: num(parsed.data.PORT),
+  // DB
+  DB_CONNECTION: data.DB_CONNECTION ?? 'fields',
+  DATABASE_URL: data.DATABASE_URL,
+  DB_TYPE: data.DB_TYPE ?? 'postgres',
+  DB_HOST: data.DB_HOST ?? 'localhost',
+  DB_PORT: data.DB_PORT ?? 5432,
+  DB_USERNAME: data.DB_USERNAME ?? 'postgres',
+  DB_PASSWORD: data.DB_PASSWORD ?? '',
+  DB_NAME: data.DB_NAME ?? 'odc_db',
+  DB_SCHEMA: data.DB_SCHEMA ?? 'public',
+  DB_SSL: data.DB_SSL ?? false,
+  DB_SSL_REJECT_UNAUTHORIZED: data.DB_SSL_REJECT_UNAUTHORIZED ?? false,
+  DB_SSL_CA: data.DB_SSL_CA,
+  DB_POOL_MIN: data.DB_POOL_MIN ?? 2,
+  DB_POOL_MAX: data.DB_POOL_MAX ?? 10,
+  DB_POOL_IDLE_TIMEOUT: data.DB_POOL_IDLE_TIMEOUT ?? 30000,
+  DB_POOL_ACQUIRE_TIMEOUT: data.DB_POOL_ACQUIRE_TIMEOUT ?? 60000,
+  DB_STATEMENT_TIMEOUT: data.DB_STATEMENT_TIMEOUT ?? 30000,
+  DB_QUERY_TIMEOUT: data.DB_QUERY_TIMEOUT ?? 30000,
+  DB_CONNECTION_TIMEOUT: data.DB_CONNECTION_TIMEOUT ?? 5000,
+  DB_LOGGING: data.DB_LOGGING ?? false,
+  DB_SYNCHRONIZE: data.DB_SYNCHRONIZE ?? false,
+  DB_MIGRATIONS_RUN: data.DB_MIGRATIONS_RUN ?? false,
+  DB_MIGRATIONS_TABLE: data.DB_MIGRATIONS_TABLE ?? 'migrations_history',
+  DB_DROP_SCHEMA: data.DB_DROP_SCHEMA ?? false,
 
-  // Database
-  DB_PORT: num(parsed.data.DB_PORT),
-  DB_SSL: bool(parsed.data.DB_SSL),
-  DB_SSL_REJECT_UNAUTHORIZED: bool(parsed.data.DB_SSL_REJECT_UNAUTHORIZED),
-  DB_POOL_MIN: num(parsed.data.DB_POOL_MIN),
-  DB_POOL_MAX: num(parsed.data.DB_POOL_MAX),
-  DB_POOL_IDLE_TIMEOUT: num(parsed.data.DB_POOL_IDLE_TIMEOUT),
-  DB_POOL_ACQUIRE_TIMEOUT: num(parsed.data.DB_POOL_ACQUIRE_TIMEOUT),
-  DB_STATEMENT_TIMEOUT: num(parsed.data.DB_STATEMENT_TIMEOUT),
-  DB_QUERY_TIMEOUT: num(parsed.data.DB_QUERY_TIMEOUT),
-  DB_CONNECTION_TIMEOUT: num(parsed.data.DB_CONNECTION_TIMEOUT),
-  DB_LOGGING: bool(parsed.data.DB_LOGGING),
-  DB_SYNCHRONIZE: bool(parsed.data.DB_SYNCHRONIZE),
-  DB_MIGRATIONS_RUN: bool(parsed.data.DB_MIGRATIONS_RUN),
-  DB_DROP_SCHEMA: bool(parsed.data.DB_DROP_SCHEMA),
+  // JWT
+  JWT_SECRET: data.JWT_SECRET ?? 'dev-jwt-secret-at-least-32-chars-long!!',
+  JWT_REFRESH_SECRET: data.JWT_REFRESH_SECRET ?? 'dev-refresh-secret-at-least-32-chars!!',
+  JWT_EXPIRES_IN: data.JWT_EXPIRES_IN ?? '1h',
+  JWT_REFRESH_EXPIRES_IN: data.JWT_REFRESH_EXPIRES_IN ?? '7d',
+  JWT_ISSUER: data.JWT_ISSUER ?? 'odc-platform',
+  JWT_AUDIENCE: data.JWT_AUDIENCE ?? 'odc-client',
+
+  // QR
+  QR_TOKEN_SECRET: data.QR_TOKEN_SECRET ?? 'dev-qr-token-secret-at-least-32-chars!!',
+  QR_TOKEN_TTL_MINUTES: data.QR_TOKEN_TTL_MINUTES ?? 15,
+  QR_TOKEN_CLOCK_SKEW_SECONDS: data.QR_TOKEN_CLOCK_SKEW_SECONDS ?? 30,
+  // ⭐ NOUVEAU — bypass de la fenêtre temporelle
+  QR_SKIP_TIME_WINDOW: data.QR_SKIP_TIME_WINDOW ?? false,
 
   // SMTP
-  SMTP_PORT: num(parsed.data.SMTP_PORT),
-  SMTP_SECURE: bool(parsed.data.SMTP_SECURE),
-  SMTP_POOL: bool(parsed.data.SMTP_POOL),
-  SMTP_MAX_CONNECTIONS: num(parsed.data.SMTP_MAX_CONNECTIONS),
-  SMTP_MAX_MESSAGES: num(parsed.data.SMTP_MAX_MESSAGES),
+  SMTP_HOST: data.SMTP_HOST ?? 'smtp.gmail.com',
+  SMTP_PORT: data.SMTP_PORT ?? 587,
+  SMTP_SECURE: data.SMTP_SECURE ?? false,
+  SMTP_USER: data.SMTP_USER ?? '',
+  SMTP_PASS: data.SMTP_PASS ?? '',
+  SMTP_FROM: data.SMTP_FROM ?? 'Orange Digital Center <noreply@odc.mg>',
+  SMTP_REPLY_TO: data.SMTP_REPLY_TO ?? 'contact@odc.mg',
+  SMTP_POOL: data.SMTP_POOL ?? true,
+  SMTP_MAX_CONNECTIONS: data.SMTP_MAX_CONNECTIONS ?? 5,
+  SMTP_MAX_MESSAGES: data.SMTP_MAX_MESSAGES ?? 100,
 
   // Upload
-  UPLOAD_MAX_FILE_SIZE: num(parsed.data.UPLOAD_MAX_FILE_SIZE),
-  UPLOAD_MAX_FILES: num(parsed.data.UPLOAD_MAX_FILES),
-  UPLOAD_KEEP_TEMP_HOURS: num(parsed.data.UPLOAD_KEEP_TEMP_HOURS),
-  UPLOAD_ALLOWED_MIMES_LIST: parsed.data.UPLOAD_ALLOWED_MIMES
-    ? list(parsed.data.UPLOAD_ALLOWED_MIMES)
-    : undefined,
-  UPLOAD_ALLOWED_EXTENSIONS_LIST: parsed.data.UPLOAD_ALLOWED_EXTENSIONS
-    ? list(parsed.data.UPLOAD_ALLOWED_EXTENSIONS)
-    : undefined,
+  UPLOAD_DIR: data.UPLOAD_DIR ?? './uploads',
+  UPLOAD_MAX_FILE_SIZE: data.UPLOAD_MAX_FILE_SIZE ?? 10485760,
+  UPLOAD_MAX_FILES: data.UPLOAD_MAX_FILES ?? 10,
+  UPLOAD_KEEP_TEMP_HOURS: data.UPLOAD_KEEP_TEMP_HOURS ?? 24,
 
   // Redis
-  REDIS_ENABLED: bool(parsed.data.REDIS_ENABLED),
-  REDIS_PORT: num(parsed.data.REDIS_PORT),
-  REDIS_DB: num(parsed.data.REDIS_DB),
-  REDIS_TTL: num(parsed.data.REDIS_TTL),
+  REDIS_ENABLED: data.REDIS_ENABLED ?? false,
+  REDIS_HOST: data.REDIS_HOST ?? 'localhost',
+  REDIS_PORT: data.REDIS_PORT ?? 6379,
+  REDIS_PASSWORD: data.REDIS_PASSWORD ?? '',
+  REDIS_DB: data.REDIS_DB ?? 0,
+  REDIS_TTL: data.REDIS_TTL ?? 300,
 
-  // Rate limiting
-  RATE_LIMIT_WINDOW_MS: num(parsed.data.RATE_LIMIT_WINDOW_MS),
-  RATE_LIMIT_MAX: num(parsed.data.RATE_LIMIT_MAX),
-  AUTH_RATE_LIMIT_MAX: num(parsed.data.AUTH_RATE_LIMIT_MAX),
-  HEAVY_RATE_LIMIT_MAX: num(parsed.data.HEAVY_RATE_LIMIT_MAX),
+  // Rate limit
+  RATE_LIMIT_WINDOW_MS: data.RATE_LIMIT_WINDOW_MS ?? 900000,
+  RATE_LIMIT_MAX: data.RATE_LIMIT_MAX ?? 500,
+  AUTH_RATE_LIMIT_MAX: data.AUTH_RATE_LIMIT_MAX ?? 20,
+  HEAVY_RATE_LIMIT_MAX: data.HEAVY_RATE_LIMIT_MAX ?? 5,
 
   // CORS
-  CORS_ORIGINS_LIST: list(parsed.data.CORS_ORIGINS),
-  CORS_CREDENTIALS: bool(parsed.data.CORS_CREDENTIALS),
-  CORS_MAX_AGE: num(parsed.data.CORS_MAX_AGE),
+  CORS_ORIGINS: data.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:5173',
+  CORS_CREDENTIALS: data.CORS_CREDENTIALS ?? true,
+  CORS_MAX_AGE: data.CORS_MAX_AGE ?? 86400,
 
   // Logs
-  LOG_MAX_SIZE: num(parsed.data.LOG_MAX_SIZE),
-  LOG_MAX_FILES: num(parsed.data.LOG_MAX_FILES),
-  LOG_CONSOLE: bool(parsed.data.LOG_CONSOLE),
-  LOG_FILE: bool(parsed.data.LOG_FILE),
+  LOG_LEVEL: data.LOG_LEVEL ?? 'info',
+  LOG_DIR: data.LOG_DIR ?? './logs',
+  LOG_MAX_SIZE: data.LOG_MAX_SIZE ?? 5242880,
+  LOG_MAX_FILES: data.LOG_MAX_FILES ?? 5,
+  LOG_CONSOLE: data.LOG_CONSOLE ?? true,
+  LOG_FILE: data.LOG_FILE ?? true,
 
   // Sécurité
-  BCRYPT_ROUNDS: num(parsed.data.BCRYPT_ROUNDS),
-  HELMET_ENABLED: bool(parsed.data.HELMET_ENABLED),
-  TRUST_PROXY: bool(parsed.data.TRUST_PROXY),
-  REQUEST_TIMEOUT_MS: num(parsed.data.REQUEST_TIMEOUT_MS),
+  BCRYPT_ROUNDS: data.BCRYPT_ROUNDS ?? 12,
+  HELMET_ENABLED: data.HELMET_ENABLED ?? true,
+  TRUST_PROXY: data.TRUST_PROXY ?? false,
+  REQUEST_TIMEOUT_MS: data.REQUEST_TIMEOUT_MS ?? 30000,
 
-  // Attestation
-  ATTESTATION_CRITERIA_PRESENCE_MIN: num(parsed.data.ATTESTATION_CRITERIA_PRESENCE_MIN),
-  ATTESTATION_CRITERIA_NOTE_MIN: num(parsed.data.ATTESTATION_CRITERIA_NOTE_MIN),
-  ATTESTATION_DELAY_HOURS: num(parsed.data.ATTESTATION_DELAY_HOURS),
+  // Attestations
+  KEYS_DIR: data.KEYS_DIR ?? './keys',
+  ATTESTATION_CRITERIA_PRESENCE_MIN: data.ATTESTATION_CRITERIA_PRESENCE_MIN ?? 75,
+  ATTESTATION_CRITERIA_NOTE_MIN: data.ATTESTATION_CRITERIA_NOTE_MIN ?? 10,
+  ATTESTATION_DELAY_HOURS: data.ATTESTATION_DELAY_HOURS ?? 24,
 
-  // Socket.io
-  SOCKET_CORS_ORIGINS_LIST: list(parsed.data.SOCKET_CORS_ORIGINS),
-  SOCKET_PING_TIMEOUT: num(parsed.data.SOCKET_PING_TIMEOUT),
-  SOCKET_PING_INTERVAL: num(parsed.data.SOCKET_PING_INTERVAL),
-  SOCKET_MAX_HTTP_BUFFER_SIZE: num(parsed.data.SOCKET_MAX_HTTP_BUFFER_SIZE),
+  // Socket
+  SOCKET_CORS_ORIGINS: data.SOCKET_CORS_ORIGINS ?? 'http://localhost:3000',
+  SOCKET_PING_TIMEOUT: data.SOCKET_PING_TIMEOUT ?? 60000,
+  SOCKET_PING_INTERVAL: data.SOCKET_PING_INTERVAL ?? 25000,
+  SOCKET_MAX_HTTP_BUFFER_SIZE: data.SOCKET_MAX_HTTP_BUFFER_SIZE ?? 1000000,
 
-  // Jobs
-  CRON_ENABLED: bool(parsed.data.CRON_ENABLED),
+  // Cron
+  CRON_ENABLED: data.CRON_ENABLED ?? true,
+  CRON_TIMEZONE: data.CRON_TIMEZONE ?? 'Indian/Fianarantsoa',
 
   // Backup
-  BACKUP_ENABLED: bool(parsed.data.BACKUP_ENABLED),
-  BACKUP_RETENTION_DAYS: num(parsed.data.BACKUP_RETENTION_DAYS),
+  BACKUP_ENABLED: data.BACKUP_ENABLED ?? true,
+  BACKUP_DIR: data.BACKUP_DIR ?? './backups',
+  BACKUP_RETENTION_DAYS: data.BACKUP_RETENTION_DAYS ?? 30,
+  PG_DUMP_PATH: data.PG_DUMP_PATH ?? 'pg_dump',
 
   // Swagger
-  SWAGGER_ENABLED: bool(parsed.data.SWAGGER_ENABLED),
+  SWAGGER_ENABLED: data.SWAGGER_ENABLED ?? true,
+  SWAGGER_PATH: data.SWAGGER_PATH ?? '/api-docs',
 
-  // Helpers
-  isDev: parsed.data.NODE_ENV === 'development',
-  isProd: parsed.data.NODE_ENV === 'production',
-  isTest: parsed.data.NODE_ENV === 'test',
+  // Lists
+  CORS_ORIGINS_LIST: data.CORS_ORIGINS
+    ? list(data.CORS_ORIGINS)
+    : ['http://localhost:3000', 'http://localhost:5173'],
+  SOCKET_CORS_ORIGINS_LIST: data.SOCKET_CORS_ORIGINS
+    ? list(data.SOCKET_CORS_ORIGINS)
+    : ['http://localhost:3000'],
+  UPLOAD_ALLOWED_MIMES_LIST: data.UPLOAD_ALLOWED_MIMES
+    ? list(data.UPLOAD_ALLOWED_MIMES)
+    : undefined,
+  UPLOAD_ALLOWED_EXTENSIONS_LIST: data.UPLOAD_ALLOWED_EXTENSIONS
+    ? list(data.UPLOAD_ALLOWED_EXTENSIONS)
+    : undefined,
+
+  // Flags
+  isDev: (data.NODE_ENV ?? NODE_ENV) === 'development',
+  isProd: (data.NODE_ENV ?? NODE_ENV) === 'production',
+  isTest: (data.NODE_ENV ?? NODE_ENV) === 'test',
 };
 
 export type Env = typeof env;

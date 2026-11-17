@@ -105,7 +105,7 @@ export function PublicFooter() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2 text-odc-secondary">
                 <MapPin className="h-4 w-4 mt-0.5 text-odc-primary shrink-0" />
-                <span>Antananarivo, Madagascar</span>
+                <span>Fianarantsoa, Madagascar</span>
               </li>
               <li>
                 <a

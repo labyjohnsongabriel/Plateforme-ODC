@@ -1,50 +1,32 @@
-<<<<<<< HEAD
-import { Request, Response, NextFunction } from 'express';
-import { AppDataSource } from '../config/database';
-import { Notification } from '../models/Notification.entity';
-import { successResponse } from '../utils/response.util';
-import { getPagination } from '../utils/pagination.util';
-
-export class NotificationController {
-=======
 // src/controllers/NotificationController.ts
 import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../config/database';
 import { Notification } from '../entities/Notification.entity';
 import { successResponse, paginatedResponse } from '../utils/response.util';
 import { getPagination } from '../utils/pagination.util';
+import { emitToUser, isSocketInitialized } from '../sockets';
+
+async function notifyUnreadCount(userId: string): Promise<void> {
+  if (!isSocketInitialized()) return;
+  const count = await AppDataSource.getRepository(Notification).count({
+    where: { userId, lue: false },
+  });
+  emitToUser(userId, 'notifications:count', { count });
+}
 
 export class NotificationController {
   /** GET /api/notifications */
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   static async mesNotifications(req: Request, res: Response, next: NextFunction) {
     try {
-      const { page, limit, skip } = getPagination(req.query.page, req.query.limit);
+      const { page, limit, skip } = getPagination(
+        typeof req.query.page === 'string' ? req.query.page : undefined,
+        typeof req.query.limit === 'string' ? req.query.limit : undefined,
+      );
+      const where: { userId: string; lue?: boolean } = { userId: req.userId! };
+      if (req.query.lue === 'true') where.lue = true;
+      if (req.query.lue === 'false') where.lue = false;
       const [data, total] = await AppDataSource.getRepository(Notification).findAndCount({
-<<<<<<< HEAD
-        where: { userId: req.userId! }, skip, take: limit, order: { createdAt: 'DESC' },
-      });
-      return successResponse(res, { data, total, page, limit });
-    } catch (e) { next(e); }
-  }
-  static async countNonLues(req: Request, res: Response, next: NextFunction) {
-    try {
-      const count = await AppDataSource.getRepository(Notification).count({ where: { userId: req.userId!, lue: false } });
-      return successResponse(res, { count });
-    } catch (e) { next(e); }
-  }
-  static async marquerLue(req: Request, res: Response, next: NextFunction) {
-    try {
-      await AppDataSource.getRepository(Notification).update({ id: req.params.id, userId: req.userId! }, { lue: true });
-      return successResponse(res, null, 'Notification lue');
-    } catch (e) { next(e); }
-  }
-  static async marquerToutesLues(req: Request, res: Response, next: NextFunction) {
-    try {
-      await AppDataSource.getRepository(Notification).update({ userId: req.userId!, lue: false }, { lue: true });
-      return successResponse(res, null, 'Toutes lues');
-=======
-        where: { userId: req.userId! },
+        where,
         skip, take: limit,
         order: { createdAt: 'DESC' },
       });
@@ -69,6 +51,7 @@ export class NotificationController {
         { id: req.params.id, userId: req.userId! },
         { lue: true, dateLecture: new Date() }
       );
+      await notifyUnreadCount(req.userId!);
       return successResponse(res, null, 'Notification lue');
     } catch (e) { next(e); }
   }
@@ -80,6 +63,7 @@ export class NotificationController {
         { userId: req.userId!, lue: false },
         { lue: true, dateLecture: new Date() }
       );
+      await notifyUnreadCount(req.userId!);
       return successResponse(res, null, 'Toutes les notifications lues');
     } catch (e) { next(e); }
   }
@@ -90,8 +74,8 @@ export class NotificationController {
       await AppDataSource.getRepository(Notification).softDelete({
         id: req.params.id, userId: req.userId!,
       });
+      await notifyUnreadCount(req.userId!);
       return successResponse(res, null, 'Notification supprimée');
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
     } catch (e) { next(e); }
   }
 }

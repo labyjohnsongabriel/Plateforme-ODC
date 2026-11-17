@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface DeleteConfirmDialogProps {
   open: boolean;
@@ -42,29 +43,43 @@ export function DeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-11 h-11 rounded-full bg-odc-error-bg flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-odc-error" />
+          <div className="mb-2 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" aria-hidden />
             </div>
-            <DialogTitle>{title}</DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-slate-50">
+              {title}
+            </DialogTitle>
           </div>
-          <DialogDescription>
+          <DialogDescription className="text-slate-500 dark:text-slate-400">
             {description ?? defaultDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+        <DialogFooter className="gap-2">
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             {cancelLabel}
           </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={loading}>
-            {loading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
-            )}
+          <Button
+            variant="danger"
+            size="md"
+            onClick={onConfirm}
+            disabled={loading}
+            leftIcon={
+              loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Trash2 className="h-4 w-4" aria-hidden />
+              )
+            }
+          >
             {confirmLabel}
           </Button>
         </DialogFooter>

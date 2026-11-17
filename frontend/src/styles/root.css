@@ -1,0 +1,142 @@
+:root {
+  /* Primary */
+  --odc-primary: #FF7900;
+  --odc-primary-hover: #EA6A00;
+  --odc-primary-active: #C25400;
+  --odc-primary-dark: #9A4300;
+  --odc-primary-light: #FDBA74;
+  --odc-primary-soft: #FFEDD5;
+  --odc-primary-softer: #FFF7ED;
+
+  /* Surfaces */
+  --odc-background: #FFFFFF;
+  --odc-surface: #FFFFFF;
+  --odc-surface-alt: #F8FAFC;
+  --odc-surface-hover: #F1F5F9;
+  --odc-elevated: #FFFFFF;
+
+  /* Textes */
+  --odc-text-primary: #0F172A;
+  --odc-text-secondary: #475569;
+  --odc-text-tertiary: #64748B;
+  --odc-text-muted: #94A3B8;
+  --odc-text-inverse: #FFFFFF;
+
+  /* Bordures */
+  --odc-border: #E2E8F0;
+  --odc-border-light: #F1F5F9;
+  --odc-border-strong: #CBD5E1;
+
+  /* États */
+  --odc-success: #10B981;
+  --odc-success-dark: #047857;
+  --odc-success-soft: #D1FAE5;
+  --odc-success-bg: #ECFDF5;
+
+  --odc-warning: #F59E0B;
+  --odc-warning-dark: #B45309;
+  --odc-warning-soft: #FEF3C7;
+  --odc-warning-bg: #FFFBEB;
+
+  --odc-error: #EF4444;
+  --odc-error-dark: #B91C1C;
+  --odc-error-soft: #FEE2E2;
+  --odc-error-bg: #FEF2F2;
+
+  --odc-info: #3B82F6;
+  --odc-info-dark: #1D4ED8;
+  --odc-info-soft: #DBEAFE;
+  --odc-info-bg: #EFF6FF;
+
+  --odc-purple: #8B5CF6;
+  --odc-purple-soft: #EDE9FE;
+  --odc-purple-bg: #F5F3FF;
+
+  --odc-pink: #EC4899;
+  --odc-pink-soft: #FCE7F3;
+
+  /* Ombres */
+  --odc-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --odc-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --odc-shadow-md: 0 4px 8px rgba(15, 23, 42, 0.08);
+  --odc-shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --odc-shadow-xl: 0 16px 40px rgba(15, 23, 42, 0.12);
+  --odc-shadow-2xl: 0 24px 64px rgba(15, 23, 42, 0.16);
+  --odc-shadow-focus: 0 0 0 3px rgba(255, 121, 0, 0.35);
+  --odc-shadow-primary-sm: 0 2px 6px rgba(255, 121, 0, 0.20);
+  --odc-shadow-primary-md: 0 4px 12px rgba(255, 121, 0, 0.25);
+  --odc-shadow-primary-lg: 0 8px 24px rgba(255, 121, 0, 0.30);
+
+  /* shadcn */
+  --radius: 0.75rem;
+
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --primary: 24 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 24 100% 50%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+}
+
+/* Mode sombre — redéfinir les tokens critiques */
+.dark {
+  --odc-background: #0B1220;
+  --odc-surface: #0F172A;
+  --odc-surface-alt: #111C33;
+  --odc-surface-hover: #1A2540;
+  --odc-elevated: #0F172A;
+
+  --odc-text-primary: #F8FAFC;
+  --odc-text-secondary: #CBD5E1;
+  --odc-text-tertiary: #94A3B8;
+  --odc-text-muted: #64748B;
+  --odc-text-inverse: #0F172A;
+
+  --odc-border: #1E293B;
+  --odc-border-light: #172033;
+  --odc-border-strong: #334155;
+
+  --odc-primary-soft: #3A220A;
+  --odc-primary-softer: #241708;
+
+  --odc-success-soft: #052E22;
+  --odc-warning-soft: #3A2A08;
+  --odc-error-soft: #3F1212;
+  --odc-info-soft: #0F2549;
+  --odc-purple-soft: #2A1A4E;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ripple,
+  .animate-pulse-soft,
+  .animate-float,
+  .animate-spin,
+  .animate-spin-slow,
+  .animate-spin-reverse,
+  .animate-progress-indeterminate,
+  .animate-scale-in,
+  .animate-shimmer-text {
+    animation: none !important;
+  }
+
+  /* Indiquer visuellement qu'il y a un chargement sans animation */
+  [role="status"]::after {
+    content: '⏳';
+    display: block;
+    font-size: 2rem;
+    text-align: center;
+    margin-top: 1rem;
+  }
+}

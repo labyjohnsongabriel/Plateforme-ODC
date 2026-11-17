@@ -1,13 +1,14 @@
+// src/entities/Role.entity.ts
 import { Entity, Column, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { BaseEntity } from './BaseEntity';
 import { User } from './User.entity';
 import { Permission } from './Permission.entity';
 
 export enum RoleName {
-  ADMIN = 'ADMIN',
-  STAFF = 'STAFF',
+  ADMINISTRATEUR = 'ADMINISTRATEUR',
+  STAFF_ODC = 'STAFF_ODC',
   FORMATEUR = 'FORMATEUR',
-PARTICIPANT = 'PARTICIPANT',
+  PARTICIPANT = 'PARTICIPANT',
   PARTENAIRE = 'PARTENAIRE',
 }
 

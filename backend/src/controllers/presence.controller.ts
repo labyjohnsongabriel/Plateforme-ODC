@@ -1,48 +1,12 @@
-<<<<<<< HEAD
+// src/controllers/presence.controller.ts
 import { Request, Response, NextFunction } from 'express';
-import { PresenceService } from '../services/presence.service';
-import { successResponse, paginatedResponse } from '../utils/response.util';
-
-export class PresenceController {
-  static async scannerQr(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await PresenceService.scannerQr(req.userId!, req.body.sessionId, req.body.qrToken), 'Presence enregistree', 201); }
-    catch (e) { next(e); }
-  }
-  static async marquerManuel(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await PresenceService.marquerManuel(req.body.sessionId, req.body.participantId, req.body.present, req.body.commentaire), 'Presence mise a jour'); }
-    catch (e) { next(e); }
-  }
-  static async findBySession(req: Request, res: Response, next: NextFunction) {
-    try {
-      const r = await PresenceService.findBySession(req.params.sessionId, req.query);
-      return paginatedResponse(res, r.data, r.total, r.page, r.limit);
-    } catch (e) { next(e); }
-  }
-  static async tauxPresence(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, { taux: await PresenceService.calculerTauxPresence(req.params.sessionId, req.params.participantId) }); }
-    catch (e) { next(e); }
-  }
-
-  static async stats(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await PresenceService.getStats(req.params.sessionId)); }
-    catch (e) { next(e); }
-  }
-
-  static async generateQr(req: Request, res: Response, next: NextFunction) {
-    try { return successResponse(res, await PresenceService.generateQr(req.body.sessionId)); }
-    catch (e) { next(e); }
-=======
-// src/controllers/PresenceController.ts
-import { Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
 import { AppDataSource } from '../config/database';
-import { Presence } from '../entities/Presence.entity';
 import { Session } from '../entities/Session.entity';
 import { Inscription } from '../entities/Inscription.entity';
 import {
-  StatutPresence,
-  MethodePresence,
+  RoleName,
   StatutInscription,
+  StatutPresence,
 } from '../entities/enums';
 import { successResponse, paginatedResponse } from '../utils/response.util';
 import { getPagination } from '../utils/pagination.util';
@@ -50,13 +14,13 @@ import {
   NotFoundError,
   ForbiddenError,
   BadRequestError,
-  ConflictError,
 } from '../errors/AppError';
+import { PresenceService } from '../services/presence.service';
 import { logger } from '../config/logger';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function getUserId(req: Request): string {
   const userId = (req as any).user?.sub ?? (req as any).userId;
@@ -64,18 +28,90 @@ function getUserId(req: Request): string {
   return userId;
 }
 
-function todayString(): string {
-  return new Date().toISOString().split('T')[0];
+function getUserRole(req: Request): RoleName {
+  const role = (req as any).userRole ?? (req as any).user?.role?.nom;
+  if (!role) throw new ForbiddenError('Rôle utilisateur introuvable');
+  return role;
 }
 
-/* ============================================================================
+function validateUuid(value: string, field: string): void {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  ) {
+    throw new BadRequestError(`${field} doit être un UUID valide`);
+  }
+}
+
+function canManageSession(req: Request, session: Session): boolean {
+  const role = getUserRole(req);
+  if (role === RoleName.ADMINISTRATEUR || role === RoleName.STAFF_ODC) {
+    return true;
+  }
+  return role === RoleName.FORMATEUR && session.formateurId === getUserId(req);
+}
+
+async function getSessionOrFail(sessionId: string): Promise<Session> {
+  const session = await AppDataSource.getRepository(Session).findOne({
+    where: { id: sessionId },
+  });
+  if (!session) throw new NotFoundError('Session introuvable');
+  return session;
+}
+
+function isValidQrTokenStructure(token: string): boolean {
+  if (typeof token !== 'string') return false;
+  if (token.length < 100) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  return parts.every((p) => p.length > 0);
+}
+
+function logControllerError(
+  method: string,
+  req: Request,
+  error: unknown,
+): void {
+  const err = error as {
+    message?: string;
+    name?: string;
+    statusCode?: number;
+    code?: string;
+    stack?: string;
+  };
+
+  logger.error(`[PRESENCE CONTROLLER] ${method} failed`, {
+    message: err?.message ?? String(error),
+    name: err?.name,
+    statusCode: err?.statusCode,
+    code: err?.code,
+    path: req.originalUrl,
+    method: req.method,
+    userId: (req as any).user?.sub ?? (req as any).userId,
+    bodyKeys: Object.keys(req.body ?? {}),
+    params: req.params,
+    stack: err?.stack?.split('\n').slice(0, 5),
+  });
+}
+
+/** Ajoute `present` à une présence (getter non sérialisé). */
+function withPresent<T extends { statut: StatutPresence }>(p: T) {
+  return {
+    ...p,
+    present:
+      p.statut === StatutPresence.PRESENT || p.statut === StatutPresence.RETARD,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    CONTROLLER
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export class PresenceController {
-  /* ==========================================================================
-     📷 SCAN QR (participant)
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     📷 SCAN QR
+     ══════════════════════════════════════════════════════════════════════════ */
   static async scannerQr(
     req: Request,
     res: Response,
@@ -83,77 +119,45 @@ export class PresenceController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-      const { sessionId, qrToken } = req.body;
+      const { sessionId, qrToken } = (req.body ?? {}) as {
+        sessionId?: string;
+        qrToken?: string;
+      };
 
-      if (!sessionId || !qrToken) {
-        throw new BadRequestError('sessionId et qrToken requis');
+      if (!sessionId) throw new BadRequestError('sessionId requis');
+      validateUuid(sessionId, 'sessionId');
+
+      if (!qrToken) throw new BadRequestError('qrToken requis');
+      if (!isValidQrTokenStructure(qrToken)) {
+        throw new BadRequestError(
+          'qrToken invalide — format attendu : header.payload.signature',
+        );
       }
 
-      const session = await AppDataSource.getRepository(Session).findOne({
-        where: { id: sessionId },
-      });
-
-      if (!session) throw new NotFoundError('Session introuvable');
-      if (!(session as any).presenceOuverte) {
-        throw new ForbiddenError('Présence fermée');
-      }
-      if ((session as any).qrCodeSecret !== qrToken) {
-        throw new BadRequestError('QR code invalide');
-      }
-
-      /* -------------------- Vérifier inscription -------------------- */
-      const inscription = await AppDataSource.getRepository(Inscription).findOne({
-        where: { sessionId, participantId: userId },
-      });
-
-      if (!inscription || inscription.statut !== StatutInscription.ACCEPTEE) {
-        throw new ForbiddenError('Vous n\'êtes pas inscrit à cette session');
-      }
-
-      /* -------------------- Vérifier doublon -------------------- */
-      const today = todayString();
-      const repo = AppDataSource.getRepository(Presence);
-
-      // ⭐ Utiliser une comparaison DATE correcte
-      const existing = await repo
-        .createQueryBuilder('p')
-        .where('p.sessionId = :sid', { sid: sessionId })
-        .andWhere('p.participantId = :pid', { pid: userId })
-        .andWhere('DATE(p.datePresence) = :today', { today })
-        .getOne();
-
-      if (existing) {
-        throw new ConflictError('Présence déjà enregistrée aujourd\'hui');
-      }
-
-      /* -------------------- Créer la présence -------------------- */
-      const presence = repo.create({
+      const presence = await PresenceService.scannerQr(
+        userId,
         sessionId,
-        participantId: userId,
-        statut: StatutPresence.PRESENT,
-        present: true,
-        methode: MethodePresence.QR_CODE,
-        datePresence: new Date(today),
-        scanneLe: new Date(),
         qrToken,
-        ipAddress: req.ip ?? null,
-      } as any);
-
-      await repo.save(presence);
-
-      logger.info(
-        `✅ Présence QR : user=${userId} session=${session.codeSession}`,
+        req.ip,
       );
 
-      return successResponse(res, presence, 'Présence enregistrée', 201);
+      logger.info('[SCANNER] ✅ Présence enregistrée', {
+        userId,
+        sessionId,
+        presenceId: presence.id,
+        statut: presence.statut,
+      });
+
+      successResponse(res, withPresent(presence), 'Présence enregistrée', 201);
     } catch (e) {
+      logControllerError('scannerQr', req, e);
       next(e);
     }
   }
 
-  /* ==========================================================================
-     📋 MES PRÉSENCES (participant)
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 MES PRÉSENCES
+     ══════════════════════════════════════════════════════════════════════════ */
   static async mesPresences(
     req: Request,
     res: Response,
@@ -161,89 +165,162 @@ export class PresenceController {
   ): Promise<void> {
     try {
       const userId = getUserId(req);
-
-      const presences = await AppDataSource.getRepository(Presence).find({
-        where: { participantId: userId },
-        relations: ['session', 'session.formation'],
-        order: { datePresence: 'DESC' },
-      });
-
-      return successResponse(res, presences, 'Mes présences');
+      const presences = await PresenceService.mesPresences(userId);
+      successResponse(res, presences.map(withPresent), 'Mes présences');
     } catch (e) {
+      logControllerError('mesPresences', req, e);
       next(e);
     }
   }
 
-  /* ==========================================================================
-     🖊️ SAISIE MANUELLE (formateur / staff)
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     🖊️ SAISIE MANUELLE
+     ══════════════════════════════════════════════════════════════════════════ */
   static async marquerManuel(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const userId = getUserId(req);
-      const { sessionId, participantId, present, commentaire } = req.body;
+      const { sessionId, participantId, present, commentaire } =
+        (req.body ?? {}) as {
+          sessionId?: string;
+          participantId?: string;
+          present?: boolean;
+          commentaire?: string;
+        };
 
-      if (!sessionId || !participantId) {
-        throw new BadRequestError('sessionId et participantId requis');
+      if (!sessionId) throw new BadRequestError('sessionId requis');
+      if (!participantId) throw new BadRequestError('participantId requis');
+      validateUuid(sessionId, 'sessionId');
+      validateUuid(participantId, 'participantId');
+
+      if (typeof present !== 'boolean') {
+        throw new BadRequestError('Le statut de présence doit être un booléen');
       }
 
-      const session = await AppDataSource.getRepository(Session).findOne({
-        where: { id: sessionId },
-      });
+      const presence = await PresenceService.marquerManuel(
+        sessionId,
+        participantId,
+        present,
+        commentaire,
+        getUserId(req),
+        getUserRole(req),
+      );
 
-      if (!session) throw new NotFoundError('Session introuvable');
+      // ✅ withPresent crée un nouvel objet, sans toucher au getter
+      successResponse(res, withPresent(presence), 'Présence enregistrée');
+    } catch (e) {
+      logControllerError('marquerManuel', req, e);
+      next(e);
+    }
+  }
+  /* ══════════════════════════════════════════════════════════════════════════
+     📱 GÉNÉRATION QR
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async generateQr(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { sessionId, dureeMinutes } = (req.body ?? {}) as {
+        sessionId?: string;
+        dureeMinutes?: number;
+      };
 
-      // ⭐ formateurId (propriété TS)
-      if (session.formateurId !== userId) {
-        throw new ForbiddenError(
-          'Seul le formateur peut saisir manuellement',
+      if (!sessionId) throw new BadRequestError('sessionId requis');
+      validateUuid(sessionId, 'sessionId');
+
+      if (
+        dureeMinutes !== undefined &&
+        (typeof dureeMinutes !== 'number' ||
+          dureeMinutes < 1 ||
+          dureeMinutes > 60)
+      ) {
+        throw new BadRequestError(
+          'dureeMinutes doit être un nombre entre 1 et 60',
         );
       }
 
-      const today = todayString();
-      const repo = AppDataSource.getRepository(Presence);
+      const data = await PresenceService.generateQr(
+        sessionId,
+        getUserId(req),
+        getUserRole(req),
+        dureeMinutes,
+      );
 
-      let presence = await repo
-        .createQueryBuilder('p')
-        .where('p.sessionId = :sid', { sid: sessionId })
-        .andWhere('p.participantId = :pid', { pid: participantId })
-        .andWhere('DATE(p.datePresence) = :today', { today })
-        .getOne();
+      logger.info('[QR GENERATE] ✅', {
+        sessionId,
+        expiresAt: data.expiresAt.toISOString(),
+        tokenLength: data.qrToken.length,
+      });
 
-      if (presence) {
-        presence.present = !!present;
-        presence.statut = present
-          ? StatutPresence.PRESENT
-          : StatutPresence.ABSENT;
-        if (commentaire !== undefined) presence.commentaire = commentaire;
-      } else {
-        presence = repo.create({
-          sessionId,
-          participantId,
-          statut: present
-            ? StatutPresence.PRESENT
-            : StatutPresence.ABSENT,
-          present: !!present,
-          methode: MethodePresence.MANUELLE,
-          datePresence: new Date(today),
-          commentaire: commentaire ?? null,
-        } as any);
-      }
-
-      await repo.save(presence);
-
-      return successResponse(res, presence, 'Présence enregistrée');
+      successResponse(res, data, 'QR code généré', 201);
     } catch (e) {
+      logControllerError('generateQr', req, e);
       next(e);
     }
   }
 
-  /* ==========================================================================
-     📋 PAR SESSION (formateur / staff)
-     ========================================================================== */
+  /* ══════════════════════════════════════════════════════════════════════════
+     🔓 OUVRIR / FERMER
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async ouvrirPresences(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { sessionId } = req.params;
+      validateUuid(sessionId, 'sessionId');
+
+      await PresenceService.ouvrirPresences(
+        sessionId,
+        getUserId(req),
+        getUserRole(req),
+      );
+
+      successResponse(
+        res,
+        { sessionId, presenceOuverte: true },
+        'Présences ouvertes',
+      );
+    } catch (e) {
+      logControllerError('ouvrirPresences', req, e);
+      next(e);
+    }
+  }
+
+  static async fermerPresences(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const { sessionId } = req.params;
+      validateUuid(sessionId, 'sessionId');
+
+      await PresenceService.fermerPresences(
+        sessionId,
+        getUserId(req),
+        getUserRole(req),
+      );
+
+      successResponse(
+        res,
+        { sessionId, presenceOuverte: false },
+        'Présences fermées',
+      );
+    } catch (e) {
+      logControllerError('fermerPresences', req, e);
+      next(e);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 CONSULTATION PAR SESSION
+     ══════════════════════════════════════════════════════════════════════════ */
   static async findBySession(
     req: Request,
     res: Response,
@@ -251,37 +328,43 @@ export class PresenceController {
   ): Promise<void> {
     try {
       const { sessionId } = req.params;
-      const { page, limit, skip } = getPagination(
-        req.query.page,
-        req.query.limit,
+      validateUuid(sessionId, 'sessionId');
+
+      const session = await getSessionOrFail(sessionId);
+      if (!canManageSession(req, session)) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas consulter les présences de cette session',
+        );
+      }
+
+      const { page, limit } = getPagination(
+        req.query.page as string | undefined,
+        req.query.limit as string | undefined,
       );
 
-      const [data, total] = await AppDataSource.getRepository(
-        Presence,
-      ).findAndCount({
-        where: { sessionId },
-        relations: ['participant', 'participant.role'],
-        order: { createdAt: 'ASC' }, // ⭐ propriété TS
-        skip,
-        take: limit,
-      });
-
-      return paginatedResponse(
-        res,
-        data,
-        total,
+      const { data, pagination } = await PresenceService.findBySession(
+        sessionId,
         page,
         limit,
+      );
+
+      paginatedResponse(
+        res,
+        data.map(withPresent),
+        pagination.total,
+        pagination.page,
+        pagination.limit,
         'Présences de la session',
       );
     } catch (e) {
+      logControllerError('findBySession', req, e);
       next(e);
     }
   }
 
-  /* ==========================================================================
+  /* ══════════════════════════════════════════════════════════════════════════
      📊 STATS
-     ========================================================================== */
+     ══════════════════════════════════════════════════════════════════════════ */
   static async stats(
     req: Request,
     res: Response,
@@ -289,30 +372,37 @@ export class PresenceController {
   ): Promise<void> {
     try {
       const { sessionId } = req.params;
-      const repo = AppDataSource.getRepository(Presence);
+      validateUuid(sessionId, 'sessionId');
 
-      const [total, presents, absents, retards] = await Promise.all([
-        repo.count({ where: { sessionId } }),
-        repo.count({ where: { sessionId, present: true } }),
-        repo.count({ where: { sessionId, present: false } }),
-        repo.count({
-          where: { sessionId, statut: StatutPresence.RETARD },
-        }),
-      ]);
+      const session = await getSessionOrFail(sessionId);
+      if (!canManageSession(req, session)) {
+        throw new ForbiddenError(
+          'Vous ne pouvez pas consulter les statistiques de cette session',
+        );
+      }
 
-      const tauxPresence =
-        total > 0 ? Math.round((presents / total) * 10000) / 100 : 0;
+      const stats = await PresenceService.stats(sessionId);
 
-      return successResponse(
+      const totalInscrits = await AppDataSource.getRepository(
+        Inscription,
+      ).count({
+        where: { sessionId, statut: StatutInscription.ACCEPTEE },
+      });
+
+      successResponse(
         res,
-        { total, presents, absents, retards, tauxPresence },
+        { totalInscrits, ...stats },
         'Statistiques de présence',
       );
     } catch (e) {
+      logControllerError('stats', req, e);
       next(e);
     }
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     📊 TAUX PRÉSENCE
+     ══════════════════════════════════════════════════════════════════════════ */
   static async tauxPresence(
     req: Request,
     res: Response,
@@ -320,72 +410,136 @@ export class PresenceController {
   ): Promise<void> {
     try {
       const { sessionId, participantId } = req.params;
-      const repo = AppDataSource.getRepository(Presence);
+      validateUuid(sessionId, 'sessionId');
+      validateUuid(participantId, 'participantId');
 
-      const total = await repo.count({ where: { sessionId } });
-      if (total === 0) return successResponse(res, { taux: 0 });
+      const session = await getSessionOrFail(sessionId);
+      if (!canManageSession(req, session)) {
+        throw new ForbiddenError(
+          'Vous ne pouvez consulter que le taux de présence de vos sessions',
+        );
+      }
 
-      const presents = await repo.count({
-        where: { sessionId, participantId, present: true },
-      });
+      const taux = await PresenceService.tauxPresence(sessionId, participantId);
 
-      const taux = Math.round((presents / total) * 10000) / 100;
-
-      return successResponse(res, { taux });
+      successResponse(res, { taux });
     } catch (e) {
+      logControllerError('tauxPresence', req, e);
       next(e);
     }
   }
 
-  /* ==========================================================================
-     📱 GÉNÉRATION QR (formateur)
-     ========================================================================== */
-  static async generateQr(
+  /* ══════════════════════════════════════════════════════════════════════════
+     📋 DÉTAIL PRÉSENCE PARTICIPANT (participant connecté)
+     ══════════════════════════════════════════════════════════════════════════ */
+  static async getParticipantPresenceDetail(
     req: Request,
     res: Response,
     next: NextFunction,
   ): Promise<void> {
     try {
-      const userId = getUserId(req);
-      const { sessionId } = req.body;
+      const participantId = getUserId(req);
+      const { sessionId } = req.params;
 
-      if (!sessionId) throw new BadRequestError('sessionId requis');
+      validateUuid(sessionId, 'sessionId');
 
-      const repo = AppDataSource.getRepository(Session);
-
-      const session = await repo.findOne({ where: { id: sessionId } });
-      if (!session) throw new NotFoundError('Session introuvable');
-
-      if (session.formateurId !== userId) {
-        throw new ForbiddenError(
-          'Seul le formateur peut générer le QR',
-        );
-      }
-
-      if (!(session as any).presenceOuverte) {
-        throw new ForbiddenError('Ouvrez d\'abord la présence');
-      }
-
-      const token = crypto.randomBytes(16).toString('hex');
-      (session as any).qrCodeSecret = token;
-
-      await repo.save(session);
-
-      return successResponse(
-        res,
-        {
-          sessionId: session.id,
-          qrToken: token,
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-          url: `${process.env.APP_URL ?? 'http://localhost:3000'}/presence/${
-            session.codeSession
-          }?t=${token}`,
-        },
-        'QR code généré',
+      /* 1. Session */
+      const sessionRows = await AppDataSource.query(
+        `SELECT
+           s.id,
+           s.code_session AS "codeSession",
+           s.date_debut AS "dateDebut",
+           s.date_fin AS "dateFin",
+           s.lieu,
+           s.capacite,
+           s.statut,
+           s.presence_ouverte AS "presenceOuverte",
+           f.id AS "formationId",
+           f.titre AS "formationTitre",
+           f.description AS "formationDescription",
+           form.id AS "formateurId",
+           form.prenom AS "formateurPrenom",
+           form.nom AS "formateurNom",
+           form.email AS "formateurEmail"
+         FROM sessions s
+         LEFT JOIN formations f ON f.id = s.formation_id
+         LEFT JOIN users form ON form.id = s.formateur_id
+         WHERE s.id = $1 AND s.deleted_at IS NULL`,
+        [sessionId],
       );
+
+      const sessionRow = sessionRows[0];
+      if (!sessionRow) throw new NotFoundError('Session introuvable');
+
+      /* 2. Inscription */
+      const inscriptionRows = await AppDataSource.query(
+        `SELECT id, statut
+         FROM inscriptions
+         WHERE session_id = $1 AND participant_id = $2`,
+        [sessionId, participantId],
+      );
+      const inscription = inscriptionRows[0] ?? null;
+
+      /* 3. Présence */
+      const presenceRows = await AppDataSource.query(
+        `SELECT
+           id,
+           statut,
+           methode,
+           date_presence AS "datePresence",
+           scanne_le AS "scanneLe",
+           heure_scan AS "heureScan"
+         FROM presences
+         WHERE session_id = $1 AND participant_id = $2
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [sessionId, participantId],
+      );
+
+      const presence = presenceRows[0] ?? null;
+
+      /* 4. Réponse structurée */
+      const response = {
+        session: {
+          id: sessionRow.id,
+          codeSession: sessionRow.codeSession,
+          dateDebut: sessionRow.dateDebut,
+          dateFin: sessionRow.dateFin,
+          lieu: sessionRow.lieu,
+          capacite: sessionRow.capacite,
+          statut: sessionRow.statut,
+          presenceOuverte: sessionRow.presenceOuverte,
+          formation: sessionRow.formationId
+            ? {
+                id: sessionRow.formationId,
+                titre: sessionRow.formationTitre,
+                description: sessionRow.formationDescription,
+              }
+            : null,
+          formateur: sessionRow.formateurId
+            ? {
+                id: sessionRow.formateurId,
+                prenom: sessionRow.formateurPrenom,
+                nom: sessionRow.formateurNom,
+                email: sessionRow.formateurEmail,
+              }
+            : null,
+        },
+        presence: presence
+          ? {
+              ...presence,
+              present:
+                presence.statut === StatutPresence.PRESENT ||
+                presence.statut === StatutPresence.RETARD,
+            }
+          : null,
+        inscription,
+      };
+
+      successResponse(res, response, 'Détail de la présence');
     } catch (e) {
+      logControllerError('getParticipantPresenceDetail', req, e);
       next(e);
     }
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

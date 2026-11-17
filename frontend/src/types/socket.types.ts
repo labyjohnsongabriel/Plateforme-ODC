@@ -5,6 +5,7 @@ export interface ServerToClientEvents {
   'message:new': (message: Message) => void;
   'message:read': (data: { conversationId: string; userId: string }) => void;
   'notification:new': (notification: Notification) => void;
+  'notifications:count': (data: { count: number }) => void;
   'presence:update': (data: { sessionId: string; participantId: string }) => void;
   'connection:request': (data: any) => void;
 }

@@ -1,3 +1,4 @@
+// src/components/ui/alert-dialog.tsx
 'use client';
 
 import * as React from 'react';
@@ -5,18 +6,9 @@ import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 
-/* ============================================================================
-   ALERT DIALOG — shadcn/ui
-   Basé sur @radix-ui/react-alert-dialog
-   ============================================================================ */
-
 const AlertDialog = AlertDialogPrimitive.Root;
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
-
-/* ============================================================================
-   OVERLAY
-   ============================================================================ */
 
 const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
@@ -25,7 +17,7 @@ const AlertDialogOverlay = React.forwardRef<
   <AlertDialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/70 backdrop-blur-sm',
+      'fixed inset-0 z-[1040] bg-slate-900/50 backdrop-blur-sm',
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className,
@@ -34,10 +26,6 @@ const AlertDialogOverlay = React.forwardRef<
   />
 ));
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
-
-/* ============================================================================
-   CONTENT
-   ============================================================================ */
 
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
@@ -48,18 +36,14 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        // Position & taille
-        'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
-        // Style
-        'grid gap-4 border border-odc-border bg-odc-surface p-6',
-        'rounded-xl shadow-odc-xl',
-        // Animations
+        'fixed left-1/2 top-1/2 z-[1050] w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
+        'grid gap-4 rounded-xl border border-slate-200 bg-white p-6',
+        'dark:border-slate-800 dark:bg-slate-950',
+        'shadow-xl',
         'duration-200',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-        'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]',
-        'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
         className,
       )}
       {...props}
@@ -68,18 +52,11 @@ const AlertDialogContent = React.forwardRef<
 ));
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
-/* ============================================================================
-   HEADER / FOOTER
-   ============================================================================ */
-
 const AlertDialogHeader = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn('flex flex-col space-y-2 text-left', className)}
-    {...props}
-  />
+  <div className={cn('flex flex-col space-y-2 text-left', className)} {...props} />
 );
 AlertDialogHeader.displayName = 'AlertDialogHeader';
 
@@ -88,18 +65,11 @@ const AlertDialogFooter = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn(
-      'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
-      className,
-    )}
+    className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
     {...props}
   />
 );
 AlertDialogFooter.displayName = 'AlertDialogFooter';
-
-/* ============================================================================
-   TITLE / DESCRIPTION
-   ============================================================================ */
 
 const AlertDialogTitle = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Title>,
@@ -108,7 +78,7 @@ const AlertDialogTitle = React.forwardRef<
   <AlertDialogPrimitive.Title
     ref={ref}
     className={cn(
-      'font-display text-lg font-semibold text-odc-text-primary',
+      'font-display text-lg font-semibold text-slate-900 dark:text-slate-50',
       className,
     )}
     {...props}
@@ -122,16 +92,12 @@ const AlertDialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-odc-text-secondary', className)}
+    className={cn('text-sm text-slate-500 dark:text-slate-400', className)}
     {...props}
   />
 ));
 AlertDialogDescription.displayName =
   AlertDialogPrimitive.Description.displayName;
-
-/* ============================================================================
-   ACTION / CANCEL
-   ============================================================================ */
 
 const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
@@ -139,7 +105,7 @@ const AlertDialogAction = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Action
     ref={ref}
-    className={cn(buttonVariants(), className)}
+    className={cn(buttonVariants({ variant: 'primary' }), className)}
     {...props}
   />
 ));
@@ -152,7 +118,7 @@ const AlertDialogCancel = React.forwardRef<
   <AlertDialogPrimitive.Cancel
     ref={ref}
     className={cn(
-      buttonVariants({ variant: 'outline' }),
+      buttonVariants({ variant: 'secondary' }),
       'mt-2 sm:mt-0',
       className,
     )}
@@ -160,10 +126,6 @@ const AlertDialogCancel = React.forwardRef<
   />
 ));
 AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName;
-
-/* ============================================================================
-   EXPORTS
-   ============================================================================ */
 
 export {
   AlertDialog,

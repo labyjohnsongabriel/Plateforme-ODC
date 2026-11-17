@@ -5,11 +5,12 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save, Upload, Building2, Wand2, X } from 'lucide-react';
+import { Save, Upload, Building2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';                    // ✅ AJOUTÉ
 import {
   Form,
   FormControl,
@@ -20,6 +21,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
+import { getMediaUrl } from '@/lib/media';
 import { slugify } from '@/lib/slugify';
 import {
   useUploadLogoPartenaire,
@@ -27,9 +29,9 @@ import {
   type PartenaireFormValues,
 } from '@/hooks/usePartenaires';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    SCHÉMA ZOD
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const partenaireSchema = z.object({
   nom: z
@@ -47,21 +49,16 @@ const partenaireSchema = z.object({
     .optional()
     .or(z.literal('')),
   contactTel: z.string().trim().max(30).optional().or(z.literal('')),
-  siteWeb: z
-    .string()
-    .trim()
-    .url('URL invalide')
-    .optional()
-    .or(z.literal('')),
+  siteWeb: z.string().trim().url('URL invalide').optional().or(z.literal('')),
   logoUrl: z.string().trim().optional().or(z.literal('')),
   actif: z.boolean().default(true),
   estPubliee: z.boolean().default(true),
   ordreAffichage: z.coerce.number().int().min(0).max(9999).default(0),
 });
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TYPES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface PartnerFormProps {
   mode: 'create' | 'edit';
@@ -73,9 +70,9 @@ interface PartnerFormProps {
   showActions?: boolean;
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPOSANT
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function PartnerForm({
   mode,
@@ -109,7 +106,7 @@ export function PartnerForm({
     mode: 'onBlur',
   });
 
-  /* -------------------- Auto-slug -------------------- */
+  /* ─── Auto-slug ─────────────────────────────────────────────────────── */
   const nomValue = form.watch('nom');
   const slugValue = form.watch('slug');
   const logoUrl = form.watch('logoUrl');
@@ -126,7 +123,7 @@ export function PartnerForm({
     form.setValue('slug', newSlug, { shouldValidate: false, shouldDirty: false });
   }, [nomValue, slugValue, isEdit, form]);
 
-  /* -------------------- Upload logo -------------------- */
+  /* ─── Upload logo ───────────────────────────────────────────────────── */
   const handleLogoUpload = async (file: File) => {
     if (!isEdit || !id) return;
     try {
@@ -137,31 +134,31 @@ export function PartnerForm({
     }
   };
 
-  /* -------------------- Submit -------------------- */
+  /* ─── Submit ────────────────────────────────────────────────────────── */
   const handleSubmit = form.handleSubmit(async (values) => {
     await onSubmit(values);
   });
 
-  /* -------------------- Rendu -------------------- */
+  /* ─── Rendu ─────────────────────────────────────────────────────────── */
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-        {/* ================================================================
+        {/* ═══════════════════════════════════════════════════════════════
             Section — Identité
-            ================================================================ */}
+        ═══════════════════════════════════════════════════════════════ */}
         <fieldset disabled={isSubmitting} className="space-y-5">
-          <legend className="mb-3 text-sm font-semibold uppercase tracking-wider text-odc-text-muted">
+          <legend className="text-odc-text-muted mb-3 text-sm font-semibold uppercase tracking-wider">
             Identité du partenaire
           </legend>
 
-          {/* Logo */}
+          {/* ✅ Logo — utilise <Label> simple (pas FormLabel) */}
           <div>
-            <FormLabel>Logo</FormLabel>
+            <Label>Logo</Label>
             <div className="mt-1.5 flex items-center gap-4">
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-odc-surface-alt ring-1 ring-odc-border">
                 {logoUrl ? (
                   <img
-                    src={logoUrl}
+                    src={getMediaUrl(logoUrl)}
                     alt=""
                     className="h-full w-full object-contain"
                   />
@@ -290,11 +287,11 @@ export function PartnerForm({
           />
         </fieldset>
 
-        {/* ================================================================
+        {/* ═══════════════════════════════════════════════════════════════
             Section — Contact
-            ================================================================ */}
+        ═══════════════════════════════════════════════════════════════ */}
         <fieldset disabled={isSubmitting} className="space-y-5">
-          <legend className="mb-3 text-sm font-semibold uppercase tracking-wider text-odc-text-muted">
+          <legend className="text-odc-text-muted mb-3 text-sm font-semibold uppercase tracking-wider">
             Coordonnées
           </legend>
 
@@ -343,11 +340,11 @@ export function PartnerForm({
           />
         </fieldset>
 
-        {/* ================================================================
+        {/* ═══════════════════════════════════════════════════════════════
             Section — Publication
-            ================================================================ */}
+        ═══════════════════════════════════════════════════════════════ */}
         <fieldset disabled={isSubmitting} className="space-y-4">
-          <legend className="mb-3 text-sm font-semibold uppercase tracking-wider text-odc-text-muted">
+          <legend className="text-odc-text-muted mb-3 text-sm font-semibold uppercase tracking-wider">
             Publication
           </legend>
 
@@ -363,10 +360,7 @@ export function PartnerForm({
                   </FormDescription>
                 </div>
                 <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
               </FormItem>
             )}
@@ -379,15 +373,10 @@ export function PartnerForm({
               <FormItem className="flex flex-row items-center justify-between rounded-lg border border-odc-border p-4">
                 <div className="space-y-0.5">
                   <FormLabel className="text-sm">Publié</FormLabel>
-                  <FormDescription>
-                    Visible sur le site public ODC
-                  </FormDescription>
+                  <FormDescription>Visible sur le site public ODC</FormDescription>
                 </div>
                 <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
                 </FormControl>
               </FormItem>
             )}

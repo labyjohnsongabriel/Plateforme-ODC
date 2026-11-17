@@ -48,9 +48,7 @@ export function AuditLogFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [search, setSearch] = React.useState(
-    searchParams.get('action') ?? '',
-  );
+  const [search, setSearch] = React.useState(searchParams.get('action') ?? '');
   const debouncedSearch = useDebounce(search, 400);
 
   /* -------------------- Recherche débouncée -------------------- */
@@ -59,6 +57,7 @@ export function AuditLogFilters() {
     if (debouncedSearch) params.set('action', debouncedSearch);
     else params.delete('action');
     params.delete('page');
+    if (params.toString() === searchParams.toString()) return;
     router.push(`/admin/audit-logs?${params.toString()}`, { scroll: false });
   }, [debouncedSearch, router, searchParams]);
 
@@ -68,6 +67,7 @@ export function AuditLogFilters() {
     if (!value || value === 'all') params.delete(key);
     else params.set(key, value);
     params.delete('page');
+    if (params.toString() === searchParams.toString()) return;
     router.push(`/admin/audit-logs?${params.toString()}`, { scroll: false });
   };
 
@@ -95,7 +95,7 @@ export function AuditLogFilters() {
               Action
             </Label>
             <div className="relative mt-1.5">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-odc-text-muted" />
+              <Search className="text-odc-text-muted pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
               <Input
                 id="action"
                 value={search}
@@ -156,7 +156,7 @@ export function AuditLogFilters() {
               Depuis
             </Label>
             <div className="relative mt-1.5">
-              <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-odc-text-muted" />
+              <Calendar className="text-odc-text-muted pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" />
               <Input
                 id="dateDebut"
                 type="date"
@@ -173,7 +173,7 @@ export function AuditLogFilters() {
               Jusqu'à
             </Label>
             <div className="relative mt-1.5">
-              <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-odc-text-muted" />
+              <Calendar className="text-odc-text-muted pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" />
               <Input
                 id="dateFin"
                 type="date"

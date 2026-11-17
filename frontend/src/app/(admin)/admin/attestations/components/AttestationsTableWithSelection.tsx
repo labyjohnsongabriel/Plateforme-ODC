@@ -11,7 +11,7 @@ import {
   Hash,
   CheckCircle2,
   XCircle,
-  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import {
@@ -34,15 +34,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/formatters';
-import {
-  useAttestations,
-  useDownloadAttestation,
-  type Attestation,
-} from '@/hooks/useAttestations';
+import { useAttestations, useDownloadAttestation } from '@/hooks/useAttestations';
 import { AttestationDetailModal } from './AttestationDetailModal';
 import { BulkDownloadButton } from './BulkDownloadButton';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSANT
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function AttestationsTableWithSelection() {
   const searchParams = useSearchParams();
@@ -61,16 +60,30 @@ export function AttestationsTableWithSelection() {
     [searchParams],
   );
 
-  const { data, isLoading, isError } = useAttestations(filters);
+  const { data, isLoading, isError, refetch, isFetching } =
+    useAttestations(filters);
   const downloadMutation = useDownloadAttestation();
 
+  const attestations = React.useMemo(() => data?.data ?? [], [data]);
+
+  /* ⭐ Reset de la sélection quand la page ou les filtres changent */
+  React.useEffect(() => {
+    setSelectedIds([]);
+  }, [filters.page, filters.sessionId, filters.valide, filters.search]);
+
+  /* ⭐ Nettoyer la sélection des IDs qui ne sont plus affichés */
+  React.useEffect(() => {
+    if (selectedIds.length === 0) return;
+    const visibleIds = new Set(attestations.map((a) => a.id));
+    setSelectedIds((prev) => prev.filter((id) => visibleIds.has(id)));
+  }, [attestations]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const allSelected =
+    attestations.length > 0 && selectedIds.length === attestations.length;
+
   const toggleSelectAll = () => {
-    const all = data?.data ?? [];
-    if (selectedIds.length === all.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(all.map((a) => a.id));
-    }
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(attestations.map((a) => a.id));
   };
 
   const toggleSelectOne = (id: string) => {
@@ -79,6 +92,7 @@ export function AttestationsTableWithSelection() {
     );
   };
 
+  /* ═══════════════ LOADING ═══════════════ */
   if (isLoading) {
     return (
       <Card className="overflow-hidden">
@@ -88,6 +102,7 @@ export function AttestationsTableWithSelection() {
               <Skeleton className="h-4 w-4 rounded" />
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-32" />
             </div>
           ))}
         </div>
@@ -95,6 +110,7 @@ export function AttestationsTableWithSelection() {
     );
   }
 
+  /* ═══════════════ ERREUR ═══════════════ */
   if (isError) {
     return (
       <Card>
@@ -105,8 +121,13 @@ export function AttestationsTableWithSelection() {
           action={
             <Button
               variant="outline"
-              onClick={() => window.location.reload()}
+              onClick={() => void refetch()}
+              disabled={isFetching}
             >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
+                aria-hidden
+              />
               Réessayer
             </Button>
           }
@@ -115,9 +136,8 @@ export function AttestationsTableWithSelection() {
     );
   }
 
-  const attestations = data?.data ?? [];
-
-  if (!attestations.length) {
+  /* ═══════════════ VIDE ═══════════════ */
+  if (attestations.length === 0) {
     return (
       <Card>
         <EmptyState
@@ -129,13 +149,16 @@ export function AttestationsTableWithSelection() {
     );
   }
 
+  /* ═══════════════ TABLE ═══════════════ */
   return (
     <>
       {/* Barre de sélection */}
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-odc-primary/30 bg-odc-primary-soft/40 p-3">
           <span className="text-sm font-medium text-odc-primary-active">
-            {selectedIds.length} attestation(s) sélectionnée(s)
+            {selectedIds.length} attestation
+            {selectedIds.length > 1 ? 's' : ''} sélectionnée
+            {selectedIds.length > 1 ? 's' : ''}
           </span>
           <div className="ml-auto flex gap-2">
             <BulkDownloadButton
@@ -159,12 +182,13 @@ export function AttestationsTableWithSelection() {
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={
-                    selectedIds.length === attestations.length &&
-                    attestations.length > 0
-                  }
+                  checked={allSelected}
                   onCheckedChange={toggleSelectAll}
-                  aria-label="Tout sélectionner"
+                  aria-label={
+                    allSelected
+                      ? 'Tout désélectionner'
+                      : 'Tout sélectionner'
+                  }
                 />
               </TableHead>
               <TableHead>Numéro</TableHead>
@@ -196,7 +220,7 @@ export function AttestationsTableWithSelection() {
 
                   <TableCell>
                     <span className="flex items-center gap-1.5 font-mono text-xs font-semibold">
-                      <Hash className="h-3 w-3 text-odc-text-muted" />
+                      <Hash className="h-3 w-3 text-odc-text-muted" aria-hidden />
                       {a.numero}
                     </span>
                   </TableCell>
@@ -223,7 +247,7 @@ export function AttestationsTableWithSelection() {
                   <TableCell>
                     {a.valide ? (
                       <Badge className="gap-1 bg-odc-success-soft text-odc-success-dark">
-                        <CheckCircle2 className="h-3 w-3" />
+                        <CheckCircle2 className="h-3 w-3" aria-hidden />
                         Valide
                       </Badge>
                     ) : (
@@ -231,7 +255,7 @@ export function AttestationsTableWithSelection() {
                         variant="outline"
                         className="gap-1 text-odc-error"
                       >
-                        <XCircle className="h-3 w-3" />
+                        <XCircle className="h-3 w-3" aria-hidden />
                         Invalide
                       </Badge>
                     )}
@@ -249,9 +273,9 @@ export function AttestationsTableWithSelection() {
                               variant="ghost"
                               size="icon-sm"
                               onClick={() => setSelectedId(a.id)}
-                              aria-label="Voir"
+                              aria-label="Voir le détail"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-4 w-4" aria-hidden />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Voir</TooltipContent>
@@ -270,9 +294,9 @@ export function AttestationsTableWithSelection() {
                                   numero: a.numero,
                                 })
                               }
-                              aria-label="Télécharger"
+                              aria-label="Télécharger le PDF"
                             >
-                              <FileDown className="h-4 w-4" />
+                              <FileDown className="h-4 w-4" aria-hidden />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Télécharger</TooltipContent>
@@ -286,14 +310,14 @@ export function AttestationsTableWithSelection() {
                               variant="ghost"
                               size="icon-sm"
                               asChild
-                              aria-label="Vérifier"
+                              aria-label="Vérifier l'authenticité"
                             >
                               <a
                                 href={`/verifier-attestation/${a.numero}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                <ExternalLink className="h-4 w-4" />
+                                <ExternalLink className="h-4 w-4" aria-hidden />
                               </a>
                             </Button>
                           </TooltipTrigger>

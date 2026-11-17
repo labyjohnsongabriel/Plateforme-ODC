@@ -1,3 +1,4 @@
+// src/app/(auth)/reset-password/components/ResetPasswordForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -15,9 +16,6 @@ import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 import { cn } from '@/lib/utils';
 
-/* ============================================================================
-   SCHÉMA
-   ============================================================================ */
 const schema = z
   .object({
     nouveauMotDePasse: z
@@ -42,9 +40,6 @@ const PASSWORD_RULES = [
   { label: 'Un chiffre', test: (p: string) => /[0-9]/.test(p) },
 ];
 
-/* ============================================================================
-   COMPOSANT
-   ============================================================================ */
 interface Props {
   token: string;
 }
@@ -60,13 +55,8 @@ export function ResetPasswordForm({ token }: Props) {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  /* -------------------------------------------------------------------- */
-  /* SOUMISSION                                                          */
-  /* -------------------------------------------------------------------- */
   const onSubmit = async (data: FormData) => {
     try {
       await api.post('/auth/reset-password', {
@@ -80,30 +70,26 @@ export function ResetPasswordForm({ token }: Props) {
     }
   };
 
-  /* -------------------------------------------------------------------- */
-  /* ÉTAT 2 : SUCCÈS                                                      */
-  /* -------------------------------------------------------------------- */
   if (success) {
     return (
-      <Card>
+      <Card className="border-slate-200 dark:border-slate-800">
         <CardContent className="py-10 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="h-8 w-8 text-green-600" />
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-950/40">
+            <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
 
-          <h2 className="font-display text-xl font-semibold mb-2">
+          <h2 className="mb-2 font-display text-xl font-bold text-slate-900 dark:text-slate-50">
             Mot de passe réinitialisé
           </h2>
 
-          <p className="text-sm text-odc-muted mb-6 max-w-sm mx-auto">
+          <p className="mx-auto mb-6 max-w-sm text-sm text-slate-600 dark:text-slate-400">
             Votre mot de passe a été modifié avec succès. Vous pouvez maintenant
             vous connecter avec vos nouveaux identifiants.
           </p>
 
           <Button
-            variant="odc"
             size="lg"
-            className="w-full"
+            className="w-full bg-slate-900 text-white shadow-md hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
             onClick={() => router.push('/connexion')}
           >
             Se connecter
@@ -113,14 +99,12 @@ export function ResetPasswordForm({ token }: Props) {
     );
   }
 
-  /* -------------------------------------------------------------------- */
-  /* ÉTAT 1 : FORMULAIRE                                                  */
-  /* -------------------------------------------------------------------- */
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {/* -------- Nouveau mot de passe -------- */}
       <div>
-        <Label htmlFor="nouveauMotDePasse">Nouveau mot de passe</Label>
+        <Label htmlFor="nouveauMotDePasse" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Nouveau mot de passe
+        </Label>
         <div className="relative mt-1.5">
           <Input
             id="nouveauMotDePasse"
@@ -132,7 +116,7 @@ export function ResetPasswordForm({ token }: Props) {
             {...register('nouveauMotDePasse', {
               onChange: (e) => setPasswordValue(e.target.value),
             })}
-            className="pr-10"
+            className="h-11 pr-10"
             aria-invalid={!!errors.nouveauMotDePasse}
           />
           <button
@@ -140,13 +124,12 @@ export function ResetPasswordForm({ token }: Props) {
             onClick={() => setShowPassword((v) => !v)}
             tabIndex={-1}
             aria-label={showPassword ? 'Masquer' : 'Afficher'}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
 
-        {/* Indicateur robustesse */}
         {passwordValue && (
           <ul className="mt-2 grid grid-cols-2 gap-1.5">
             {PASSWORD_RULES.map((rule) => {
@@ -156,7 +139,7 @@ export function ResetPasswordForm({ token }: Props) {
                   key={rule.label}
                   className={cn(
                     'flex items-center gap-1.5 text-xs',
-                    ok ? 'text-odc-success' : 'text-odc-muted',
+                    ok ? 'text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400',
                   )}
                 >
                   {ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
@@ -168,15 +151,16 @@ export function ResetPasswordForm({ token }: Props) {
         )}
 
         {errors.nouveauMotDePasse && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.nouveauMotDePasse.message}
           </p>
         )}
       </div>
 
-      {/* -------- Confirmation -------- */}
       <div>
-        <Label htmlFor="confirmation">Confirmer le mot de passe</Label>
+        <Label htmlFor="confirmation" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Confirmer le mot de passe
+        </Label>
         <div className="relative mt-1.5">
           <Input
             id="confirmation"
@@ -185,7 +169,7 @@ export function ResetPasswordForm({ token }: Props) {
             autoComplete="new-password"
             disabled={isSubmitting}
             {...register('confirmation')}
-            className="pr-10"
+            className="h-11 pr-10"
             aria-invalid={!!errors.confirmation}
           />
           <button
@@ -193,27 +177,25 @@ export function ResetPasswordForm({ token }: Props) {
             onClick={() => setShowConfirm((v) => !v)}
             tabIndex={-1}
             aria-label={showConfirm ? 'Masquer' : 'Afficher'}
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center text-odc-muted hover:text-odc-primary transition-colors"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
           >
             {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
         {errors.confirmation && (
-          <p className="text-odc-error text-xs mt-1.5" role="alert">
+          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400" role="alert">
             {errors.confirmation.message}
           </p>
         )}
       </div>
 
-      {/* -------- Bouton -------- */}
       <Button
         type="submit"
-        variant="odc"
         size="lg"
         disabled={isSubmitting}
-        className="w-full"
+        className="h-11 w-full bg-slate-900 text-white shadow-md hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
       >
-        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Réinitialiser le mot de passe
       </Button>
     </form>

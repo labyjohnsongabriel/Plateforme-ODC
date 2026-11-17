@@ -13,7 +13,6 @@ import {
   Settings2,
   ChevronRight,
   ChevronLeft,
-  Download,
   Loader2,
   UserCheck,
   UserX,
@@ -41,7 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ParticipantAvatar } from '@/components/shared/ParticipantAvatar';
 import {
   Tooltip,
   TooltipContent,
@@ -50,7 +49,6 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/formatters';
-import { getInitials } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
@@ -60,9 +58,9 @@ import {
   type EligibleParticipant,
 } from '@/hooks/useAttestations';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TYPES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface GenerateAttestationsDialogProps {
   trigger?: React.ReactNode;
@@ -72,9 +70,9 @@ interface GenerateAttestationsDialogProps {
 
 type Step = 'session' | 'criteria' | 'preview' | 'confirm';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPOSANT PRINCIPAL
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function GenerateAttestationsDialog({
   trigger,
@@ -91,7 +89,6 @@ export function GenerateAttestationsDialog({
     inscriptionValidee: true,
   });
 
-  /* -------------------- Reset à l'ouverture -------------------- */
   React.useEffect(() => {
     if (open) {
       setStep(defaultSessionId ? 'criteria' : 'session');
@@ -99,7 +96,6 @@ export function GenerateAttestationsDialog({
     }
   }, [open, defaultSessionId]);
 
-  /* -------------------- Sessions terminées -------------------- */
   const { data: sessions = [], isLoading: loadingSessions } = useQuery({
     queryKey: ['admin', 'sessions', 'terminees'],
     queryFn: async () => {
@@ -112,7 +108,6 @@ export function GenerateAttestationsDialog({
     staleTime: 60_000,
   });
 
-  /* -------------------- Aperçu des participants -------------------- */
   const {
     data: preview,
     isLoading: loadingPreview,
@@ -123,18 +118,12 @@ export function GenerateAttestationsDialog({
     open && (step === 'preview' || step === 'confirm'),
   );
 
-  /* -------------------- Mutation -------------------- */
   const generateMutation = useGenerateAttestations();
 
-  /* -------------------- Handlers -------------------- */
   const handleNext = () => {
-    if (step === 'session' && sessionId) {
-      setStep('criteria');
-    } else if (step === 'criteria') {
-      setStep('preview');
-    } else if (step === 'preview') {
-      setStep('confirm');
-    }
+    if (step === 'session' && sessionId) setStep('criteria');
+    else if (step === 'criteria') setStep('preview');
+    else if (step === 'preview') setStep('confirm');
   };
 
   const handleBack = () => {
@@ -145,7 +134,6 @@ export function GenerateAttestationsDialog({
 
   const handleGenerate = async () => {
     if (!sessionId) return;
-
     try {
       const result = await generateMutation.mutateAsync({
         sessionId,
@@ -158,53 +146,54 @@ export function GenerateAttestationsDialog({
     }
   };
 
-  /* -------------------- Rendu -------------------- */
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button variant="odc">
-            <Award className="mr-2 h-4 w-4" />
+          <Button
+            className={cn(
+              'h-9 rounded-lg px-4 font-medium',
+              'bg-slate-900 text-white hover:bg-slate-800',
+              'dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-600',
+            )}
+          >
+            <Award className="mr-2 h-4 w-4" aria-hidden />
             Générer des attestations
           </Button>
         )}
       </DialogTrigger>
 
-      <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-        {/* ================================================================
-            EN-TÊTE
-            ================================================================ */}
-        <DialogHeader className="shrink-0 border-b border-odc-border bg-odc-surface px-6 py-5">
+      <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col gap-0 overflow-hidden border-slate-200 bg-white p-0 dark:border-slate-800 dark:bg-slate-950">
+        {/* En-tête */}
+        <DialogHeader className="shrink-0 border-b border-slate-200 bg-slate-50 px-6 py-5 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-start gap-4">
             <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-odc-500 to-odc-700 shadow-odc-md"
-              aria-hidden="true"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm dark:bg-slate-50 dark:text-slate-900"
+              aria-hidden
             >
-              <Sparkles className="h-6 w-6 text-white" />
+              <Sparkles className="h-6 w-6" />
             </div>
 
             <div className="min-w-0 flex-1">
-              <DialogTitle className="font-display text-xl font-bold">
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 dark:text-slate-50">
                 Générer les attestations
               </DialogTitle>
-              <DialogDescription className="mt-0.5 text-sm">
+              <DialogDescription className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                 Étape {step === 'session' ? 1 : step === 'criteria' ? 2 : step === 'preview' ? 3 : 4} sur 4
                 {' — '}
                 {step === 'session' && 'Sélection de la session'}
-                {step === 'criteria' && 'Critères d\'éligibilité'}
+                {step === 'criteria' && "Critères d'éligibilité"}
                 {step === 'preview' && 'Aperçu des participants'}
                 {step === 'confirm' && 'Confirmation'}
               </DialogDescription>
             </div>
           </div>
 
-          {/* Indicateur d'étapes */}
           <StepIndicator currentStep={step} />
         </DialogHeader>
 
-        {/* ================================================================
-            CONTENU SCROLLABLE
-            ================================================================ */}
+        {/* Contenu */}
         <div className="scrollbar-thin flex-1 overflow-y-auto px-6 py-5">
           {step === 'session' && (
             <SessionStep
@@ -214,14 +203,9 @@ export function GenerateAttestationsDialog({
               onSessionChange={setSessionId}
             />
           )}
-
           {step === 'criteria' && (
-            <CriteriaStep
-              criteria={criteria}
-              onCriteriaChange={setCriteria}
-            />
+            <CriteriaStep criteria={criteria} onCriteriaChange={setCriteria} />
           )}
-
           {step === 'preview' && (
             <PreviewStep
               preview={preview}
@@ -229,19 +213,13 @@ export function GenerateAttestationsDialog({
               error={previewError}
             />
           )}
-
           {step === 'confirm' && (
-            <ConfirmStep
-              preview={preview}
-              criteria={criteria}
-            />
+            <ConfirmStep preview={preview} criteria={criteria} />
           )}
         </div>
 
-        {/* ================================================================
-            ACTIONS
-            ================================================================ */}
-        <DialogFooter className="shrink-0 border-t border-odc-border bg-odc-surface px-6 py-4">
+        {/* Actions */}
+        <DialogFooter className="shrink-0 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-between">
             <div>
               {step !== 'session' && (
@@ -250,8 +228,9 @@ export function GenerateAttestationsDialog({
                   variant="outline"
                   onClick={handleBack}
                   disabled={generateMutation.isPending}
-                  leftIcon={<ChevronLeft className="h-4 w-4" />}
+                  className="h-9 rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
                 >
+                  <ChevronLeft className="mr-2 h-4 w-4" aria-hidden />
                   Retour
                 </Button>
               )}
@@ -263,6 +242,7 @@ export function GenerateAttestationsDialog({
                 variant="outline"
                 onClick={() => setOpen(false)}
                 disabled={generateMutation.isPending}
+                className="h-9 rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
               >
                 Annuler
               </Button>
@@ -270,28 +250,43 @@ export function GenerateAttestationsDialog({
               {step !== 'confirm' ? (
                 <Button
                   type="button"
-                  variant="odc"
                   onClick={handleNext}
                   disabled={
                     (step === 'session' && !sessionId) ||
                     (step === 'preview' && !preview?.stats.eligibles)
                   }
-                  rightIcon={<ChevronRight className="h-4 w-4" />}
+                  className={cn(
+                    'h-9 rounded-lg px-4 font-medium',
+                    'bg-slate-900 text-white hover:bg-slate-800',
+                    'dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-600',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                  )}
                 >
                   Suivant
+                  <ChevronRight className="ml-2 h-4 w-4" aria-hidden />
                 </Button>
               ) : (
                 <Button
                   type="button"
-                  variant="odc"
                   onClick={handleGenerate}
                   disabled={generateMutation.isPending}
-                  loading={generateMutation.isPending}
-                  loadingText="Génération…"
-                  leftIcon={<Award className="h-4 w-4" />}
+                  className={cn(
+                    'h-9 rounded-lg px-4 font-medium',
+                    'bg-slate-900 text-white hover:bg-slate-800',
+                    'dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:focus-visible:ring-slate-600',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                  )}
                 >
-                  Générer {preview?.stats.eligibles ?? 0} attestation
-                  {(preview?.stats.eligibles ?? 0) > 1 ? 's' : ''}
+                  {generateMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Award className="mr-2 h-4 w-4" aria-hidden />
+                  )}
+                  {generateMutation.isPending
+                    ? 'Génération…'
+                    : `Générer ${preview?.stats.eligibles ?? 0} attestation${(preview?.stats.eligibles ?? 0) > 1 ? 's' : ''}`}
                 </Button>
               )}
             </div>
@@ -302,9 +297,9 @@ export function GenerateAttestationsDialog({
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    INDICATEUR D'ÉTAPES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function StepIndicator({ currentStep }: { currentStep: Step }) {
   const steps: Array<{ key: Step; label: string }> = [
@@ -324,13 +319,15 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
             <div
               className={cn(
                 'flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold transition-colors',
-                i < currentIndex && 'bg-odc-success text-white',
-                i === currentIndex && 'bg-odc-primary text-white',
-                i > currentIndex && 'bg-odc-surface-alt text-odc-text-muted',
+                i < currentIndex && 'bg-emerald-500 text-white',
+                i === currentIndex &&
+                  'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900',
+                i > currentIndex &&
+                  'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
               )}
             >
               {i < currentIndex ? (
-                <CheckCircle2 className="h-3.5 w-3.5" />
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
               ) : (
                 i + 1
               )}
@@ -339,8 +336,8 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
               className={cn(
                 'text-xs font-medium',
                 i <= currentIndex
-                  ? 'text-odc-text-primary'
-                  : 'text-odc-text-muted',
+                  ? 'text-slate-900 dark:text-slate-50'
+                  : 'text-slate-500 dark:text-slate-400',
               )}
             >
               {s.label}
@@ -351,7 +348,9 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
             <div
               className={cn(
                 'h-px flex-1 transition-colors',
-                i < currentIndex ? 'bg-odc-success' : 'bg-odc-border',
+                i < currentIndex
+                  ? 'bg-emerald-500'
+                  : 'bg-slate-200 dark:bg-slate-800',
               )}
             />
           )}
@@ -361,9 +360,9 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    ÉTAPE 1 — SESSION
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface SessionStepProps {
   sessions: any[];
@@ -389,12 +388,12 @@ function SessionStep({
 
   if (sessions.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-odc-border p-8 text-center">
-        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-odc-warning" />
-        <p className="text-sm font-semibold text-odc-text-primary">
+      <div className="rounded-lg border border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
+        <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-amber-500 dark:text-amber-400" aria-hidden />
+        <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
           Aucune session terminée
         </p>
-        <p className="mt-1 text-xs text-odc-text-muted">
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Terminez au moins une session avant de générer des attestations.
         </p>
       </div>
@@ -404,8 +403,8 @@ function SessionStep({
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="session">
-          Session terminée <span className="text-odc-error">*</span>
+        <Label htmlFor="session" className="text-sm font-medium text-slate-900 dark:text-slate-50">
+          Session terminée <span className="text-red-600 dark:text-red-400">*</span>
         </Label>
         <Select value={sessionId} onValueChange={onSessionChange}>
           <SelectTrigger id="session" className="mt-1.5">
@@ -415,12 +414,9 @@ function SessionStep({
             {sessions.map((s: any) => (
               <SelectItem key={s.id} value={s.id}>
                 <div className="flex flex-col py-0.5">
-                  <span className="font-medium">
-                    {s.formation?.titre ?? 'Session'}
-                  </span>
-                  <span className="text-xs text-odc-text-muted">
-                    {s.codeSession} · {formatDate(s.dateDebut)} →{' '}
-                    {formatDate(s.dateFin)}
+                  <span className="font-medium">{s.formation?.titre ?? 'Session'}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {s.codeSession} · {formatDate(s.dateDebut)} → {formatDate(s.dateFin)}
                   </span>
                 </div>
               </SelectItem>
@@ -429,9 +425,9 @@ function SessionStep({
         </Select>
       </div>
 
-      <div className="rounded-lg bg-odc-info-soft p-3">
-        <p className="flex items-start gap-2 text-xs text-odc-info-dark">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-500/30 dark:bg-sky-500/10">
+        <p className="flex items-start gap-2 text-xs text-sky-800 dark:text-sky-200">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Seules les sessions <strong>terminées</strong> peuvent générer des
             attestations. Les participants doivent satisfaire aux critères
@@ -443,9 +439,9 @@ function SessionStep({
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    ÉTAPE 2 — CRITÈRES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface CriteriaStepProps {
   criteria: EligibilityCriteria;
@@ -455,18 +451,19 @@ interface CriteriaStepProps {
 function CriteriaStep({ criteria, onCriteriaChange }: CriteriaStepProps) {
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-odc-border p-4">
-        <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-odc-text-primary">
-          <Settings2 className="h-4 w-4 text-odc-primary" />
+      <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+          <Settings2 className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />
           Critères d&apos;éligibilité
         </p>
 
         <div className="space-y-4">
-          {/* Présence minimale */}
           <div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="presenceMin">Taux de présence minimum</Label>
-              <span className="font-mono text-sm font-bold text-odc-primary">
+              <Label htmlFor="presenceMin" className="text-slate-900 dark:text-slate-50">
+                Taux de présence minimum
+              </Label>
+              <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-50">
                 {criteria.presenceMin}%
               </span>
             </div>
@@ -485,16 +482,17 @@ function CriteriaStep({ criteria, onCriteriaChange }: CriteriaStepProps) {
               }
               className="mt-2"
             />
-            <p className="mt-1 text-xs text-odc-text-muted">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Recommandé : 75% minimum
             </p>
           </div>
 
-          {/* Note minimale */}
           <div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="noteMin">Note finale minimum</Label>
-              <span className="font-mono text-sm font-bold text-odc-primary">
+              <Label htmlFor="noteMin" className="text-slate-900 dark:text-slate-50">
+                Note finale minimum
+              </Label>
+              <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-50">
                 {criteria.noteMin}/20
               </span>
             </div>
@@ -513,21 +511,20 @@ function CriteriaStep({ criteria, onCriteriaChange }: CriteriaStepProps) {
               }
               className="mt-2"
             />
-            <p className="mt-1 text-xs text-odc-text-muted">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Recommandé : 10/20 minimum
             </p>
           </div>
         </div>
       </div>
 
-      {/* Options supplémentaires */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between rounded-lg border border-odc-border p-4">
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           <div>
-            <Label className="cursor-pointer text-sm font-medium">
+            <Label className="cursor-pointer text-sm font-medium text-slate-900 dark:text-slate-50">
               Inscription validée
             </Label>
-            <p className="mt-0.5 text-xs text-odc-text-muted">
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               Le participant doit avoir une inscription validée par le staff
             </p>
           </div>
@@ -539,12 +536,12 @@ function CriteriaStep({ criteria, onCriteriaChange }: CriteriaStepProps) {
           />
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-odc-border p-4">
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           <div>
-            <Label className="cursor-pointer text-sm font-medium">
+            <Label className="cursor-pointer text-sm font-medium text-slate-900 dark:text-slate-50">
               Sélection validée
             </Label>
-            <p className="mt-0.5 text-xs text-odc-text-muted">
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               Le participant doit avoir été sélectionné pour la session
             </p>
           </div>
@@ -557,29 +554,28 @@ function CriteriaStep({ criteria, onCriteriaChange }: CriteriaStepProps) {
         </div>
       </div>
 
-      {/* Aperçu des critères */}
-      <div className="rounded-lg bg-odc-surface-alt/60 p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
+      <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Résumé des critères
         </p>
-        <ul className="space-y-1 text-xs text-odc-text-secondary">
+        <ul className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
           <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
             Présence ≥ <strong>{criteria.presenceMin}%</strong>
           </li>
           <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
             Note ≥ <strong>{criteria.noteMin}/20</strong>
           </li>
           {criteria.inscriptionValidee && (
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
               Inscription <strong>validée</strong>
             </li>
           )}
           {criteria.selectionValidee && (
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
               Sélection <strong>validée</strong>
             </li>
           )}
@@ -589,9 +585,9 @@ function CriteriaStep({ criteria, onCriteriaChange }: CriteriaStepProps) {
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    ÉTAPE 3 — APERÇU
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface PreviewStepProps {
   preview: any;
@@ -612,9 +608,9 @@ function PreviewStep({ preview, isLoading, error }: PreviewStepProps) {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-odc-error bg-odc-error-bg p-4">
-        <p className="flex items-center gap-2 text-sm text-odc-error-dark">
-          <XCircle className="h-4 w-4" />
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-500/30 dark:bg-red-950/30">
+        <p className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+          <XCircle className="h-4 w-4" aria-hidden />
           Impossible de charger l&apos;aperçu. Vérifiez que la session contient
           des participants.
         </p>
@@ -628,35 +624,33 @@ function PreviewStep({ preview, isLoading, error }: PreviewStepProps) {
 
   return (
     <div className="space-y-5">
-      {/* Résumé */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border border-odc-border bg-odc-surface p-3 text-center">
-          <p className="text-xs text-odc-text-muted">Total</p>
-          <p className="mt-1 font-display text-2xl font-bold text-odc-text-primary">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 text-center dark:border-slate-800 dark:bg-slate-950">
+          <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
+          <p className="mt-1 font-display text-2xl font-bold text-slate-900 dark:text-slate-50">
             {stats.total}
           </p>
         </div>
-        <div className="rounded-lg border border-odc-success/30 bg-odc-success-soft p-3 text-center">
-          <p className="text-xs text-odc-success-dark">Éligibles</p>
-          <p className="mt-1 font-display text-2xl font-bold text-odc-success-dark">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+          <p className="text-xs text-emerald-700 dark:text-emerald-300">Éligibles</p>
+          <p className="mt-1 font-display text-2xl font-bold text-emerald-700 dark:text-emerald-300">
             {stats.eligibles}
           </p>
         </div>
-        <div className="rounded-lg border border-odc-error/30 bg-odc-error-soft p-3 text-center">
-          <p className="text-xs text-odc-error-dark">Non éligibles</p>
-          <p className="mt-1 font-display text-2xl font-bold text-odc-error-dark">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center dark:border-red-500/30 dark:bg-red-500/10">
+          <p className="text-xs text-red-700 dark:text-red-300">Non éligibles</p>
+          <p className="mt-1 font-display text-2xl font-bold text-red-700 dark:text-red-300">
             {stats.ineligibles}
           </p>
         </div>
       </div>
 
-      {/* Liste des participants */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Participants ({participants.length})
         </p>
 
-        <div className="max-h-72 space-y-2 overflow-y-auto scrollbar-thin rounded-lg border border-odc-border p-2">
+        <div className="scrollbar-thin max-h-72 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-800">
           {participants.map((p: EligibleParticipant) => (
             <ParticipantRow key={p.participantId} participant={p} />
           ))}
@@ -666,46 +660,36 @@ function PreviewStep({ preview, isLoading, error }: PreviewStepProps) {
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    LIGNE PARTICIPANT
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-function ParticipantRow({
-  participant,
-}: {
-  participant: EligibleParticipant;
-}) {
+function ParticipantRow({ participant }: { participant: EligibleParticipant }) {
   return (
     <div
       className={cn(
         'flex items-center gap-3 rounded-lg border p-2.5 transition-colors',
         participant.eligible
-          ? 'border-odc-success/30 bg-odc-success-soft/30'
-          : 'border-odc-border bg-odc-surface',
+          ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+          : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950',
       )}
     >
-      {/* Avatar */}
-      <Avatar className="h-9 w-9 shrink-0">
-        <AvatarImage src={participant.participant.photoUrl} />
-        <AvatarFallback className="bg-odc-primary-soft text-xs font-medium text-odc-primary">
-          {getInitials(
-            participant.participant.nom,
-            participant.participant.prenom,
-          )}
-        </AvatarFallback>
-      </Avatar>
+      <ParticipantAvatar
+        prenom={participant.participant.prenom}
+        nom={participant.participant.nom}
+        photoUrl={participant.participant.photoUrl}
+        size="md"
+      />
 
-      {/* Infos */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-odc-text-primary">
+        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
           {participant.participant.prenom} {participant.participant.nom}
         </p>
-        <p className="truncate text-xs text-odc-text-muted">
+        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
           {participant.participant.email}
         </p>
       </div>
 
-      {/* Métriques */}
       <div className="hidden items-center gap-3 sm:flex">
         <TooltipProvider delayDuration={200}>
           <Tooltip>
@@ -714,11 +698,11 @@ function ParticipantRow({
                 className={cn(
                   'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                   participant.tauxPresence >= 75
-                    ? 'bg-odc-success-soft text-odc-success-dark'
-                    : 'bg-odc-warning-soft text-odc-warning-dark',
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                    : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
                 )}
               >
-                <Clock className="h-3 w-3" />
+                <Clock className="h-3 w-3" aria-hidden />
                 {participant.tauxPresence}%
               </span>
             </TooltipTrigger>
@@ -734,8 +718,8 @@ function ParticipantRow({
                   className={cn(
                     'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
                     participant.noteFinale >= 10
-                      ? 'bg-odc-success-soft text-odc-success-dark'
-                      : 'bg-odc-error-soft text-odc-error-dark',
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                      : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
                   )}
                 >
                   {participant.noteFinale}/20
@@ -747,19 +731,18 @@ function ParticipantRow({
         )}
       </div>
 
-      {/* Statut */}
       <div className="shrink-0">
         {participant.dejaGeneree ? (
           <Badge
             variant="outline"
-            className="gap-1 border-odc-info/30 text-odc-info-dark"
+            className="gap-1 border-sky-200 text-sky-700 dark:border-sky-500/30 dark:text-sky-300"
           >
-            <Info className="h-3 w-3" />
+            <Info className="h-3 w-3" aria-hidden />
             Déjà générée
           </Badge>
         ) : participant.eligible ? (
-          <Badge className="gap-1 bg-odc-success-soft text-odc-success-dark hover:bg-odc-success-soft">
-            <UserCheck className="h-3 w-3" />
+          <Badge className="gap-1 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <UserCheck className="h-3 w-3" aria-hidden />
             Éligible
           </Badge>
         ) : (
@@ -769,9 +752,9 @@ function ParticipantRow({
                 <span className="inline-flex">
                   <Badge
                     variant="outline"
-                    className="gap-1 text-odc-text-muted"
+                    className="gap-1 border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400"
                   >
-                    <UserX className="h-3 w-3" />
+                    <UserX className="h-3 w-3" aria-hidden />
                     Non éligible
                   </Badge>
                 </span>
@@ -791,9 +774,9 @@ function ParticipantRow({
   );
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    ÉTAPE 4 — CONFIRMATION
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 interface ConfirmStepProps {
   preview: any;
@@ -810,86 +793,82 @@ function ConfirmStep({ preview, criteria }: ConfirmStepProps) {
 
   return (
     <div className="space-y-5">
-      {/* Confirmation visuelle */}
-      <div className="rounded-lg border-2 border-odc-primary bg-odc-primary-softer p-5 text-center">
-        <Award className="mx-auto mb-3 h-10 w-10 text-odc-primary" />
-        <p className="font-display text-lg font-bold text-odc-text-primary">
+      <div className="rounded-lg border-2 border-slate-900 bg-slate-50 p-5 text-center dark:border-slate-50 dark:bg-slate-900">
+        <Award className="mx-auto mb-3 h-10 w-10 text-slate-900 dark:text-slate-50" aria-hidden />
+        <p className="font-display text-lg font-bold text-slate-900 dark:text-slate-50">
           {toGenerate.length} attestation
           {toGenerate.length > 1 ? 's' : ''} à générer
         </p>
-        <p className="mt-1 text-sm text-odc-text-secondary">
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Pour la session{' '}
           <strong>{session?.formation?.titre ?? session?.codeSession}</strong>
         </p>
       </div>
 
-      {/* Récapitulatif */}
-      <div className="space-y-2 rounded-lg border border-odc-border bg-odc-surface-alt/30 p-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
+      <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/30">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Récapitulatif
         </p>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-xs text-odc-text-muted">Éligibles</p>
-            <p className="mt-0.5 font-semibold text-odc-success-dark">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Éligibles</p>
+            <p className="mt-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
               {stats.eligibles}
             </p>
           </div>
           <div>
-            <p className="text-xs text-odc-text-muted">Déjà générées</p>
-            <p className="mt-0.5 font-semibold text-odc-info-dark">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Déjà générées</p>
+            <p className="mt-0.5 font-semibold text-sky-700 dark:text-sky-300">
               {stats.dejaGenerees}
             </p>
           </div>
           <div>
-            <p className="text-xs text-odc-text-muted">Non éligibles</p>
-            <p className="mt-0.5 font-semibold text-odc-error-dark">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Non éligibles</p>
+            <p className="mt-0.5 font-semibold text-red-700 dark:text-red-300">
               {stats.ineligibles}
             </p>
           </div>
           <div>
-            <p className="text-xs text-odc-text-muted">À générer</p>
-            <p className="mt-0.5 font-semibold text-odc-primary">
+            <p className="text-xs text-slate-500 dark:text-slate-400">À générer</p>
+            <p className="mt-0.5 font-semibold text-slate-900 dark:text-slate-50">
               {toGenerate.length}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Critères appliqués */}
-      <div className="rounded-lg border border-odc-border p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-odc-text-muted">
+      <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Critères appliqués
         </p>
-        <ul className="space-y-1 text-xs text-odc-text-secondary">
+        <ul className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
           <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
             Présence ≥ <strong>{criteria.presenceMin}%</strong>
           </li>
           <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
             Note ≥ <strong>{criteria.noteMin}/20</strong>
           </li>
           {criteria.inscriptionValidee && (
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
               Inscription <strong>validée</strong>
             </li>
           )}
           {criteria.selectionValidee && (
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-odc-success" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
               Sélection <strong>validée</strong>
             </li>
           )}
         </ul>
       </div>
 
-      {/* Avertissement */}
-      <div className="rounded-lg border border-odc-warning bg-odc-warning-bg p-3">
-        <p className="flex items-start gap-2 text-xs text-odc-warning-dark">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+        <p className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Les attestations seront générées avec un <strong>numéro unique</strong>{' '}
             et un <strong>QR code de vérification</strong>. Cette action ne peut

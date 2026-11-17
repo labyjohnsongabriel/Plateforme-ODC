@@ -1,4 +1,7 @@
-import { Search, MessageSquarePlus, Users, MessageSquare } from 'lucide-react';
+// src/components/messagerie/ConversationList.tsx
+'use client';
+
+import { Search, MessageSquarePlus, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 import { Conversation } from '../types/messagerie.types';
 import { Input } from '@/components/common/Input';
@@ -7,7 +10,6 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ConversationItem } from './ConversationItem';
 import { MessagerieService } from '../services/messagerie.service';
 import { useDebounce } from '@/hooks/useDebounce';
-import { cn } from '@/utils/cn';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -33,22 +35,22 @@ export function ConversationList({
     ? conversations.filter((c) =>
         MessagerieService.getDisplayName(c, currentUserId)
           .toLowerCase()
-          .includes(debouncedSearch.toLowerCase())
+          .includes(debouncedSearch.toLowerCase()),
       )
     : conversations;
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-odc-surface-dark">
+    <div className="flex h-full flex-col bg-white dark:bg-slate-950">
       {/* Header */}
-      <div className="p-4 border-b border-odc-border-light dark:border-odc-border-dark">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-heading font-bold text-lg text-odc-text-light dark:text-odc-text-dark">
+      <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-slate-50">
             Messages
           </h2>
           {onNewClick && (
             <button
               onClick={onNewClick}
-              className="p-2 rounded-lg hover:bg-odc-primary-soft dark:hover:bg-odc-primary-soft/20 text-odc-primary transition-colors"
+              className="rounded-lg p-2 text-orange-600 transition-colors hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-500/10"
               title="Nouvelle conversation"
             >
               <MessageSquarePlus size={18} />
@@ -64,7 +66,7 @@ export function ConversationList({
         />
       </div>
 
-      {/* List */}
+      {/* Liste */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <Loader text="Chargement..." />

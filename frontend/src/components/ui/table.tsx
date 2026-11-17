@@ -4,35 +4,47 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE — Conteneur racine
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement> & {
-    /** Désactive le défilement horizontal */
-    noScroll?: boolean;
-  }
->(({ className, noScroll = false, ...props }, ref) => (
-  <div
-    className={cn(
-      'relative w-full',
-      !noScroll && 'overflow-x-auto scrollbar-thin',
-    )}
-  >
-    <table
-      ref={ref}
-      className={cn('w-full caption-bottom text-sm', className)}
-      {...props}
-    />
-  </div>
-));
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  /** Désactive le défilement horizontal */
+  noScroll?: boolean;
+  /** Active l'alternance de lignes (zebra) */
+  striped?: boolean;
+  /** Fixe l'en-tête au scroll */
+  stickyHeader?: boolean;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, noScroll = false, striped = false, stickyHeader = false, ...props }, ref) => (
+    <div
+      className={cn(
+        'relative w-full',
+        !noScroll && 'overflow-x-auto scrollbar-thin',
+        stickyHeader && 'max-h-[70vh] overflow-y-auto',
+      )}
+    >
+      <table
+        ref={ref}
+        data-striped={striped || undefined}
+        className={cn(
+          'w-full caption-bottom text-sm',
+          striped && '[&_tbody_tr:nth-child(even)]:bg-odc-surface-alt/30',
+          stickyHeader && '[&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10',
+          className,
+        )}
+        {...props}
+      />
+    </div>
+  ),
+);
 Table.displayName = 'Table';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE HEADER
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
@@ -41,7 +53,8 @@ const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={cn(
-      'bg-odc-surface-alt/60 backdrop-blur-sm [&_tr]:border-b [&_tr]:border-odc-border',
+      'bg-odc-surface-alt/80 backdrop-blur-sm',
+      '[&_tr]:border-b [&_tr]:border-odc-border',
       className,
     )}
     {...props}
@@ -49,9 +62,9 @@ const TableHeader = React.forwardRef<
 ));
 TableHeader.displayName = 'TableHeader';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE BODY
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const TableBody = React.forwardRef<
   HTMLTableSectionElement,
@@ -65,9 +78,9 @@ const TableBody = React.forwardRef<
 ));
 TableBody.displayName = 'TableBody';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE FOOTER
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const TableFooter = React.forwardRef<
   HTMLTableSectionElement,
@@ -76,7 +89,8 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      'border-t border-odc-border bg-odc-surface-alt/80 font-medium [&>tr]:last:border-b-0',
+      'border-t-2 border-odc-border bg-odc-surface-alt font-semibold',
+      '[&>tr]:last:border-b-0',
       className,
     )}
     {...props}
@@ -84,33 +98,41 @@ const TableFooter = React.forwardRef<
 ));
 TableFooter.displayName = 'TableFooter';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE ROW
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-const TableRow = React.forwardRef<
-  HTMLTableRowElement,
-  React.HTMLAttributes<HTMLTableRowElement> & {
-    /** Désactive les effets de survol */
-    noHover?: boolean;
-  }
->(({ className, noHover = false, ...props }, ref) => (
-  <tr
-    ref={ref}
-    className={cn(
-      'border-b border-odc-border transition-colors',
-      !noHover && 'hover:bg-odc-surface-alt/50',
-      'data-[state=selected]:bg-odc-primary-soft/30',
-      className,
-    )}
-    {...props}
-  />
-));
+interface TableRowProps extends React.HTMLAttributes<HTMLTableRowElement> {
+  /** Désactive les effets de survol */
+  noHover?: boolean;
+  /** Marque la ligne comme sélectionnée */
+  selected?: boolean;
+  /** Marque la ligne comme cliquable */
+  interactive?: boolean;
+}
+
+const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(
+  ({ className, noHover = false, selected = false, interactive = false, ...props }, ref) => (
+    <tr
+      ref={ref}
+      data-state={selected ? 'selected' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      className={cn(
+        'border-b border-odc-border/60 transition-colors',
+        !noHover && 'hover:bg-odc-surface-alt/60',
+        interactive && 'cursor-pointer focus-visible:outline-none focus-visible:bg-odc-primary-soft/20',
+        'data-[state=selected]:bg-odc-primary-soft/40',
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
 TableRow.displayName = 'TableRow';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE HEAD (cellule d'en-tête)
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
@@ -120,11 +142,8 @@ const TableHead = React.forwardRef<
     ref={ref}
     scope="col"
     className={cn(
-      // Mise en page
-      'h-11 px-4 text-left align-middle',
-      // Typographie
-      'text-xs font-semibold uppercase tracking-wider text-odc-muted',
-      // Cas particulier : checkbox
+      'h-12 px-4 text-left align-middle',
+      'text-xs font-semibold uppercase tracking-wider text-odc-text-muted',
       '[&:has([role=checkbox])]:pr-0 [&:has([role=checkbox])]:w-10',
       className,
     )}
@@ -133,9 +152,9 @@ const TableHead = React.forwardRef<
 ));
 TableHead.displayName = 'TableHead';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE CELL (cellule de contenu)
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const TableCell = React.forwardRef<
   HTMLTableCellElement,
@@ -144,7 +163,7 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      'p-4 align-middle text-odc-text-primary',
+      'px-4 py-3 align-middle text-odc-text-primary',
       '[&:has([role=checkbox])]:pr-0 [&:has([role=checkbox])]:w-10',
       className,
     )}
@@ -153,9 +172,9 @@ const TableCell = React.forwardRef<
 ));
 TableCell.displayName = 'TableCell';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TABLE CAPTION
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
@@ -163,15 +182,37 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn('mt-4 text-sm text-odc-muted', className)}
+    className={cn('mt-4 text-sm text-odc-text-muted', className)}
     {...props}
   />
 ));
 TableCaption.displayName = 'TableCaption';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABLE EMPTY (état vide réutilisable)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface TableEmptyProps {
+  colSpan: number;
+  message?: string;
+  icon?: React.ReactNode;
+}
+
+const TableEmpty = ({ colSpan, message = 'Aucune donnée', icon }: TableEmptyProps) => (
+  <tr>
+    <td colSpan={colSpan} className="h-32 text-center">
+      <div className="flex flex-col items-center justify-center gap-2 text-odc-text-muted">
+        {icon && <div className="opacity-60">{icon}</div>}
+        <p className="text-sm">{message}</p>
+      </div>
+    </td>
+  </tr>
+);
+TableEmpty.displayName = 'TableEmpty';
+
+/* ═══════════════════════════════════════════════════════════════════════════
    EXPORTS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export {
   Table,
@@ -182,4 +223,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TableEmpty,
 };

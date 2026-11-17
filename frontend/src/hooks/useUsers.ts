@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    TYPES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export type RoleNom =
   | 'ADMINISTRATEUR'
@@ -91,9 +91,9 @@ export interface UserFilters {
   limit?: number;
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    HELPERS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 function extractList<T>(response: any): T[] {
   if (Array.isArray(response)) return response;
@@ -167,9 +167,9 @@ function cleanFilters(filters?: UserFilters): Record<string, any> {
   return cleaned;
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    CLÉS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const userKeys = {
   all: ['admin', 'users'] as const,
@@ -180,9 +180,9 @@ export const userKeys = {
   stats: () => [...userKeys.all, 'stats'] as const,
 };
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    QUERIES
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useUsers(filters?: UserFilters) {
   return useQuery({
@@ -221,17 +221,18 @@ export function useUsersStats() {
         const response = await api.get('/admin/users/stats/roles');
         const raw = extractItem<any>(response) ?? {};
 
-        // ⭐ Gérer les deux formats : avec total/actifs/inactifs OU directement parRole
         if (Array.isArray(raw?.parRole)) {
           return {
             total: Number(raw?.total ?? 0),
             actifs: Number(raw?.actifs ?? 0),
             inactifs: Number(raw?.inactifs ?? 0),
-            parRole: raw.parRole,
+            parRole: raw.parRole.map((r: any) => ({
+              role: r.role as RoleNom,
+              count: Number(r.count),
+            })),
           };
         }
 
-        // Si l'API renvoie un tableau direct (ancien format)
         if (Array.isArray(raw)) {
           const total = raw.reduce(
             (sum: number, r: any) => sum + Number(r.count ?? 0),
@@ -242,7 +243,7 @@ export function useUsersStats() {
             actifs: total,
             inactifs: 0,
             parRole: raw.map((r: any) => ({
-              role: r.role,
+              role: r.role as RoleNom,
               count: Number(r.count),
             })),
           };
@@ -250,7 +251,6 @@ export function useUsersStats() {
 
         return { total: 0, actifs: 0, inactifs: 0, parRole: [] };
       } catch {
-        // Fallback : dériver depuis la liste complète
         try {
           const response = await api.get('/admin/users', {
             params: { limit: 1000 },
@@ -281,9 +281,9 @@ export function useUsersStats() {
   });
 }
 
-/* ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
    MUTATIONS
-   ============================================================================ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useCreateUser() {
   const qc = useQueryClient();
@@ -309,12 +309,11 @@ export function useUpdateUser(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Partial<UserFormValues>) => {
-      // ⭐⭐⭐ Retirer roleNom, email, motDePasse de la mise à jour
       const {
-        roleNom,        // ← géré par useChangeUserRole
-        email,          // ← email immuable
-        motDePasse,     // ← géré par resetPassword
-        confirmation,   // ← inutile
+        roleNom: _roleNom,
+        email: _email,
+        motDePasse: _motDePasse,
+        confirmation: _confirmation,
         ...rest
       } = payload;
 
@@ -323,7 +322,6 @@ export function useUpdateUser(id: string) {
     },
     onSuccess: (data) => {
       toast.success('Utilisateur mis à jour');
-      // ⭐ Mise à jour optimiste du cache détail
       qc.setQueryData(userKeys.detail(id), data);
       qc.invalidateQueries({ queryKey: userKeys.lists() });
       qc.invalidateQueries({ queryKey: userKeys.stats() });
@@ -332,12 +330,13 @@ export function useUpdateUser(id: string) {
   });
 }
 
-/**
- * ⭐⭐ Changement de rôle via l'endpoint DÉDIÉ
- * PUT /admin/users/:id/role
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐⭐⭐ CHANGEMENT DE RÔLE — robuste et complet
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 export function useChangeUserRole() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: async ({
       userId,
@@ -346,25 +345,70 @@ export function useChangeUserRole() {
       userId: string;
       roleNom: RoleNom;
     }) => {
+      // ⭐ PUT /admin/users/:id/role avec roleNom
       const response = await api.put(`/admin/users/${userId}/role`, {
         roleNom,
       });
       return normalizeUser(extractItem<any>(response));
     },
+
     onSuccess: (data, vars) => {
-      toast.success(`Rôle changé avec succès`);
-      // ⭐ Mise à jour IMMÉDIATE du cache détail
-      qc.setQueryData(userKeys.detail(vars.userId), data);
-      // ⭐ Invalider toutes les listes (avec refetch)
+      console.log('[useChangeUserRole] Succès:', {
+        userId: vars.userId,
+        roleNom: vars.roleNom,
+        newUser: data,
+      });
+
+      toast.success(
+        `Rôle modifié en ${ROLE_LABELS[vars.roleNom] ?? vars.roleNom}`,
+      );
+
+      // ⭐ Mise à jour optimiste du cache détail
+      if (data) {
+        qc.setQueryData(userKeys.detail(vars.userId), data);
+      }
+
+      // ⭐ Invalider TOUTES les listes (avec refetch immédiat)
       qc.invalidateQueries({
         queryKey: userKeys.lists(),
-        refetchType: 'active',
+        refetchType: 'all',
       });
+
+      // ⭐ Invalider les stats
       qc.invalidateQueries({ queryKey: userKeys.stats() });
     },
-    onError: (e) => toast.error(getErrorMessage(e)),
+
+    onError: (error: any, vars) => {
+      console.error('[useChangeUserRole] Erreur:', {
+        userId: vars.userId,
+        roleNom: vars.roleNom,
+        message: error?.message,
+        response: error?.response?.data,
+      });
+
+      // ⭐ Message d'erreur détaillé
+      const apiMessage =
+        error?.response?.data?.message ?? error?.message ?? '';
+
+      if (apiMessage.includes('dernier administrateur')) {
+        toast.error(
+          'Impossible : il doit rester au moins un administrateur actif',
+          { duration: 5000 },
+        );
+      } else if (apiMessage.includes('introuvable')) {
+        toast.error(`Rôle "${vars.roleNom}" introuvable dans le système`);
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+      } else {
+        toast.error(getErrorMessage(error));
+      }
+    },
   });
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTRES MUTATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function useToggleUserActif() {
   const qc = useQueryClient();
@@ -383,8 +427,7 @@ export function useToggleUserActif() {
       toast.success(
         vars.actif ? 'Utilisateur activé' : 'Utilisateur désactivé',
       );
-      // ⭐ Mise à jour immédiate du cache détail
-      qc.setQueryData(userKeys.detail(vars.id), data);
+      if (data) qc.setQueryData(userKeys.detail(vars.id), data);
       qc.invalidateQueries({ queryKey: userKeys.lists() });
       qc.invalidateQueries({ queryKey: userKeys.stats() });
     },
@@ -400,7 +443,6 @@ export function useDeleteUser() {
     },
     onSuccess: (_, id) => {
       toast.success('Utilisateur supprimé');
-      // ⭐ Retirer du cache détail
       qc.removeQueries({ queryKey: userKeys.detail(id) });
       qc.invalidateQueries({ queryKey: userKeys.lists() });
       qc.invalidateQueries({ queryKey: userKeys.stats() });
@@ -413,11 +455,9 @@ export function useBulkDeleteUsers() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      // ⭐ Essayer l'endpoint bulk, sinon faire des appels individuels
       try {
         await api.post('/admin/users/bulk-delete', { ids });
       } catch {
-        // Fallback : appels individuels
         await Promise.all(ids.map((id) => api.delete(`/admin/users/${id}`)));
       }
     },
@@ -453,10 +493,6 @@ export function useUploadUserAvatar(userId: string) {
   });
 }
 
-/**
- * ⭐ NOUVEAU : Reset mot de passe (admin)
- * POST /admin/users/:id/reset-password
- */
 export function useResetUserPassword(userId: string) {
   return useMutation({
     mutationFn: async (nouveauMotDePasse: string) => {
@@ -473,9 +509,6 @@ export function useResetUserPassword(userId: string) {
   });
 }
 
-/**
- * ⭐ Hook composé : actions fréquentes sur un utilisateur
- */
 export function useUserActions(userId?: string) {
   const changeRole = useChangeUserRole();
   const toggleActif = useToggleUserActif();

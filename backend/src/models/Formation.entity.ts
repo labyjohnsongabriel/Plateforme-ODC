@@ -19,14 +19,17 @@ export class Formation extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description: string | null;;
 
-  @Column({ type: 'varchar', length: 100 })
-  domaine: string;
+ @Column({ type: 'varchar', length: 100, nullable: true })
+domaine: string | null;
 
   @Column({ type: 'int', name: 'duree_heures' })
   dureeHeures: number;
 
   @Column({ type: 'varchar', length: 50 })
+
   niveau: NiveauFormation;
+  @Column({ type: 'boolean', default: false, name: 'est_publiee' })
+estPubliee: boolean;
 
   @Column({ type: 'text', nullable: true })
   prerequis: string | null;

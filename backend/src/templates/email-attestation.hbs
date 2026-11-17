@@ -1,100 +1,204 @@
+{{! src/templates/email-attestation.hbs }}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Votre attestation ODC</title>
+
+  <!--[if mso]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <style type="text/css">
+    body, table, td, a { font-family: Arial, sans-serif !important; }
+    .outlook-fix { width: 600px !important; }
+  </style>
+  <![endif]-->
+
+  <style type="text/css">
+    /* ═══════════ Reset ═══════════ */
+    body { margin: 0 !important; padding: 0 !important; }
+    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    a { text-decoration: none; }
+
+    /* ═══════════ Mobile ═══════════ */
+    @media screen and (max-width: 600px) {
+      .container { width: 100% !important; }
+      .content-padding { padding: 32px 24px !important; }
+      .header-padding { padding: 32px 24px !important; }
+      .footer-padding { padding: 20px 24px !important; }
+      h1 { font-size: 22px !important; }
+      .btn-full { width: 100% !important; display: block !important; text-align: center !important; }
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;background:#FFF8F2;font-family:'Inter',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8F2;padding:30px 0;">
+<body style="margin:0;padding:0;background:#FFF8F2;font-family:'Segoe UI',Tahoma,Geneva,Verdana,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+
+  <!-- ═══════════ PREHEADER (aperçu inbox) ═══════════ -->
+  <div style="display:none;font-size:1px;color:#FFFFFF;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    🎓 Votre attestation de formation {{formationTitre}} est prête. Numéro : {{numeroAttestation}}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFF8F2;padding:40px 15px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background:#FFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(255,121,0,0.1);">
+        <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(255,121,0,0.12);">
 
-          <!-- HEADER -->
+          <!-- ═══════════ HEADER (bgcolor fallback pour Outlook) ═══════════ -->
           <tr>
-            <td style="background:linear-gradient(135deg,#FF7900,#E65100);padding:40px 30px;text-align:center;">
-              <div style="font-size:48px;margin-bottom:10px;">🎓</div>
-              <h1 style="color:#FFF;margin:0;font-size:24px;font-weight:700;">
-                Félicitations {{nomParticipant}} !
+            <td class="header-padding" bgcolor="#FF7900" style="background:#FF7900;background:linear-gradient(135deg,#FF7900 0%,#E65100 100%);padding:48px 32px;text-align:center;">
+              <div style="font-size:56px;line-height:1;margin-bottom:16px;" aria-hidden="true">🎓</div>
+              <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:700;letter-spacing:-0.5px;">
+                Félicitations {{#if nomParticipant}}{{nomParticipant}}{{else}}à vous{{/if}} !
               </h1>
-              <p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:14px;">
+              <p style="color:rgba(255,255,255,0.92);margin:12px 0 0;font-size:15px;font-weight:400;">
                 Votre attestation est disponible
               </p>
             </td>
           </tr>
 
-          <!-- BODY -->
+          <!-- ═══════════ BODY ═══════════ -->
           <tr>
-            <td style="padding:40px 30px;">
-              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                Bonjour <strong>{{nomParticipant}}</strong>,
+            <td class="content-padding" style="padding:48px 32px 32px;">
+              <p style="color:#1A1A1A;font-size:16px;line-height:1.6;margin:0 0 20px;">
+                Bonjour <strong>{{#if nomParticipant}}{{nomParticipant}}{{else}}à vous{{/if}}</strong>,
               </p>
 
-              <p style="color:#1A1A1A;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              <p style="color:#4A4A4A;font-size:15px;line-height:1.7;margin:0 0 28px;">
                 Nous avons le plaisir de vous informer que votre attestation de réussite
-                pour la formation <strong style="color:#E65100;">« {{formationTitre}} »</strong>
+                pour la formation
+                <strong style="color:#E65100;">« {{#if formationTitre}}{{formationTitre}}{{else}}votre formation{{/if}} »</strong>
                 est maintenant disponible.
               </p>
 
-              <div style="background:#FFF8F2;border-left:4px solid #FF7900;padding:20px;border-radius:6px;margin:25px 0;">
-                <div style="font-size:11px;color:#6B6B6B;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">
-                  Numéro d'attestation
-                </div>
-                <div style="font-family:monospace;font-size:18px;font-weight:700;color:#FF7900;">
-                  {{numeroAttestation}}
-                </div>
-              </div>
-
-              <p style="color:#6B6B6B;font-size:13px;line-height:1.6;margin:20px 0;">
-                L'attestation officielle est jointe en pièce jointe au format PDF.
-              </p>
-
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
+              <!-- ═══════════ BLOC INFOS ═══════════ -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFF8F2;border-left:4px solid #FF7900;border-radius:8px;margin:28px 0;">
                 <tr>
-                  <td align="center">
-                    <a href="{{urlVerification}}"
-                       style="display:inline-block;background:#FF7900;color:#FFF;text-decoration:none;padding:14px 35px;border-radius:8px;font-weight:600;font-size:15px;">
-                      ✅ Vérifier l'authenticité
-                    </a>
+                  <td style="padding:24px;">
+                    <div style="font-size:11px;color:#8A8A8A;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;margin-bottom:8px;">
+                      Numéro d'attestation
+                    </div>
+                    <div style="font-family:'Courier New',monospace;font-size:20px;font-weight:700;color:#FF7900;letter-spacing:0.5px;">
+                      {{#if numeroAttestation}}{{numeroAttestation}}{{else}}—{{/if}}
+                    </div>
+
+                    {{#if noteFinale}}
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;padding-top:16px;border-top:1px dashed #FFE0B2;">
+                        <tr>
+                          <td style="font-size:13px;color:#6B6B6B;padding:4px 0;">
+                            <strong style="color:#1A1A1A;">Note finale :</strong>
+                          </td>
+                          <td align="right" style="font-size:14px;color:#FF7900;font-weight:700;padding:4px 0;">
+                            {{formatNumber noteFinale 1}} / 20
+                          </td>
+                        </tr>
+                        {{#if tauxPresence}}
+                          <tr>
+                            <td style="font-size:13px;color:#6B6B6B;padding:4px 0;">
+                              <strong style="color:#1A1A1A;">Assiduité :</strong>
+                            </td>
+                            <td align="right" style="font-size:14px;color:#FF7900;font-weight:700;padding:4px 0;">
+                              {{tauxPresence}} %
+                            </td>
+                          </tr>
+                        {{/if}}
+                      </table>
+                    {{else}}
+                      {{#if tauxPresence}}
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;padding-top:16px;border-top:1px dashed #FFE0B2;">
+                          <tr>
+                            <td style="font-size:13px;color:#6B6B6B;padding:4px 0;">
+                              <strong style="color:#1A1A1A;">Assiduité :</strong>
+                            </td>
+                            <td align="right" style="font-size:14px;color:#FF7900;font-weight:700;padding:4px 0;">
+                              {{tauxPresence}} %
+                            </td>
+                          </tr>
+                        </table>
+                      {{/if}}
+                    {{/if}}
                   </td>
                 </tr>
               </table>
 
-              <p style="color:#6B6B6B;font-size:12px;line-height:1.6;margin:20px 0 0;">
-                Vous pouvez également scanner le QR code présent sur l'attestation
-                pour vérifier son authenticité à tout moment.
+              <p style="color:#6B6B6B;font-size:14px;line-height:1.6;margin:24px 0;">
+                📎 L'attestation officielle est jointe à cet email au format PDF.
               </p>
 
-              <!-- Suggestions -->
-              <div style="margin-top:30px;padding-top:20px;border-top:1px solid #F0F0F0;">
-                <p style="color:#1A1A1A;font-size:14px;font-weight:600;margin:0 0 12px;">
-                  🚀 Continuez votre parcours
+              {{#if urlVerification}}
+                <!-- ═══════════ CTA ═══════════ -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0;">
+                  <tr>
+                    <td align="center">
+                      <a href="{{urlVerification}}"
+                         class="btn-full"
+                         style="display:inline-block;background:#FF7900;background:linear-gradient(135deg,#FF7900 0%,#E65100 100%);color:#FFFFFF;text-decoration:none;padding:16px 40px;border-radius:10px;font-weight:600;font-size:15px;box-shadow:0 4px 14px rgba(255,121,0,0.35);">
+                        ✅ Vérifier l'authenticité
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="color:#8A8A8A;font-size:13px;line-height:1.6;margin:24px 0 0;">
+                  Vous pouvez également scanner le QR code présent sur l'attestation
+                  pour vérifier son authenticité à tout moment.
                 </p>
-                <p style="color:#6B6B6B;font-size:13px;line-height:1.6;margin:0;">
-                  Découvrez nos prochaines formations sur
-                  <a href="{{odcWebsite}}" style="color:#FF7900;text-decoration:none;font-weight:600;">
-                    {{odcWebsite}}
+
+                <!-- ═══════════ FALLBACK LINK ═══════════ -->
+                <p style="color:#8A8A8A;font-size:12px;line-height:1.6;margin:16px 0 0;word-break:break-all;">
+                  Si le bouton ne fonctionne pas, copiez ce lien :<br>
+                  <a href="{{urlVerification}}" style="color:#FF7900;text-decoration:none;">
+                    {{urlVerification}}
                   </a>
                 </p>
-              </div>
+              {{/if}}
+
+              <!-- ═══════════ SUGGESTION ═══════════ -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;padding-top:24px;border-top:1px solid #F0F0F0;">
+                <tr>
+                  <td>
+                    <p style="color:#1A1A1A;font-size:15px;font-weight:600;margin:0 0 12px;">
+                      🚀 Continuez votre parcours
+                    </p>
+                    <p style="color:#6B6B6B;font-size:14px;line-height:1.6;margin:0;">
+                      Découvrez nos prochaines formations sur
+                      <a href="https://{{#if odcWebsite}}{{odcWebsite}}{{else}}www.odc.mg{{/if}}"
+                         style="color:#FF7900;text-decoration:none;font-weight:600;">
+                        {{#if odcWebsite}}{{odcWebsite}}{{else}}www.odc.mg{{/if}}
+                      </a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
-          <!-- FOOTER -->
+          <!-- ═══════════ FOOTER — Fianarantsoa ═══════════ -->
           <tr>
-            <td style="background:#F5F5F5;padding:25px 30px;text-align:center;">
-              <p style="color:#6B6B6B;font-size:12px;margin:0 0 8px;">
-                <strong style="color:#FF7900;">Orange Digital Center</strong>
+            <td class="footer-padding" style="background:#FAFAFA;padding:28px 32px;text-align:center;border-top:1px solid #F0F0F0;">
+              <p style="color:#FF7900;font-size:14px;font-weight:700;margin:0 0 8px;">
+                {{#if odcName}}{{odcName}}{{else}}Orange Digital Center{{/if}}
               </p>
-              <p style="color:#6B6B6B;font-size:11px;margin:0;">
-                Antananarivo, Madagascar • contact@odc.mg
+              <p style="color:#8A8A8A;font-size:12px;margin:0;line-height:1.5;">
+                {{#if odcAdresse}}{{odcAdresse}}{{else}}Fianarantsoa, Madagascar{{/if}}
+                •
+                <a href="mailto:{{#if contactEmail}}{{contactEmail}}{{else}}contact@odc.mg{{/if}}"
+                   style="color:#8A8A8A;text-decoration:none;">
+                  {{#if contactEmail}}{{contactEmail}}{{else}}contact@odc.mg{{/if}}
+                </a>
               </p>
             </td>
           </tr>
         </table>
 
-        <p style="color:#999;font-size:11px;margin-top:20px;">
-          © {{year}} Orange Digital Center. Tous droits réservés.
+        <p style="color:#A0A0A0;font-size:11px;margin-top:24px;text-align:center;">
+          © {{#if year}}{{year}}{{else}}2026{{/if}} {{#if odcName}}{{odcName}}{{else}}Orange Digital Center{{/if}}. Tous droits réservés.
         </p>
       </td>
     </tr>

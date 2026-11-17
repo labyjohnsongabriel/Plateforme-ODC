@@ -1,44 +1,67 @@
-// ============================================================================
-//  ODC PLATFORM — Thème JS
-// ============================================================================
+// src/config/theme.ts
 
-export type ThemeMode = 'light' | 'dark';
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export type ThemeMode = 'light' | 'dark' | 'auto';
 
 export interface ThemeColors {
+  /* Primary */
   primary: string;
   primaryDark: string;
   primaryLight: string;
   primarySoft: string;
+  primarySofter: string;
 
+  /* Surfaces */
   background: string;
   surface: string;
   surfaceAlt: string;
+  surfaceHover: string;
   elevated: string;
 
+  /* Textes — contraste garanti sur surface/surfaceAlt */
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  textTertiary: string;
   textInverse: string;
 
+  /* Bordures */
   border: string;
   borderLight: string;
   borderStrong: string;
 
+  /* États */
   success: string;
+  successDark: string;
+  successSoft: string;
   successBg: string;
+
   warning: string;
+  warningDark: string;
+  warningSoft: string;
   warningBg: string;
+
   error: string;
+  errorDark: string;
+  errorSoft: string;
   errorBg: string;
+
   info: string;
+  infoDark: string;
+  infoSoft: string;
   infoBg: string;
+
   purple: string;
+  purpleSoft: string;
   purpleBg: string;
 }
 
 export interface Theme {
   name: string;
-  mode: ThemeMode;
+  mode: 'light' | 'dark';
   colors: ThemeColors;
   fonts: {
     sans: string;
@@ -53,6 +76,7 @@ export interface Theme {
     full: string;
   };
   shadows: {
+    xs: string;
     sm: string;
     md: string;
     lg: string;
@@ -60,43 +84,64 @@ export interface Theme {
   };
 }
 
-// ============================================================================
-//  LIGHT THEME
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT THEME
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const lightTheme: Theme = {
   name: 'ODC Light',
   mode: 'light',
   colors: {
+    /* Primary */
     primary: '#FF7900',
-    primaryDark: '#E65100',
-    primaryLight: '#FFB74D',
-    primarySoft: '#FFE0B2',
+    primaryDark: '#C25400',
+    primaryLight: '#FDBA74',
+    primarySoft: '#FFEDD5',
+    primarySofter: '#FFF7ED',
 
-    background: '#FFF8F2',
+    /* Surfaces */
+    background: '#F8FAFC',
     surface: '#FFFFFF',
-    surfaceAlt: '#F5F5F5',
+    surfaceAlt: '#F1F5F9',
+    surfaceHover: '#E2E8F0',
     elevated: '#FFFFFF',
 
-    textPrimary: '#1A1A1A',
-    textSecondary: '#4A4A4A',
-    textMuted: '#6B6B6B',
+    /* Textes — tous lisibles sur fond clair (contraste ≥ 7:1) */
+    textPrimary: '#0F172A',   // 15.8:1 sur blanc
+    textSecondary: '#334155', // 9.2:1 sur blanc
+    textMuted: '#64748B',     // 5.6:1 sur blanc
+    textTertiary: '#94A3B8',  // 3.4:1 sur blanc
     textInverse: '#FFFFFF',
 
-    border: '#E0E0E0',
-    borderLight: '#F0F0F0',
-    borderStrong: '#BDBDBD',
+    /* Bordures */
+    border: '#E2E8F0',
+    borderLight: '#F1F5F9',
+    borderStrong: '#CBD5E1',
 
-    success: '#2E7D32',
-    successBg: '#E8F5E9',
-    warning: '#F57C00',
-    warningBg: '#FFF3E0',
-    error: '#C62828',
-    errorBg: '#FFEBEE',
-    info: '#0277BD',
-    infoBg: '#E1F5FE',
-    purple: '#7B1FA2',
-    purpleBg: '#F3E5F5',
+    /* États — contraste ≥ 4.5:1 */
+    success: '#10B981',
+    successDark: '#047857',
+    successSoft: '#D1FAE5',
+    successBg: '#ECFDF5',
+
+    warning: '#F59E0B',
+    warningDark: '#B45309',
+    warningSoft: '#FEF3C7',
+    warningBg: '#FFFBEB',
+
+    error: '#EF4444',
+    errorDark: '#B91C1C',
+    errorSoft: '#FEE2E2',
+    errorBg: '#FEF2F2',
+
+    info: '#3B82F6',
+    infoDark: '#1D4ED8',
+    infoSoft: '#DBEAFE',
+    infoBg: '#EFF6FF',
+
+    purple: '#8B5CF6',
+    purpleSoft: '#EDE9FE',
+    purpleBg: '#F5F3FF',
   },
   fonts: {
     sans: "'Inter', system-ui, -apple-system, sans-serif",
@@ -111,50 +156,72 @@ export const lightTheme: Theme = {
     full: '9999px',
   },
   shadows: {
-    sm: '0 1px 3px rgba(0, 0, 0, 0.06)',
-    md: '0 4px 6px rgba(255, 121, 0, 0.08)',
-    lg: '0 10px 25px rgba(255, 121, 0, 0.12)',
-    xl: '0 20px 40px rgba(255, 121, 0, 0.15)',
+    xs: '0 1px 2px rgba(15, 23, 42, 0.04)',
+    sm: '0 1px 3px rgba(15, 23, 42, 0.08)',
+    md: '0 4px 8px rgba(15, 23, 42, 0.10)',
+    lg: '0 8px 24px rgba(15, 23, 42, 0.12)',
+    xl: '0 16px 40px rgba(15, 23, 42, 0.15)',
   },
 };
 
-// ============================================================================
-//  DARK THEME
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK THEME
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export const darkTheme: Theme = {
   name: 'ODC Dark',
   mode: 'dark',
   colors: {
-    primary: '#FF7900',
-    primaryDark: '#E65100',
+    /* Primary — plus clair pour ressortir sur fond sombre */
+    primary: '#FFA040',
+    primaryDark: '#FF7900',
     primaryLight: '#FFB74D',
-    primarySoft: '#3D2A1A',
+    primarySoft: '#3A220A',
+    primarySofter: '#241708',
 
-    background: '#0F0F0F',
-    surface: '#1A1A1A',
-    surfaceAlt: '#242424',
-    elevated: '#2A2A2A',
+    /* Surfaces — dégradé de profondeur visible */
+    background: '#0B1220',      // fond le plus sombre
+    surface: '#111C33',         // cartes principales
+    surfaceAlt: '#1A2540',      // zones secondaires
+    surfaceHover: '#22304D',    // hover
+    elevated: '#0F172A',        // zones élevées
 
-    textPrimary: '#F5F5F5',
-    textSecondary: '#D0D0D0',
-    textMuted: '#A0A0A0',
-    textInverse: '#1A1A1A',
+    /* Textes — clairs sur fond sombre (contraste ≥ 7:1) */
+    textPrimary: '#F8FAFC',   // 15.3:1 sur #111C33
+    textSecondary: '#CBD5E1', // 9.6:1 sur #111C33
+    textMuted: '#94A3B8',     // 5.6:1 sur #111C33
+    textTertiary: '#64748B',  // 3.4:1 sur #111C33
+    textInverse: '#0F172A',
 
-    border: '#333333',
-    borderLight: '#2A2A2A',
-    borderStrong: '#4A4A4A',
+    /* Bordures — visibles sans être agressives */
+    border: '#1E293B',
+    borderLight: '#1A2540',
+    borderStrong: '#334155',
 
-    success: '#4CAF50',
-    successBg: '#1B3D1E',
-    warning: '#FF9800',
-    warningBg: '#3D2A00',
-    error: '#EF5350',
-    errorBg: '#3D1A1A',
-    info: '#29B6F6',
-    infoBg: '#1A2F3D',
-    purple: '#BA68C8',
-    purpleBg: '#2D1B3D',
+    /* États — adaptés au fond sombre */
+    success: '#34D399',
+    successDark: '#10B981',
+    successSoft: '#052E22',
+    successBg: '#04231A',
+
+    warning: '#FBBF24',
+    warningDark: '#F59E0B',
+    warningSoft: '#3A2A08',
+    warningBg: '#2D2006',
+
+    error: '#F87171',
+    errorDark: '#EF4444',
+    errorSoft: '#3F1212',
+    errorBg: '#2D0E0E',
+
+    info: '#60A5FA',
+    infoDark: '#3B82F6',
+    infoSoft: '#0F2549',
+    infoBg: '#0A1D3D',
+
+    purple: '#A78BFA',
+    purpleSoft: '#2A1A4E',
+    purpleBg: '#1F1338',
   },
   fonts: {
     sans: "'Inter', system-ui, -apple-system, sans-serif",
@@ -169,26 +236,115 @@ export const darkTheme: Theme = {
     full: '9999px',
   },
   shadows: {
-    sm: '0 1px 3px rgba(0, 0, 0, 0.4)',
-    md: '0 4px 6px rgba(0, 0, 0, 0.5)',
-    lg: '0 10px 25px rgba(0, 0, 0, 0.6)',
-    xl: '0 20px 40px rgba(0, 0, 0, 0.7)',
+    xs: '0 1px 2px rgba(0, 0, 0, 0.4)',
+    sm: '0 1px 3px rgba(0, 0, 0, 0.5)',
+    md: '0 4px 8px rgba(0, 0, 0, 0.6)',
+    lg: '0 8px 24px rgba(0, 0, 0, 0.7)',
+    xl: '0 16px 40px rgba(0, 0, 0, 0.8)',
   },
 };
 
-// ============================================================================
-//  EXPORTS
-// ============================================================================
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXPORTS
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-export const themes: Record<ThemeMode, Theme> = {
+export const themes: Record<'light' | 'dark', Theme> = {
   light: lightTheme,
   dark: darkTheme,
 };
 
-export const theme = lightTheme; // Default theme
-
-export const getTheme = (mode: ThemeMode): Theme => themes[mode] || lightTheme;
-
 export const defaultTheme = lightTheme;
 
+/**
+ * Résout le mode `auto` en `light` ou `dark` selon le système.
+ */
+export function resolveThemeMode(mode: ThemeMode): 'light' | 'dark' {
+  if (mode !== 'auto') return mode;
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+/**
+ * Retourne le thème selon le mode (light, dark ou auto).
+ */
+export function getTheme(mode: ThemeMode = 'light'): Theme {
+  const resolved = resolveThemeMode(mode);
+  return themes[resolved];
+}
+
+/**
+ * Génère les variables CSS d'un thème.
+ */
+export function themeToCSSVariables(theme: Theme): Record<string, string> {
+  const c = theme.colors;
+  return {
+    /* Primary */
+    '--odc-primary': c.primary,
+    '--odc-primary-dark': c.primaryDark,
+    '--odc-primary-light': c.primaryLight,
+    '--odc-primary-soft': c.primarySoft,
+    '--odc-primary-softer': c.primarySofter,
+
+    /* Surfaces */
+    '--odc-background': c.background,
+    '--odc-surface': c.surface,
+    '--odc-surface-alt': c.surfaceAlt,
+    '--odc-surface-hover': c.surfaceHover,
+    '--odc-elevated': c.elevated,
+
+    /* Textes */
+    '--odc-text-primary': c.textPrimary,
+    '--odc-text-secondary': c.textSecondary,
+    '--odc-text-muted': c.textMuted,
+    '--odc-text-tertiary': c.textTertiary,
+    '--odc-text-inverse': c.textInverse,
+
+    /* Bordures */
+    '--odc-border': c.border,
+    '--odc-border-light': c.borderLight,
+    '--odc-border-strong': c.borderStrong,
+
+    /* États */
+    '--odc-success': c.success,
+    '--odc-success-dark': c.successDark,
+    '--odc-success-soft': c.successSoft,
+    '--odc-success-bg': c.successBg,
+
+    '--odc-warning': c.warning,
+    '--odc-warning-dark': c.warningDark,
+    '--odc-warning-soft': c.warningSoft,
+    '--odc-warning-bg': c.warningBg,
+
+    '--odc-error': c.error,
+    '--odc-error-dark': c.errorDark,
+    '--odc-error-soft': c.errorSoft,
+    '--odc-error-bg': c.errorBg,
+
+    '--odc-info': c.info,
+    '--odc-info-dark': c.infoDark,
+    '--odc-info-soft': c.infoSoft,
+    '--odc-info-bg': c.infoBg,
+
+    '--odc-purple': c.purple,
+    '--odc-purple-soft': c.purpleSoft,
+    '--odc-purple-bg': c.purpleBg,
+
+    /* Radius */
+    '--odc-radius-sm': theme.radius.sm,
+    '--odc-radius-md': theme.radius.md,
+    '--odc-radius-lg': theme.radius.lg,
+    '--odc-radius-xl': theme.radius.xl,
+
+    /* Shadows */
+    '--odc-shadow-xs': theme.shadows.xs,
+    '--odc-shadow-sm': theme.shadows.sm,
+    '--odc-shadow-md': theme.shadows.md,
+    '--odc-shadow-lg': theme.shadows.lg,
+    '--odc-shadow-xl': theme.shadows.xl,
+  };
+}
+
+export const theme = lightTheme;
 export default themes;

@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getStoredTheme, setTheme, type ThemeMode } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 
 const MODES: Array<{
   value: ThemeMode;
@@ -50,25 +51,46 @@ export function ThemeToggle() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
           aria-label="Changer de thème"
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-5 w-5" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuContent
+        align="end"
+        className="w-44 border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+      >
         {MODES.map(({ value, label, icon: ItemIcon }) => {
           const active = mounted && mode === value;
           return (
             <DropdownMenuItem
               key={value}
               onClick={() => handleChange(value)}
-              className="cursor-pointer"
+              className={cn(
+                'cursor-pointer rounded-md px-2 py-2 text-sm font-medium',
+                'focus:bg-orange-50 focus:text-orange-700 dark:focus:bg-orange-500/10 dark:focus:text-orange-300',
+                active
+                  ? 'text-orange-700 dark:text-orange-300'
+                  : 'text-slate-600 dark:text-slate-400',
+              )}
             >
-              <ItemIcon className="h-4 w-4 mr-2" />
+              <ItemIcon
+                className={cn(
+                  'mr-2 h-4 w-4',
+                  active
+                    ? 'text-orange-600 dark:text-orange-400'
+                    : 'text-slate-400 dark:text-slate-500',
+                )}
+                aria-hidden
+              />
               <span className="flex-1">{label}</span>
-              {active && <Check className="h-3.5 w-3.5 text-odc-primary" />}
+              {active && (
+                <Check
+                  className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
+                  aria-hidden
+                />
+              )}
             </DropdownMenuItem>
           );
         })}

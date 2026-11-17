@@ -1,5 +1,8 @@
+// src/components/messagerie/MessageInput.tsx
+'use client';
+
 import { useState, useRef, KeyboardEvent } from 'react';
-import { Send, Paperclip, Smile, X } from 'lucide-react';
+import { Send, Paperclip, Smile } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 interface MessageInputProps {
@@ -48,20 +51,16 @@ export function MessageInput({
   const handleChange = (value: string) => {
     setMessage(value);
 
-    // Typing indicator
     if (onTyping) {
       onTyping();
-
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        onStopTyping?.();
-      }, 2000);
+      typingTimeoutRef.current = setTimeout(() => onStopTyping?.(), 2000);
     }
   };
 
   return (
     <div className="flex items-end gap-2">
-      <div className="flex-1 relative">
+      <div className="relative flex-1">
         <textarea
           ref={textareaRef}
           value={message}
@@ -71,29 +70,28 @@ export function MessageInput({
           disabled={disabled || sending}
           rows={1}
           className={cn(
-            'w-full px-4 py-2.5 pr-20 rounded-xl resize-none max-h-32',
-            'bg-odc-surface-alt-light dark:bg-odc-surface-alt-dark',
-            'text-odc-text-light dark:text-odc-text-dark',
-            'placeholder:text-odc-text-muted-light dark:placeholder:text-odc-text-muted-dark',
-            'border border-transparent focus:border-odc-primary',
-            'focus:ring-4 focus:ring-odc-primary/10 focus:outline-none',
-            'transition-all'
+            'w-full max-h-32 resize-none rounded-xl px-4 py-2.5 pr-20',
+            'bg-slate-100 text-slate-900 placeholder:text-slate-500',
+            'dark:bg-slate-800 dark:text-slate-50 dark:placeholder:text-slate-400',
+            'border border-transparent focus:border-orange-400',
+            'focus:outline-none focus:ring-4 focus:ring-orange-400/10',
+            'transition-all',
           )}
           style={{ minHeight: '44px' }}
         />
 
         {/* Actions */}
-        <div className="absolute right-2 bottom-2 flex items-center gap-1">
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
           <button
             type="button"
-            className="p-1.5 rounded-lg hover:bg-odc-primary-soft dark:hover:bg-odc-primary-soft/20 text-odc-text-muted-light dark:text-odc-text-muted-dark transition-colors"
+            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-orange-50 hover:text-orange-600 dark:text-slate-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-400"
             title="Joindre un fichier"
           >
             <Paperclip size={16} />
           </button>
           <button
             type="button"
-            className="p-1.5 rounded-lg hover:bg-odc-primary-soft dark:hover:bg-odc-primary-soft/20 text-odc-text-muted-light dark:text-odc-text-muted-dark transition-colors"
+            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-orange-50 hover:text-orange-600 dark:text-slate-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-400"
             title="Emoji"
           >
             <Smile size={16} />
@@ -105,11 +103,12 @@ export function MessageInput({
         onClick={handleSend}
         disabled={!message.trim() || sending || disabled}
         className={cn(
-          'p-3 rounded-xl transition-all flex-shrink-0',
-          'bg-gradient-to-br from-odc-primary to-odc-primary-dark text-white',
-          'hover:shadow-odc-md active:scale-95',
-          'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none'
+          'flex-shrink-0 rounded-xl p-3 transition-all',
+          'bg-gradient-to-br from-orange-500 to-orange-700 text-white',
+          'hover:shadow-md active:scale-95',
+          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none',
         )}
+        aria-label="Envoyer"
       >
         <Send size={18} />
       </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   QrCode,
   Users,
@@ -126,6 +127,16 @@ export function SessionPresencesCard({
               ? 'Fermer la présence'
               : 'Ouvrir la présence'}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="mt-2 w-full"
+          >
+            <Link href={`/admin/presences/${session.id}`}>
+              Gérer la feuille de présence
+            </Link>
+          </Button>
         </div>
 
         {/* Liste des présences */}
@@ -152,12 +163,12 @@ export function SessionPresencesCard({
                 <div
                   className={cn(
                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                    p.estPresent
+                    (p.present ?? p.estPresent)
                       ? 'bg-odc-success-soft'
                       : 'bg-odc-error-soft',
                   )}
                 >
-                  {p.estPresent ? (
+                  {(p.present ?? p.estPresent) ? (
                     <CheckCircle2 className="h-4 w-4 text-odc-success" />
                   ) : (
                     <XCircle className="h-4 w-4 text-odc-error" />

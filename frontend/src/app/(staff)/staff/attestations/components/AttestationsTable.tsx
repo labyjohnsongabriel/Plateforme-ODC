@@ -1,64 +1,115 @@
+// src/app/(admin)/admin/attestations/components/AttestationsTable.tsx
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Award, Download, Eye, CheckCircle2, XCircle } from 'lucide-react';
+import * as React from 'react';
+import { useSearchParams } from 'next/navigation';
+import {
+  Award,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  Hash,
+  Eye,
+  FileDown,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { api } from '@/lib/api';
+import { Pagination } from '@/components/shared/Pagination';
+import { ParticipantAvatar } from '@/components/shared/ParticipantAvatar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/formatters';
-import { getErrorMessage } from '@/lib/error-handler';
+import {
+  useAttestations,
+  useDownloadAttestation,
+  type Attestation,
+} from '@/hooks/useAttestations';
+import { AttestationDetailModal } from './AttestationDetailModal';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SQUELETTE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function TableSkeleton() {
+  return (
+    <Card className="overflow-hidden border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="divide-y divide-slate-200 dark:divide-slate-800">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 p-4">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+            <Skeleton className="h-6 w-20" />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSANT
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 export function AttestationsTable() {
-  const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['staff', 'attestations'],
-    queryFn: async () => {
-      const { data } = await api.get('/staff/attestations', {
-        params: { limit: 100 },
-      });
-      return data;
-    },
-  });
+  const filters = React.useMemo(
+    () => ({
+      page: Number(searchParams.get('page')) || 1,
+      limit: 20,
+      sessionId: searchParams.get('sessionId') ?? undefined,
+      formationId: searchParams.get('formationId') ?? undefined,
+      valide:
+        (searchParams.get('valide') as 'all' | 'true' | 'false') ?? 'all',
+      search: searchParams.get('search') ?? undefined,
+      dateDebut: searchParams.get('dateDebut') ?? undefined,
+      dateFin: searchParams.get('dateFin') ?? undefined,
+    }),
+    [searchParams],
+  );
 
-  const invalidateMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/staff/attestations/${id}`);
-    },
-    onSuccess: () => {
-      toast.success('Attestation invalidée');
-      qc.invalidateQueries({ queryKey: ['staff', 'attestations'] });
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
+  const { data, isLoading, isError } = useAttestations(filters);
+  const downloadMutation = useDownloadAttestation();
 
-  const download = async (id: string, numero: string) => {
-    try {
-      const response = await api.get(`/staff/attestations/${id}/telecharger`, {
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(new Blob([response.data]));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${numero}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      toast.error(getErrorMessage(e));
-    }
-  };
+  if (isLoading) return <TableSkeleton />;
 
-  if (isLoading) {
+  if (isError) {
     return (
-      <Card className="p-4">
-        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 mb-2" />)}
+      <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <EmptyState
+          icon={Award}
+          title="Erreur de chargement"
+          description="Impossible de charger les attestations."
+          action={
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="h-9 rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+            >
+              Réessayer
+            </Button>
+          }
+        />
       </Card>
     );
   }
@@ -66,76 +117,262 @@ export function AttestationsTable() {
   const attestations = data?.data ?? [];
 
   if (!attestations.length) {
-    return <Card><EmptyState icon={Award} title="Aucune attestation" /></Card>;
+    return (
+      <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <EmptyState
+          icon={Award}
+          title="Aucune attestation"
+          description="Générez des attestations depuis une session terminée."
+        />
+      </Card>
+    );
   }
 
   return (
-    <Card>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Numéro</TableHead>
-            <TableHead>Participant</TableHead>
-            <TableHead className="hidden md:table-cell">Formation</TableHead>
-            <TableHead className="hidden lg:table-cell">Émise le</TableHead>
-            <TableHead>Valide</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {attestations.map((a: any) => (
-            <TableRow key={a.id}>
-              <TableCell className="font-mono text-xs">{a.numero}</TableCell>
-              <TableCell>
-                <p className="font-medium text-sm">
-                  {a.participant?.prenom} {a.participant?.nom}
-                </p>
-              </TableCell>
-              <TableCell className="hidden md:table-cell text-sm">
-                {a.session?.formation?.titre}
-              </TableCell>
-              <TableCell className="hidden lg:table-cell text-sm text-odc-muted">
-                {formatDate(a.dateEmission)}
-              </TableCell>
-              <TableCell>
-                {a.valide ? (
-                  <Badge className="bg-odc-success-bg text-odc-success">
-                    <CheckCircle2 className="h-3 w-3 mr-1" /> Valide
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-odc-error">
-                    <XCircle className="h-3 w-3 mr-1" /> Invalide
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => download(a.id, a.numero)}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  asChild
-                >
-                  <a
-                    href={`/verifier-attestation/${a.numero}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </a>
-                </Button>
-              </TableCell>
+    <>
+      <Card className="overflow-hidden border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-slate-200 hover:bg-transparent dark:border-slate-800">
+              <TableHead className="w-[140px] text-slate-700 dark:text-slate-300">
+                Numéro
+              </TableHead>
+              <TableHead className="text-slate-700 dark:text-slate-300">
+                Participant
+              </TableHead>
+              <TableHead className="hidden text-slate-700 dark:text-slate-300 md:table-cell">
+                Formation
+              </TableHead>
+              <TableHead className="hidden text-center text-slate-700 dark:text-slate-300 lg:table-cell">
+                Présence
+              </TableHead>
+              <TableHead className="hidden text-center text-slate-700 dark:text-slate-300 lg:table-cell">
+                Note
+              </TableHead>
+              <TableHead className="hidden text-slate-700 dark:text-slate-300 xl:table-cell">
+                Émise le
+              </TableHead>
+              <TableHead className="text-slate-700 dark:text-slate-300">
+                Statut
+              </TableHead>
+              <TableHead className="w-[120px] text-right text-slate-700 dark:text-slate-300">
+                Actions
+              </TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+          </TableHeader>
+
+          <TableBody>
+            {attestations.map((a) => (
+              <TableRow
+                key={a.id}
+                className="group cursor-pointer border-slate-200 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900"
+                onClick={() => setSelectedId(a.id)}
+              >
+                {/* Numéro */}
+                <TableCell>
+                  <span className="flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-900 dark:text-slate-50">
+                    <Hash className="h-3 w-3 text-slate-400 dark:text-slate-500" aria-hidden />
+                    {a.numero}
+                  </span>
+                </TableCell>
+
+                {/* Participant + avatar photo */}
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <ParticipantAvatar
+                      prenom={a.participant?.prenom}
+                      nom={a.participant?.nom}
+                      photoUrl={a.participant?.photoUrl}
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">
+                        {a.participant?.prenom} {a.participant?.nom}
+                      </p>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {a.participant?.email}
+                      </p>
+                    </div>
+                  </div>
+                </TableCell>
+
+                {/* Formation */}
+                <TableCell className="hidden md:table-cell">
+                  <p className="truncate text-sm text-slate-700 dark:text-slate-300">
+                    {a.session?.formation?.titre ?? '—'}
+                  </p>
+                  {a.session?.codeSession && (
+                    <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
+                      {a.session.codeSession}
+                    </p>
+                  )}
+                </TableCell>
+
+                {/* Présence */}
+                <TableCell className="hidden text-center lg:table-cell">
+                  {a.tauxPresence !== undefined ? (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                        a.tauxPresence >= 75
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                          : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+                      )}
+                    >
+                      {a.tauxPresence}%
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                  )}
+                </TableCell>
+
+                {/* Note */}
+                <TableCell className="hidden text-center lg:table-cell">
+                  {a.noteFinale !== undefined ? (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                        a.noteFinale >= 10
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                          : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+                      )}
+                    >
+                      {a.noteFinale}/20
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                  )}
+                </TableCell>
+
+                {/* Date */}
+                <TableCell className="hidden text-xs text-slate-500 dark:text-slate-400 xl:table-cell">
+                  {formatDate(a.dateEmission)}
+                </TableCell>
+
+                {/* Statut */}
+                <TableCell>
+                  {a.valide ? (
+                    <Badge className="gap-1 border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                      <CheckCircle2 className="h-3 w-3" aria-hidden />
+                      Valide
+                    </Badge>
+                  ) : (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex">
+                            <Badge
+                              variant="outline"
+                              className="gap-1 border-red-200 text-red-700 dark:border-red-500/30 dark:text-red-300"
+                            >
+                              <XCircle className="h-3 w-3" aria-hidden />
+                              Invalide
+                            </Badge>
+                          </span>
+                        </TooltipTrigger>
+                        {a.motifInvalidation && (
+                          <TooltipContent side="top" className="max-w-xs">
+                            <p className="text-xs">
+                              <strong>Motif :</strong> {a.motifInvalidation}
+                            </p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </TableCell>
+
+                {/* Actions */}
+                <TableCell
+                  className="text-right"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex justify-end gap-1">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelectedId(a.id)}
+                            aria-label="Voir les détails"
+                            className="h-8 w-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+                          >
+                            <Eye className="h-4 w-4" aria-hidden />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Voir les détails</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              downloadMutation.mutate({
+                                id: a.id,
+                                numero: a.numero,
+                              })
+                            }
+                            disabled={downloadMutation.isPending}
+                            aria-label="Télécharger le PDF"
+                            className="h-8 w-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+                          >
+                            <FileDown className="h-4 w-4" aria-hidden />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Télécharger le PDF</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            asChild
+                            aria-label="Vérifier"
+                            className="h-8 w-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+                          >
+                            <a
+                              href={`/verifier-attestation/${a.numero}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="h-4 w-4" aria-hidden />
+                            </a>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Vérifier en ligne</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+
+        {data?.pagination && data.pagination.totalPages > 1 && (
+          <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+            <Pagination
+              currentPage={data.pagination.page}
+              totalPages={data.pagination.totalPages}
+            />
+          </div>
+        )}
+      </Card>
+
+      {/* Modale de détail */}
+      <AttestationDetailModal
+        attestationId={selectedId ?? undefined}
+        open={!!selectedId}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+      />
+    </>
   );
 }

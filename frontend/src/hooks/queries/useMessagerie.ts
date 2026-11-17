@@ -325,7 +325,6 @@ export function useRemoveConversationMember() {
 
 export function useSendMessage() {
   const qc = useQueryClient();
-  const { socket } = useSocket();
 
   return useMutation({
     mutationFn: async ({
@@ -341,12 +340,11 @@ export function useSendMessage() {
       );
       return data.data;
     },
-    onSuccess: (msg, { conversationId }) => {
+    onSuccess: (_, { conversationId }) => {
       qc.invalidateQueries({
         queryKey: queryKeys.messagerie.messages(conversationId),
       });
       qc.invalidateQueries({ queryKey: queryKeys.messagerie.conversations() });
-      socket?.emit('message:send', msg);
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });

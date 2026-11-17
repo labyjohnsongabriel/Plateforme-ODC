@@ -1,371 +1,315 @@
+// src/app/(staff)/staff/formations/components/FormationForm.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import {
-  Loader2, Save, ArrowLeft, Upload, BookOpen, X,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
-import { api } from '@/lib/api';
-import { getErrorMessage } from '@/lib/error-handler';
+import { Switch } from '@/components/ui/switch';
 
-interface Props {
-  mode: 'create' | 'edit';
-  id?: string;
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCHÉMA ZOD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const formationSchema = z.object({
+  titre: z.string().min(3, 'Le titre doit faire au moins 3 caractères').max(200),
+  slug: z
+    .string()
+    .min(3)
+    .max(200)
+    .regex(/^[a-z0-9-]+$/, 'Uniquement minuscules, chiffres et tirets'),
+  resume: z.string().max(500).optional().or(z.literal('')),
+  description: z.string().optional().or(z.literal('')),
+  domaineId: z.string().min(1, 'Sélectionnez un domaine'),
+  niveau: z.enum(['DEBUTANT', 'INTERMEDIAIRE', 'AVANCE']),
+  dureeHeures: z.coerce.number().min(1, 'Minimum 1 heure').max(500),
+  imageUrl: z.string().url('URL invalide').optional().or(z.literal('')),
+  estPubliee: z.boolean().default(false),
+});
+
+export type FormationFormValues = z.infer<typeof formationSchema>;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROPS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+interface Domaine {
+  id: string;
+  nom: string;
 }
 
-export function FormationForm({ mode, id }: Props) {
-  const router = useRouter();
-  const qc = useQueryClient();
-  const isEdit = mode === 'edit';
-  const fileRef = useRef<HTMLInputElement>(null);
+interface FormationFormProps {
+  defaultValues?: Partial<FormationFormValues>;
+  domaines: Domaine[];
+  onSubmit: (values: FormationFormValues) => void | Promise<void>;
+  onCancel: () => void;
+  isPending?: boolean;
+  mode: 'create' | 'edit';
+}
 
-  const [form, setForm] = useState({
-    titre: '',
-    slug: '',
-    description: '',
-    objectifs: '',
-    prerequis: '',
-    programme: '',
-    domaineId: '',
-    niveau: 'DEBUTANT',
-    dureeHeures: 10,
-    imageUrl: '',
-    prix: 0,
-    nbParticipantsMax: 30,
-    estPubliee: false,
-    actif: true,
-    miseEnAvant: false,
-  });
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSANT
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-  const { data: domaines } = useQuery({
-    queryKey: ['staff', 'domaines'],
-    queryFn: async () => {
-      const { data } = await api.get('/staff/domaines');
-      return data.data;
+export function FormationForm({
+  defaultValues,
+  domaines,
+  onSubmit,
+  onCancel,
+  isPending,
+  mode,
+}: FormationFormProps) {
+  const form = useForm<FormationFormValues>({
+    resolver: zodResolver(formationSchema),
+    defaultValues: {
+      titre: '',
+      slug: '',
+      resume: '',
+      description: '',
+      domaineId: '',
+      niveau: 'DEBUTANT',
+      dureeHeures: 1,
+      imageUrl: '',
+      estPubliee: false,
+      ...defaultValues,
     },
   });
 
-  const { data: existing } = useQuery({
-    queryKey: ['staff', 'formation', id],
-    queryFn: async () => {
-      const { data } = await api.get(`/staff/formations/${id}`);
-      return data.data;
-    },
-    enabled: isEdit && !!id,
-  });
-
+  /* Auto-génération du slug depuis le titre (create uniquement) */
+  const titre = form.watch('titre');
   useEffect(() => {
-    if (existing) {
-      setForm({
-        titre: existing.titre ?? '',
-        slug: existing.slug ?? '',
-        description: existing.description ?? '',
-        objectifs: existing.objectifs ?? '',
-        prerequis: existing.prerequis ?? '',
-        programme: existing.programme ?? '',
-        domaineId: existing.domaineId ?? '',
-        niveau: existing.niveau ?? 'DEBUTANT',
-        dureeHeures: existing.dureeHeures ?? 10,
-        imageUrl: existing.imageUrl ?? '',
-        prix: existing.prix ?? 0,
-        nbParticipantsMax: existing.nbParticipantsMax ?? 30,
-        estPubliee: existing.estPubliee ?? false,
-        actif: existing.actif ?? true,
-        miseEnAvant: existing.miseEnAvant ?? false,
-      });
+    if (mode === 'create' && titre) {
+      const slug = titre
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      form.setValue('slug', slug, { shouldValidate: false });
     }
-  }, [existing]);
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        ...form,
-        domaineId: form.domaineId || undefined,
-        slug: form.slug || undefined,
-      };
-      if (isEdit) {
-        await api.put(`/staff/formations/${id}`, payload);
-      } else {
-        await api.post('/staff/formations', payload);
-      }
-    },
-    onSuccess: () => {
-      toast.success(isEdit ? 'Formation mise à jour' : 'Formation créée');
-      qc.invalidateQueries({ queryKey: ['staff', 'formations'] });
-      router.push('/staff/formations');
-    },
-    onError: (e) => toast.error(getErrorMessage(e)),
-  });
-
-  const uploadImage = async (file: File) => {
-    if (!isEdit || !id) {
-      toast.info('Enregistrez la formation avant d\'uploader une image');
-      return;
-    }
-    const fd = new FormData();
-    fd.append('image', file);
-    try {
-      const { data } = await api.post(`/staff/formations/${id}/image`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setForm({ ...form, imageUrl: data.data.imageUrl });
-      toast.success('Image mise à jour');
-    } catch (e) {
-      toast.error(getErrorMessage(e));
-    }
-  };
+  }, [titre, mode, form]);
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        mutation.mutate();
-      }}
-      className="space-y-6"
-    >
-      <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Retour
-      </Button>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Titre */}
+        <FormField
+          control={form.control}
+          name="titre"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Titre *</FormLabel>
+              <FormControl>
+                <Input placeholder="Ex. Introduction à React" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Informations générales</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Image */}
-          <div>
-            <Label>Image de couverture</Label>
-            <div className="mt-1.5 flex items-center gap-4">
-              <div className="w-24 h-24 rounded-lg bg-odc-surface-alt flex items-center justify-center overflow-hidden shrink-0">
-                {form.imageUrl ? (
-                  <img src={form.imageUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <BookOpen className="h-8 w-8 text-odc-muted" />
-                )}
-              </div>
-              <div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadImage(f);
-                  }}
+        {/* Slug */}
+        <FormField
+          control={form.control}
+          name="slug"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Slug *</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="introduction-a-react"
+                  {...field}
+                  className="font-mono text-sm"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={!isEdit}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Changer l&apos;image
-                </Button>
-                {!isEdit && (
-                  <p className="text-xs text-odc-muted mt-1.5">
-                    Enregistrez d&apos;abord la formation
-                  </p>
-                )}
+              </FormControl>
+              <FormDescription>
+                Identifiant unique dans l&apos;URL (auto-généré depuis le titre).
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Domaine + Niveau */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="domaineId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Domaine *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner…" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {domaines.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="niveau"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Niveau *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="DEBUTANT">Débutant</SelectItem>
+                    <SelectItem value="INTERMEDIAIRE">Intermédiaire</SelectItem>
+                    <SelectItem value="AVANCE">Avancé</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Durée */}
+        <FormField
+          control={form.control}
+          name="dureeHeures"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Durée (heures) *</FormLabel>
+              <FormControl>
+                <Input type="number" min={1} max={500} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Résumé */}
+        <FormField
+          control={form.control}
+          name="resume"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Résumé</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Court résumé affiché dans le catalogue"
+                  rows={2}
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>500 caractères max.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Description */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Description complète de la formation"
+                  rows={4}
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Image URL */}
+        <FormField
+          control={form.control}
+          name="imageUrl"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Image (URL)</FormLabel>
+              <FormControl>
+                <Input
+                  type="url"
+                  placeholder="https://..."
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Publiée */}
+        <FormField
+          control={form.control}
+          name="estPubliee"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <FormLabel className="cursor-pointer">Publier immédiatement</FormLabel>
+                <FormDescription>
+                  Si désactivé, la formation sera en brouillon.
+                </FormDescription>
               </div>
-            </div>
-          </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <Label htmlFor="titre">Titre *</Label>
-              <Input
-                id="titre"
-                value={form.titre}
-                onChange={(e) => setForm({ ...form, titre: e.target.value })}
-                required
-                className="mt-1.5"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description *</Label>
-            <Textarea
-              id="description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={4}
-              required
-              className="mt-1.5"
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="domaineId">Domaine *</Label>
-              <Select
-                value={form.domaineId}
-                onValueChange={(v) => setForm({ ...form, domaineId: v })}
-              >
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue placeholder="Sélectionnez" />
-                </SelectTrigger>
-                <SelectContent>
-                  {domaines?.map((d: any) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="niveau">Niveau *</Label>
-              <Select
-                value={form.niveau}
-                onValueChange={(v) => setForm({ ...form, niveau: v })}
-              >
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DEBUTANT">Débutant</SelectItem>
-                  <SelectItem value="INTERMEDIAIRE">Intermédiaire</SelectItem>
-                  <SelectItem value="AVANCE">Avancé</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="duree">Durée (h) *</Label>
-              <Input
-                id="duree"
-                type="number"
-                value={form.dureeHeures}
-                onChange={(e) => setForm({ ...form, dureeHeures: Number(e.target.value) })}
-                min={1}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="places">Places max</Label>
-              <Input
-                id="places"
-                type="number"
-                value={form.nbParticipantsMax}
-                onChange={(e) => setForm({ ...form, nbParticipantsMax: Number(e.target.value) })}
-                min={0}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="prix">Prix (Ar)</Label>
-              <Input
-                id="prix"
-                type="number"
-                value={form.prix}
-                onChange={(e) => setForm({ ...form, prix: Number(e.target.value) })}
-                min={0}
-                className="mt-1.5"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Contenu pédagogique</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="objectifs">Objectifs</Label>
-            <Textarea
-              id="objectifs"
-              value={form.objectifs}
-              onChange={(e) => setForm({ ...form, objectifs: e.target.value })}
-              rows={3}
-              className="mt-1.5"
-            />
-          </div>
-          <div>
-            <Label htmlFor="prerequis">Prérequis</Label>
-            <Textarea
-              id="prerequis"
-              value={form.prerequis}
-              onChange={(e) => setForm({ ...form, prerequis: e.target.value })}
-              rows={3}
-              className="mt-1.5"
-            />
-          </div>
-          <div>
-            <Label htmlFor="programme">Programme détaillé</Label>
-            <Textarea
-              id="programme"
-              value={form.programme}
-              onChange={(e) => setForm({ ...form, programme: e.target.value })}
-              rows={6}
-              className="mt-1.5"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Publication</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="actif">Actif</Label>
-            <Switch
-              id="actif"
-              checked={form.actif}
-              onCheckedChange={(v) => setForm({ ...form, actif: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="publiee">Publié</Label>
-            <Switch
-              id="publiee"
-              checked={form.estPubliee}
-              onCheckedChange={(v) => setForm({ ...form, estPubliee: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="miseEnAvant">Mise en avant</Label>
-            <Switch
-              id="miseEnAvant"
-              checked={form.miseEnAvant}
-              onCheckedChange={(v) => setForm({ ...form, miseEnAvant: v })}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
-          Annuler
-        </Button>
-        <Button type="submit" variant="odc" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          <Save className="h-4 w-4 mr-2" />
-          {isEdit ? 'Mettre à jour' : 'Créer'}
-        </Button>
-      </div>
-    </form>
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
+            Annuler
+          </Button>
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            {mode === 'create' ? 'Créer la formation' : 'Enregistrer'}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

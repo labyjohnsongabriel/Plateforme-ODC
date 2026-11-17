@@ -228,7 +228,7 @@ export function useTogglePublishDomaine() {
       id: string;
       estPubliee: boolean;
     }) => {
-      await api.patch(`/admin/domaines/${id}/publier`, { estPubliee });
+      await api.put(`/admin/domaines/${id}/publier`, { estPubliee });
     },
     onSuccess: (_, vars) => {
       toast.success(vars.estPubliee ? 'Domaine publié' : 'Domaine dépublié');

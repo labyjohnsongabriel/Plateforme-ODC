@@ -1,100 +1,7 @@
-<<<<<<< HEAD
-import { AppDataSource } from '../config/database';
-import { Attestation } from '../models/Attestation.entity';
-import { Inscription, StatutInscription } from '../models/Inscription.entity';
-import { Presence } from '../models/Presence.entity';
-import { Note } from '../models/Note.entity';
-import { Session } from '../models/Session.entity';
-import { NotFoundError, ConflictError } from '../errors/AppError';
-import { logger } from '../config/logger';
-import crypto from 'crypto';
-import { getPagination } from '../utils/pagination.util';
-
-export class AttestationService {
-  private static get repo() { return AppDataSource.getRepository(Attestation); }
-
-  static async verifierEligibilite(sessionId: string, participantId: string) {
-    const raisons: string[] = [];
-    const inscription = await AppDataSource.getRepository(Inscription).findOne({
-      where: { sessionId, participantId, statut: StatutInscription.ACCEPTEE },
-    });
-    if (!inscription) raisons.push('Inscription non acceptee');
-
-    const presenceRepo = AppDataSource.getRepository(Presence);
-    const total = await presenceRepo.createQueryBuilder('p')
-      .select('COUNT(DISTINCT DATE(p.date_presence))', 'total')
-      .where('p.session_id = :sid', { sid: sessionId }).getRawOne();
-    const pres = await presenceRepo.createQueryBuilder('p')
-      .select('COUNT(DISTINCT DATE(p.date_presence))', 'count')
-      .where('p.session_id = :sid', { sid: sessionId })
-      .andWhere('p.participant_id = :pid', { pid: participantId })
-      .andWhere('p.present = true').getRawOne();
-    const taux = total.total && total.total !== '0' ? (Number(pres.count) / Number(total.total)) * 100 : 0;
-    if (taux < 75) raisons.push(`Presence insuffisante (${taux.toFixed(1)}%)`);
-
-    const notes = await AppDataSource.getRepository(Note).createQueryBuilder('n')
-      .leftJoin('n.evaluation', 'e')
-      .where('e.session_id = :sid', { sid: sessionId })
-      .andWhere('n.participant_id = :pid', { pid: participantId }).getMany();
-    const moyenne = notes.length > 0 ? notes.reduce((s, n) => s + Number(n.note), 0) / notes.length : 0;
-    if (moyenne < 10) raisons.push(`Note insuffisante (${moyenne.toFixed(2)})`);
-
-    return { eligible: raisons.length === 0, raisons, details: { taux: Math.round(taux * 100) / 100, moyenne: Math.round(moyenne * 100) / 100 } };
-  }
-
-  static async generer(sessionId: string, participantId: string) {
-    const existing = await this.repo.findOne({ where: { sessionId, participantId } });
-    if (existing) return existing;
-    const { eligible, raisons, details } = await this.verifierEligibilite(sessionId, participantId);
-    if (!eligible) throw new ConflictError(raisons.join(', '));
-
-    const session = await AppDataSource.getRepository(Session).findOne({ where: { id: sessionId }, relations: ['formation'] });
-    if (!session) throw new NotFoundError('Session introuvable');
-
-    const domaine = session.formation.domaine.substring(0, 3).toUpperCase();
-    const numero = `ODC-${new Date().getFullYear()}-${domaine}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-    const dateEmission = new Date();
-    const hash = crypto.createHash('sha256').update(`${numero}|${participantId}|${sessionId}|${dateEmission.toISOString()}`).digest('hex');
-
-    const a = this.repo.create({
-      numero, hash, sessionId, participantId,
-      noteFinale: details.moyenne, tauxPresence: details.taux,
-      dateEmission, fichierUrl: `/uploads/attestations/${numero}.pdf`,
-    });
-    await this.repo.save(a);
-    logger.info(`Attestation generee : ${numero}`);
-    return a;
-  }
-
-  static async genererParSession(sessionId: string) {
-    const inscriptions = await AppDataSource.getRepository(Inscription).find({
-      where: { sessionId, statut: StatutInscription.ACCEPTEE },
-    });
-    let succes = 0, echecs = 0;
-    const details: any[] = [];
-    for (const i of inscriptions) {
-      try { await this.generer(sessionId, i.participantId); succes++; details.push({ id: i.participantId, ok: true }); }
-      catch (e: any) { echecs++; details.push({ id: i.participantId, ok: false, raison: e.message }); }
-    }
-    return { succes, echecs, details };
-  }
-
-  static async verifierAuthenticite(numero: string) {
-    const a = await this.repo.findOne({ where: { numero }, relations: ['participant', 'session', 'session.formation'] });
-    if (!a) return { valide: false };
-    return {
-      valide: true,
-      attestation: {
-        numero: a.numero,
-        participant: `${a.participant.prenom} ${a.participant.nom}`,
-        formation: a.session.formation.titre,
-        dateEmission: a.dateEmission,
-        noteFinale: a.noteFinale,
-=======
 // src/services/attestation.service.ts
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { attestationRepository } from '../repositories/attestation.repository';
 import { Attestation } from '../entities/Attestation.entity';
 import { AppDataSource } from '../config/database';
@@ -103,11 +10,12 @@ import { Presence } from '../entities/Presence.entity';
 import { Note } from '../entities/Note.entity';
 import { Session } from '../entities/Session.entity';
 import { User } from '../entities/User.entity';
-import {
-  NotFoundError,
-  BadRequestError,
-  ConflictError,
-} from '../errors/AppError';
+import { StatutInscription } from '../entities/enums';
+import { PdfService } from './pdf.service';
+import { MailService } from './mail.service';
+import { logger } from '../config/logger';
+import { env } from '../config/env';
+import { NotFoundError, BadRequestError, ConflictError } from '../errors/AppError';
 
 /* ============================================================================
    TYPES
@@ -121,20 +29,148 @@ export interface EligibilityCriteria {
 }
 
 const DEFAULT_CRITERIA: EligibilityCriteria = {
-  presenceMin: 75,
-  noteMin: 10,
+  presenceMin: env.ATTESTATION_CRITERIA_PRESENCE_MIN ?? 75,
+  noteMin: env.ATTESTATION_CRITERIA_NOTE_MIN ?? 10,
   selectionValidee: true,
   inscriptionValidee: true,
 };
+
+export interface PresenceCalculation {
+  taux: number;
+  presentes: number;
+  retards: number;
+  absents: number;
+  excuses: number;
+  total: number;
+}
+
+export interface AttestationFile {
+  buffer: Buffer;
+  nom: string;
+  contentType: string;
+}
 
 /* ============================================================================
    SERVICE
    ============================================================================ */
 
 export class AttestationService {
-  /* ==========================================================================
-     FIND ALL
-     ========================================================================== */
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ CACHE LOGO — Chargé une seule fois par process
+     ════════════════════════════════════════════════════════════════════════ */
+  private static _logoCache: string | null | undefined = undefined;
+
+  private static getLogoDataUrl(): string | undefined {
+    if (this._logoCache !== undefined) return this._logoCache ?? undefined;
+
+    const candidates: string[] = [
+      path.resolve(process.cwd(), 'src/assets/brand/logo-odc.png'),
+      path.resolve(process.cwd(), 'assets/brand/logo-odc.png'),
+      path.resolve(__dirname, '../assets/brand/logo-odc.png'),
+      path.resolve(process.cwd(), 'public/images/brand/logo-odc.png'),
+      path.resolve(process.cwd(), '../frontend/public/images/brand/logo-odc.png'),
+      path.resolve(process.cwd(), 'frontend/public/images/brand/logo-odc.png'),
+      'E:\\Dossier\\odc-platform\\frontend\\public\\images\\brand\\logo-odc.png',
+    ];
+
+    for (const p of candidates) {
+      try {
+        if (!fs.existsSync(p)) continue;
+        const buffer = fs.readFileSync(p);
+        const ext = path.extname(p).toLowerCase();
+        const mime =
+          ext === '.svg'
+            ? 'image/svg+xml'
+            : ext === '.jpg' || ext === '.jpeg'
+              ? 'image/jpeg'
+              : ext === '.webp'
+                ? 'image/webp'
+                : 'image/png';
+
+        this._logoCache = `data:${mime};base64,${buffer.toString('base64')}`;
+        logger.info(`[attestation] Logo ODC chargé depuis : ${p}`);
+        return this._logoCache;
+      } catch {
+        /* next */
+      }
+    }
+
+    logger.warn(
+      '[attestation] Logo ODC introuvable. Copie "logo-odc.png" dans backend/src/assets/brand/'
+    );
+    this._logoCache = null;
+    return undefined;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     HELPER — Détection sélection
+     ════════════════════════════════════════════════════════════════════════ */
+  private static isSelected(inscription: Inscription): boolean {
+    const raw = inscription as any;
+    const date = raw.dateSelection ?? raw.date_selection;
+    return date !== null && date !== undefined;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     HELPER — Calcul présence
+     ════════════════════════════════════════════════════════════════════════ */
+  private static calculerPresence(presences: Presence[]): PresenceCalculation {
+    const total = presences.length;
+    if (total === 0) {
+      return { taux: 0, presentes: 0, retards: 0, absents: 0, excuses: 0, total: 0 };
+    }
+
+    let presentes = 0,
+      retards = 0,
+      absents = 0,
+      excuses = 0;
+
+    for (const p of presences) {
+      const raw = p as any;
+      const statut = String(raw.statut ?? raw.status ?? '')
+        .toUpperCase()
+        .trim();
+
+      if (statut === 'PRESENT' || statut === 'PRÉSENT' || statut === 'PRESENTE') {
+        presentes++;
+        continue;
+      }
+      if (statut === 'RETARD') {
+        retards++;
+        continue;
+      }
+      if (statut === 'ABSENT') {
+        absents++;
+        continue;
+      }
+      if (statut === 'EXCUSE' || statut === 'EXCUSÉ' || statut === 'JUSTIFIE') {
+        excuses++;
+        continue;
+      }
+
+      if (typeof raw.estPresent === 'boolean') {
+        if (raw.estPresent) presentes++;
+        else absents++;
+        continue;
+      }
+      if (typeof raw.present === 'boolean') {
+        if (raw.present) presentes++;
+        else absents++;
+        continue;
+      }
+      absents++;
+    }
+
+    const valides = presentes + retards;
+    const denominateur = total - excuses;
+    const taux = denominateur > 0 ? Math.round((valides / denominateur) * 100) : 0;
+
+    return { taux, presentes, retards, absents, excuses, total };
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     READ
+     ════════════════════════════════════════════════════════════════════════ */
   static async findAll(query: any) {
     return attestationRepository.search({
       page: query.page,
@@ -149,20 +185,21 @@ export class AttestationService {
     });
   }
 
-  /* ==========================================================================
-     FIND ONE
-     ========================================================================== */
   static async findOne(id: string): Promise<Attestation> {
     const attestation = await attestationRepository.findByIdWithRelations(id);
-    if (!attestation) {
+    if (!attestation) throw new NotFoundError('Attestation introuvable');
+    return attestation;
+  }
+
+  static async findOneForParticipant(id: string, userId: string): Promise<Attestation> {
+    const attestation = await attestationRepository.findByIdWithRelations(id);
+    if (!attestation) throw new NotFoundError('Attestation introuvable');
+    if (attestation.participantId !== userId) {
       throw new NotFoundError('Attestation introuvable');
     }
     return attestation;
   }
 
-  /* ==========================================================================
-     STATS
-     ========================================================================== */
   static async getStats() {
     const [total, valides, invalides, ceMois] = await Promise.all([
       attestationRepository.count(),
@@ -170,19 +207,16 @@ export class AttestationService {
       attestationRepository.countInvalid(),
       attestationRepository.countThisMonth(),
     ]);
-
     return { total, valides, invalides, ceMois };
   }
 
-  /* ==========================================================================
-     VÉRIFICATION PUBLIQUE (QR CODE)
-     ========================================================================== */
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ VÉRIFICATION PUBLIQUE (QR)
+     ⭐ FIX : retiré 'session.formation.domaine' des relations
+     ════════════════════════════════════════════════════════════════════════ */
   static async verifierAuthenticite(numero: string) {
     const attestation = await attestationRepository.findByNumero(numero);
-
-    if (!attestation) {
-      return { valide: false, attestation: null };
-    }
+    if (!attestation) return { valide: false, attestation: null };
 
     return {
       valide: attestation.valide,
@@ -190,31 +224,66 @@ export class AttestationService {
     };
   }
 
-  /* ==========================================================================
-     MES ATTESTATIONS (participant connecté)
-     ========================================================================== */
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ MES ATTESTATIONS
+     ⭐ FIX : retiré .leftJoinAndSelect('formation.domaine', 'domaine')
+     ════════════════════════════════════════════════════════════════════════ */
   static async mesAttestations(userId: string): Promise<Attestation[]> {
-    return attestationRepository.findByParticipant(userId);
+    return (
+      AppDataSource.getRepository(Attestation)
+        .createQueryBuilder('att')
+        .leftJoinAndSelect('att.session', 'session')
+        .leftJoinAndSelect('session.formation', 'formation')
+        // ⭐ SUPPRIMÉ : .leftJoinAndSelect('formation.domaine', 'domaine')
+        .where('att.participantId = :userId', { userId })
+        .andWhere('att.deletedAt IS NULL')
+        .orderBy('att.dateEmission', 'DESC')
+        .getMany()
+    );
   }
 
-  /* ==========================================================================
+  /* ════════════════════════════════════════════════════════════════════════
+     HELPER — Notes
+     ════════════════════════════════════════════════════════════════════════ */
+  private static async getNotesForSessionParticipant(
+    sessionId: string,
+    participantId: string
+  ): Promise<Note[]> {
+    return AppDataSource.getRepository(Note)
+      .createQueryBuilder('note')
+      .innerJoin('note.evaluation', 'evaluation')
+      .where('evaluation.sessionId = :sessionId', { sessionId })
+      .andWhere('note.participantId = :participantId', { participantId })
+      .getMany();
+  }
+
+  private static calculateNoteFinale(notes: Note[]): number {
+    if (notes.length === 0) return 0;
+    const sum = notes.reduce((acc, n) => {
+      const v = Number((n as any).note);
+      return acc + (Number.isFinite(v) ? v : 0);
+    }, 0);
+    const avg = sum / notes.length;
+    return Number.isFinite(avg) ? Number(avg.toFixed(2)) : 0;
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
      ⭐ VÉRIFIER ÉLIGIBILITÉ
-     ========================================================================== */
+     ⭐ FIX : retiré 'formation.domaine' des relations
+     ════════════════════════════════════════════════════════════════════════ */
   static async verifierEligibilite(
     sessionId: string,
     participantId: string,
-    criteria: EligibilityCriteria = DEFAULT_CRITERIA,
+    criteria: EligibilityCriteria = DEFAULT_CRITERIA
   ) {
     const raisons: string[] = [];
 
-    /* -------------------- Session -------------------- */
     const session = await AppDataSource.getRepository(Session).findOne({
       where: { id: sessionId },
-      relations: ['formation'],
+      relations: ['formation'], // ⭐ SUPPRIMÉ : 'formation.domaine'
     });
     if (!session) throw new NotFoundError('Session introuvable');
 
-    /* -------------------- Inscription -------------------- */
     const inscription = await AppDataSource.getRepository(Inscription).findOne({
       where: { sessionId, participantId },
     });
@@ -223,121 +292,182 @@ export class AttestationService {
       raisons.push('Aucune inscription trouvée');
     } else if (
       criteria.inscriptionValidee &&
-      inscription.statut !== 'VALIDEE'
+      inscription.statut !== StatutInscription.ACCEPTEE
     ) {
-      raisons.push(
-        `Inscription non validée (statut : ${inscription.statut})`,
-      );
+      raisons.push(`Inscription non validée (statut : ${inscription.statut})`);
     }
 
-    /* -------------------- Sélection -------------------- */
-    if (criteria.selectionValidee && inscription) {
-      if (!(inscription as any).estSelectionne) {
-        raisons.push('Participant non sélectionné');
-      }
+    const estSelectionne = inscription ? this.isSelected(inscription) : false;
+    if (criteria.selectionValidee && inscription && !estSelectionne) {
+      raisons.push('Participant non sélectionné');
     }
 
-    /* -------------------- Présences -------------------- */
     const presences = await AppDataSource.getRepository(Presence).find({
       where: { sessionId, participantId },
+      order: { datePresence: 'ASC' },
     });
+    const presenceCalc = this.calculerPresence(presences);
 
-    const totalPresences = presences.length;
-    const presencesPresentes = presences.filter((p) => p.estPresent).length;
-    const tauxPresence =
-      totalPresences > 0
-        ? Math.round((presencesPresentes / totalPresences) * 100)
-        : 0;
-
-    if (tauxPresence < criteria.presenceMin) {
+    if (presenceCalc.taux < criteria.presenceMin) {
       raisons.push(
-        `Taux de présence insuffisant (${tauxPresence}% < ${criteria.presenceMin}%)`,
+        `Taux de présence insuffisant (${presenceCalc.taux}% < ${criteria.presenceMin}%) — ${presenceCalc.presentes + presenceCalc.retards}/${presenceCalc.total} séances`
       );
     }
 
-    /* -------------------- Notes -------------------- */
-    const notes = await AppDataSource.getRepository(Note).find({
-      where: { sessionId, participantId },
-    });
-
-    const noteFinale =
-      notes.length > 0
-        ? notes.reduce((sum, n) => sum + Number(n.note ?? 0), 0) / notes.length
-        : 0;
+    const notes = await this.getNotesForSessionParticipant(sessionId, participantId);
+    const noteFinale = this.calculateNoteFinale(notes);
 
     if (noteFinale < criteria.noteMin) {
-      raisons.push(
-        `Note insuffisante (${noteFinale.toFixed(1)}/20 < ${criteria.noteMin}/20)`,
-      );
+      raisons.push(`Note insuffisante (${noteFinale.toFixed(1)}/20 < ${criteria.noteMin}/20)`);
     }
 
-    /* -------------------- Attestation existante -------------------- */
     const existing = await attestationRepository.findBySessionAndParticipant(
       sessionId,
-      participantId,
+      participantId
     );
 
-    /* -------------------- Résultat -------------------- */
     return {
       eligible: raisons.length === 0,
       raisons,
-      tauxPresence,
-      noteFinale: Number(noteFinale.toFixed(2)),
+      estSelectionne,
+      dateSelection: (inscription as any)?.dateSelection ?? null,
+      tauxPresence: presenceCalc.taux,
+      presencesPresentes: presenceCalc.presentes,
+      presencesRetards: presenceCalc.retards,
+      presencesAbsentes: presenceCalc.absents,
+      presencesExcusees: presenceCalc.excuses,
+      totalSeances: presenceCalc.total,
+      noteFinale,
       dejaGeneree: !!existing,
       attestationId: existing?.id,
       session: this.serializeSession(session),
     };
   }
 
-  /* ==========================================================================
-     ⭐ APERÇU D'UNE SESSION (avant génération)
-     ========================================================================== */
-  static async previewSession(
-    sessionId: string,
-    criteria: EligibilityCriteria = DEFAULT_CRITERIA,
-  ) {
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ APERÇU SESSION
+     ⭐ FIX : retiré 'formation.domaine' des relations
+     ════════════════════════════════════════════════════════════════════════ */
+  static async previewSession(sessionId: string, criteria: EligibilityCriteria = DEFAULT_CRITERIA) {
     const session = await AppDataSource.getRepository(Session).findOne({
       where: { id: sessionId },
-      relations: ['formation'],
+      relations: ['formation'], // ⭐ SUPPRIMÉ : 'formation.domaine'
     });
-
     if (!session) throw new NotFoundError('Session introuvable');
 
-    /* -------------------- Inscriptions -------------------- */
-    const inscriptions = await AppDataSource.getRepository(Inscription).find({
-      where: { sessionId },
-      relations: ['participant'],
-    });
+    const inscriptions = await AppDataSource.getRepository(Inscription)
+      .createQueryBuilder('inscription')
+      .innerJoinAndSelect('inscription.participant', 'participant')
+      .where('inscription.sessionId = :sessionId', { sessionId })
+      .andWhere('inscription.deletedAt IS NULL')
+      .getMany();
 
-    /* -------------------- Vérifier chaque participant -------------------- */
-    const participants = await Promise.all(
-      inscriptions.map(async (inscription) => {
-        const result = await this.verifierEligibilite(
-          sessionId,
-          inscription.participantId,
-          criteria,
-        );
+    if (inscriptions.length === 0) {
+      return {
+        session: this.serializeSession(session),
+        criteres: criteria,
+        participants: [],
+        stats: { total: 0, eligibles: 0, ineligibles: 0, dejaGenerees: 0 },
+      };
+    }
+
+    const participantIds = inscriptions.map((i) => i.participantId);
+
+    const allPresences = await AppDataSource.getRepository(Presence).find({
+      where: { sessionId },
+    });
+    const presencesByParticipant = new Map<string, Presence[]>();
+    for (const p of allPresences) {
+      const arr = presencesByParticipant.get(p.participantId) ?? [];
+      arr.push(p);
+      presencesByParticipant.set(p.participantId, arr);
+    }
+
+    const allNotes = await AppDataSource.getRepository(Note)
+      .createQueryBuilder('note')
+      .innerJoin('note.evaluation', 'evaluation')
+      .where('evaluation.sessionId = :sessionId', { sessionId })
+      .andWhere('note.participantId IN (:...participantIds)', { participantIds })
+      .getMany();
+
+    const notesByParticipant = new Map<string, Note[]>();
+    for (const n of allNotes) {
+      const arr = notesByParticipant.get(n.participantId) ?? [];
+      arr.push(n);
+      notesByParticipant.set(n.participantId, arr);
+    }
+
+    const existingAttestations = await AppDataSource.getRepository(Attestation)
+      .createQueryBuilder('att')
+      .where('att.sessionId = :sessionId', { sessionId })
+      .andWhere('att.participantId IN (:...participantIds)', { participantIds })
+      .andWhere('att.deletedAt IS NULL')
+      .getMany();
+
+    const attestationByParticipant = new Map<string, Attestation>();
+    for (const a of existingAttestations) {
+      attestationByParticipant.set(a.participantId, a);
+    }
+
+    const participants = inscriptions
+      .map((inscription) => {
+        const participant = inscription.participant;
+        if (!participant) return null;
+
+        const raisons: string[] = [];
+
+        if (
+          criteria.inscriptionValidee &&
+          inscription.statut !== StatutInscription.ACCEPTEE
+        ) {
+          raisons.push(`Inscription non validée (${inscription.statut})`);
+        }
+
+        const estSelectionne = this.isSelected(inscription);
+        if (criteria.selectionValidee && !estSelectionne) {
+          raisons.push('Participant non sélectionné');
+        }
+
+        const presences = presencesByParticipant.get(participant.id) ?? [];
+        const presenceCalc = this.calculerPresence(presences);
+        if (presenceCalc.taux < criteria.presenceMin) {
+          raisons.push(`Présence insuffisante (${presenceCalc.taux}% < ${criteria.presenceMin}%)`);
+        }
+
+        const notes = notesByParticipant.get(participant.id) ?? [];
+        const noteFinale = this.calculateNoteFinale(notes);
+        if (noteFinale < criteria.noteMin) {
+          raisons.push(`Note insuffisante (${noteFinale.toFixed(1)}/20 < ${criteria.noteMin}/20)`);
+        }
+
+        const existing = attestationByParticipant.get(participant.id);
 
         return {
-          participantId: inscription.participantId,
+          participantId: participant.id,
           participant: {
-            id: inscription.participant.id,
-            nom: inscription.participant.nom,
-            prenom: inscription.participant.prenom,
-            email: inscription.participant.email,
-            photoUrl: inscription.participant.photoUrl,
+            id: participant.id,
+            nom: participant.nom,
+            prenom: participant.prenom,
+            email: participant.email,
+            photoUrl: participant.photoUrl,
           },
-          tauxPresence: result.tauxPresence,
-          noteFinale: result.noteFinale,
-          eligible: result.eligible,
-          raisons: result.raisons,
-          dejaGeneree: result.dejaGeneree,
-          attestationId: result.attestationId,
+          estSelectionne,
+          dateSelection: (inscription as any).dateSelection ?? null,
+          tauxPresence: presenceCalc.taux,
+          presencesPresentes: presenceCalc.presentes,
+          presencesRetards: presenceCalc.retards,
+          presencesAbsentes: presenceCalc.absents,
+          presencesExcusees: presenceCalc.excuses,
+          totalSeances: presenceCalc.total,
+          noteFinale,
+          eligible: raisons.length === 0,
+          raisons,
+          dejaGeneree: !!existing,
+          attestationId: existing?.id,
         };
-      }),
-    );
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
 
-    /* -------------------- Statistiques -------------------- */
     const stats = {
       total: participants.length,
       eligibles: participants.filter((p) => p.eligible).length,
@@ -345,38 +475,22 @@ export class AttestationService {
       dejaGenerees: participants.filter((p) => p.dejaGeneree).length,
     };
 
-    return {
-      session: this.serializeSession(session),
-      criteres: criteria,
-      participants,
-      stats,
-    };
+    return { session: this.serializeSession(session), criteres: criteria, participants, stats };
   }
 
-  /* ==========================================================================
-     ⭐ GÉNÉRER UNE ATTESTATION
-     ========================================================================== */
-  static async generer(
-    sessionId: string,
-    participantId: string,
-  ): Promise<Attestation> {
-    /* -------------------- Vérifier éligibilité -------------------- */
-    const eligibility = await this.verifierEligibilite(
-      sessionId,
-      participantId,
-    );
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ GÉNÉRER
+     ════════════════════════════════════════════════════════════════════════ */
+  static async generer(sessionId: string, participantId: string): Promise<Attestation> {
+    const eligibility = await this.verifierEligibilite(sessionId, participantId);
 
     if (!eligibility.eligible) {
-      throw new BadRequestError(
-        `Participant non éligible : ${eligibility.raisons.join(', ')}`,
-      );
+      throw new BadRequestError(`Participant non éligible : ${eligibility.raisons.join(', ')}`);
     }
-
     if (eligibility.dejaGeneree) {
       throw new ConflictError('Une attestation existe déjà pour ce participant');
     }
 
-    /* -------------------- Créer l'attestation -------------------- */
     const numero = await this.generateNumero();
     const hash = this.generateHash(numero, participantId, sessionId);
 
@@ -392,210 +506,251 @@ export class AttestationService {
       telechargee: false,
     });
 
-    /* -------------------- Générer le PDF -------------------- */
     try {
-      const pdfUrl = await this.generatePdf(attestation);
-      await attestationRepository.update(attestation.id, {
-        fichierUrl: pdfUrl,
-      } as any);
-      attestation.fichierUrl = pdfUrl;
+      const pdfUrl = await this.generateAndSavePdf(attestation);
+      if (pdfUrl) {
+        await attestationRepository.update(attestation.id, { fichierUrl: pdfUrl } as any);
+        attestation.fichierUrl = pdfUrl;
+      }
     } catch (pdfError) {
-      console.error('[AttestationService.generer] Erreur PDF:', pdfError);
-      // On ne bloque pas la création si le PDF échoue
+      logger.error('[generer] Erreur PDF (non bloquant):', pdfError);
     }
+
+    this.envoyerParEmail(attestation.id).catch((err) => {
+      logger.error('[generer] Erreur email (non bloquant):', err);
+    });
 
     return attestation;
   }
 
-  /* ==========================================================================
-     ⭐ GÉNÉRER PAR SESSION (batch)
-     ========================================================================== */
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ GÉNÉRER PAR SESSION
+     ════════════════════════════════════════════════════════════════════════ */
   static async genererParSession(
     sessionId: string,
-    criteria: EligibilityCriteria = DEFAULT_CRITERIA,
+    criteria: EligibilityCriteria = DEFAULT_CRITERIA
   ) {
     const preview = await this.previewSession(sessionId, criteria);
 
-    let generes = 0;
-    let ignores = 0;
-    let erreurs = 0;
-    const attestations: Array<{
-      id: string;
-      numero: string;
-      participantId: string;
-      participantNom: string;
-    }> = [];
+    const result = {
+      generes: 0,
+      ignores: 0,
+      erreurs: 0,
+      attestations: [] as Array<{
+        id: string;
+        numero: string;
+        participantId: string;
+        participantNom: string;
+      }>,
+      details: {
+        participantsTotal: preview.participants.length,
+        participantsEligibles: 0,
+        participantsIgnores: 0,
+        dejaGenerees: 0,
+      },
+    };
 
     for (const p of preview.participants) {
-      if (!p.eligible || p.dejaGeneree) {
-        ignores++;
+      if (p.dejaGeneree) {
+        result.ignores++;
+        result.details.participantsIgnores++;
+        result.details.dejaGenerees++;
+        logger.warn(`[ATTESTATION] Déjà générée pour ${p.participantId} (${p.attestationId})`);
         continue;
       }
-
+      if (!p.eligible) {
+        result.ignores++;
+        result.details.participantsIgnores++;
+        logger.info(`[ATTESTATION] Ignoré ${p.participantId}: ${p.raisons.join(', ')}`);
+        continue;
+      }
       try {
-        const attestation = await this.generer(
-          sessionId,
-          p.participantId,
-        );
-        generes++;
-        attestations.push({
+        const attestation = await this.generer(sessionId, p.participantId);
+        result.generes++;
+        result.details.participantsEligibles++;
+        result.attestations.push({
           id: attestation.id,
           numero: attestation.numero,
           participantId: p.participantId,
           participantNom: `${p.participant.prenom} ${p.participant.nom}`,
         });
-      } catch (error) {
-        erreurs++;
-        console.error(
-          `[genererParSession] Erreur pour ${p.participantId}:`,
-          error,
-        );
+      } catch (e) {
+        result.erreurs++;
+        result.details.participantsIgnores++;
+        logger.error(`[ATTESTATION] Erreur génération ${p.participantId}`, e);
       }
     }
 
-    return { generes, ignores, erreurs, attestations };
+    return result;
   }
 
-  /* ==========================================================================
-     INVALIDER
-     ========================================================================== */
-  static async invalider(
-    id: string,
-    motif: string,
-  ): Promise<Attestation> {
+  /* ════════════════════════════════════════════════════════════════════════
+     INVALIDER / RÉACTIVER
+     ════════════════════════════════════════════════════════════════════════ */
+  static async invalider(id: string, motif: string): Promise<Attestation> {
     const attestation = await attestationRepository.findByIdWithRelations(id);
     if (!attestation) throw new NotFoundError('Attestation introuvable');
-
     const updated = await attestationRepository.updateValidity(id, false, motif);
     return updated!;
   }
 
-  /* ==========================================================================
-     RÉACTIVER
-     ========================================================================== */
   static async reactiver(id: string): Promise<Attestation> {
     const attestation = await attestationRepository.findByIdWithRelations(id);
     if (!attestation) throw new NotFoundError('Attestation introuvable');
-
     const updated = await attestationRepository.updateValidity(id, true);
     return updated!;
   }
 
-  /* ==========================================================================
-     TÉLÉCHARGER PDF
-     ========================================================================== */
-  static async telecharger(id: string, userId: string) {
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ TÉLÉCHARGER
+     ════════════════════════════════════════════════════════════════════════ */
+  static async telecharger(id: string, userId: string): Promise<AttestationFile> {
     const attestation = await attestationRepository.findByIdWithRelations(id);
     if (!attestation) throw new NotFoundError('Attestation introuvable');
 
-    // ⭐ Sécurité : participant ne peut télécharger que SES attestations
-    // (sauf admin/staff)
-    if (
-      attestation.participantId !== userId &&
-      !(await this.isAdminOrStaff(userId))
-    ) {
+    const isOwner = attestation.participantId === userId;
+    if (!isOwner && !(await this.isAdminOrStaff(userId))) {
       throw new BadRequestError('Non autorisé à télécharger cette attestation');
     }
 
-    if (!attestation.fichierUrl) {
-      throw new NotFoundError('PDF non encore généré');
+    let buffer: Buffer;
+    try {
+      const pdfData = await this.buildPdfData(attestation);
+      buffer = await PdfService.genererAttestation(pdfData);
+    } catch (pdfError) {
+      logger.error('[telecharger] Erreur génération PDF:', pdfError);
+      throw new BadRequestError(`Impossible de générer le PDF : ${(pdfError as Error).message}`);
     }
 
-    const filePath = path.join(
-      process.cwd(),
-      'uploads',
-      'attestations',
-      path.basename(attestation.fichierUrl),
-    );
-
-    // Marquer comme téléchargée
-    await attestationRepository.markAsDownloaded(id);
+    attestationRepository.markAsDownloaded(id).catch((e) => {
+      logger.error('[telecharger] markAsDownloaded:', e);
+    });
 
     return {
-<<<<<<< HEAD
-      path: filePath,
+      buffer,
       nom: `attestation-${attestation.numero}.pdf`,
+      contentType: 'application/pdf',
     };
   }
 
-  /* ==========================================================================
+  /* ════════════════════════════════════════════════════════════════════════
+     ⭐ ENVOYER PAR EMAIL
+     ⭐ FIX : passe urlVerification + noteFinale + tauxPresence à MailService
+     ════════════════════════════════════════════════════════════════════════ */
+  static async envoyerParEmail(attestationId: string): Promise<boolean> {
+    try {
+      const attestation = await attestationRepository.findByIdWithRelations(attestationId);
+      if (!attestation) throw new NotFoundError('Attestation introuvable');
+
+      const participant = attestation.participant;
+      if (!participant?.email) {
+        logger.warn(`[envoyerParEmail] Aucun email pour ${attestation.participantId}`);
+        return false;
+      }
+
+      let pdfBuffer: Buffer;
+      try {
+        const pdfData = await this.buildPdfData(attestation);
+        pdfBuffer = await PdfService.genererAttestation(pdfData);
+      } catch (pdfError) {
+        logger.error(
+          `[envoyerParEmail] Erreur génération PDF pour ${attestation.numero}:`,
+          pdfError
+        );
+        return false;
+      }
+
+      try {
+        await MailService.envoyerAttestation({
+          destinataire: participant.email,
+          nomParticipant: `${participant.prenom ?? ''} ${participant.nom ?? ''}`.trim(),
+          formationTitre: attestation.session?.formation?.titre ?? 'Formation',
+          numeroAttestation: attestation.numero,
+          pdfBuffer,
+          noteFinale: attestation.noteFinale ?? undefined, // ⭐
+          tauxPresence: attestation.tauxPresence ?? undefined, // ⭐
+          urlVerification: this.buildVerificationUrl(attestation.numero), // ⭐
+        });
+        logger.info(`📧 Attestation ${attestation.numero} envoyée à ${participant.email}`);
+        return true;
+      } catch (mailError) {
+        logger.error(
+          `[envoyerParEmail] Erreur envoi email pour ${attestation.numero} à ${participant.email}:`,
+          mailError
+        );
+        return false;
+      }
+    } catch (err) {
+      logger.error('[envoyerParEmail] Erreur:', err);
+      return false;
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════
      HELPERS PRIVÉS
-     ========================================================================== */
+     ════════════════════════════════════════════════════════════════════════ */
+
+  /**
+   * ⭐ Construit les données PDF (avec logo)
+   *    Centralisé pour éviter les duplications
+   */
+  private static async buildPdfData(attestation: Attestation) {
+    return PdfService.buildDataAsync(attestation, {
+      verificationUrl: this.buildVerificationUrl(attestation.numero),
+      logoDataUrl: this.getLogoDataUrl(),
+    });
+  }
+
+  private static async generateAndSavePdf(attestation: Attestation): Promise<string | null> {
+    try {
+      const full = await attestationRepository.findByIdWithRelations(attestation.id);
+      if (!full) {
+        logger.warn(`[generateAndSavePdf] Attestation ${attestation.id} introuvable`);
+        return null;
+      }
+
+      const pdfData = await this.buildPdfData(full);
+      const buffer = await PdfService.genererAttestation(pdfData);
+
+      const fileName = `attestation-${full.numero}.pdf`;
+      await PdfService.sauvegarderPdf(buffer, fileName);
+
+      logger.info(`📄 PDF généré et sauvegardé : ${fileName}`);
+      return `/uploads/attestations/${fileName}`;
+    } catch (err) {
+      logger.error('[generateAndSavePdf] Erreur:', err);
+      return null;
+    }
+  }
+
+  private static buildVerificationUrl(numero: string): string {
+    const baseUrl = (env.CLIENT_URL ?? 'https://odc.mg').replace(/\/+$/, '');
+    return `${baseUrl}/verifier-attestation/${numero}`;
+  }
 
   private static async generateNumero(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await attestationRepository.count();
-    const sequence = String(count + 1).padStart(6, '0');
-    return `ATT-${year}-${sequence}`;
-=======
-      valide: true,
-      attestation: {
-        numero: att.numero,
-        dateEmission: att.dateEmission,
-        participant: `${att.participant.prenom} ${att.participant.nom}`,
-        formation: att.session.formation.titre,
-        noteFinale: att.noteFinale,
-        tauxPresence: att.tauxPresence,
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
-      },
-    };
-  }
+    const prefix = `ATT-${year}-`;
 
-<<<<<<< HEAD
-  static async mesAttestations(participantId: string) {
-    return this.repo.find({ where: { participantId }, relations: ['session', 'session.formation'], order: { dateEmission: 'DESC' } });
-  }
+    const last = await AppDataSource.getRepository(Attestation)
+      .createQueryBuilder('att')
+      .where('att.numero LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('att.numero', 'DESC')
+      .getOne();
 
-  static async findAll(params: any) {
-    const { page, limit, skip } = getPagination(params.page, params.limit);
-    const query = this.repo.createQueryBuilder('a')
-      .leftJoinAndSelect('a.participant', 'participant')
-      .leftJoinAndSelect('a.session', 'session')
-      .leftJoinAndSelect('session.formation', 'formation')
-      .orderBy('a.dateEmission', 'DESC')
-      .skip(skip)
-      .take(limit);
-
-    if (params.search) {
-      query.andWhere(
-        '(a.numero ILIKE :search OR participant.nom ILIKE :search OR participant.prenom ILIKE :search)',
-        { search: `%${params.search}%` }
-      );
+    let lastSeq = 0;
+    if (last?.numero) {
+      const m = last.numero.match(/(\d+)$/);
+      if (m) lastSeq = parseInt(m[1], 10) || 0;
     }
-
-    const [data, total] = await query.getManyAndCount();
-    return { data, total, page, limit };
-=======
-  /** Mes attestations (participant) */
-  static async mesAttestations(participantId: string) {
-    return attestationRepository.findByParticipant(participantId);
->>>>>>> origin/main
+    return `${prefix}${String(lastSeq + 1).padStart(6, '0')}`;
   }
 
-  private static generateHash(
-    numero: string,
-    participantId: string,
-    sessionId: string,
-  ): string {
+  private static generateHash(numero: string, participantId: string, sessionId: string): string {
     return crypto
       .createHash('sha256')
       .update(`${numero}:${participantId}:${sessionId}:${Date.now()}`)
-      .digest('hex')
-      .slice(0, 64);
-  }
-
-  private static async generatePdf(attestation: Attestation): Promise<string> {
-    // ⚠️ À implémenter avec Puppeteer ou PDFKit
-    // Pour l'instant, retourne un chemin fictif
-    const fileName = `attestation-${attestation.numero}.pdf`;
-    const dir = path.join(process.cwd(), 'uploads', 'attestations');
-
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    // TODO : générer le vrai PDF ici
-    return fileName;
+      .digest('hex');
   }
 
   private static async isAdminOrStaff(userId: string): Promise<boolean> {
@@ -603,16 +758,12 @@ export class AttestationService {
       where: { id: userId },
       relations: ['role'],
     });
-
-    return (
-      user?.role?.nom === 'ADMINISTRATEUR' ||
-      user?.role?.nom === 'STAFF_ODC'
-    );
+    return user?.role?.nom === 'ADMINISTRATEUR' || user?.role?.nom === 'STAFF_ODC';
   }
 
-  /* ==========================================================================
+  /* ════════════════════════════════════════════════════════════════════════
      SERIALIZE
-     ========================================================================== */
+     ════════════════════════════════════════════════════════════════════════ */
   private static serialize(attestation: Attestation): any {
     return {
       id: attestation.id,
@@ -629,17 +780,10 @@ export class AttestationService {
           }
         : undefined,
       sessionId: attestation.sessionId,
-      session: attestation.session
-        ? this.serializeSession(attestation.session)
-        : undefined,
-      noteFinale:
-        attestation.noteFinale !== null
-          ? Number(attestation.noteFinale)
-          : undefined,
+      session: attestation.session ? this.serializeSession(attestation.session) : undefined,
+      noteFinale: attestation.noteFinale !== null ? Number(attestation.noteFinale) : undefined,
       tauxPresence:
-        attestation.tauxPresence !== null
-          ? Number(attestation.tauxPresence)
-          : undefined,
+        attestation.tauxPresence !== null ? Number(attestation.tauxPresence) : undefined,
       dateEmission: attestation.dateEmission,
       fichierUrl: attestation.fichierUrl,
       qrCodeUrl: attestation.qrCodeUrl,
@@ -650,21 +794,41 @@ export class AttestationService {
     };
   }
 
+  /**
+   * ⭐ Récupère le domaine de façon robuste SANS jointure.
+   *    - Cas A : formation.domaine = string
+   *    - Cas B : formation.domaine = objet { nom }
+   *    - Cas C : formation.domaineRelation.nom
+   *    - Fallback : formation.domaineNom
+   */
   private static serializeSession(session: Session): any {
+    if (!session) return undefined;
+
+    const formation: any = session.formation;
+    let domaine: string | undefined;
+
+    if (formation) {
+      const d = formation.domaine;
+      if (typeof d === 'string') domaine = d;
+      else if (d && typeof d === 'object' && d.nom) domaine = d.nom;
+      else if (formation.domaineRelation?.nom) domaine = formation.domaineRelation.nom;
+      else if (formation.domaineNom) domaine = formation.domaineNom;
+    }
+
     return {
       id: session.id,
       codeSession: session.codeSession,
       dateDebut: session.dateDebut,
       dateFin: session.dateFin,
       statut: session.statut,
-      formation: session.formation
+      formation: formation
         ? {
-            id: session.formation.id,
-            titre: session.formation.titre,
-            dureeHeures: session.formation.dureeHeures,
+            id: formation.id,
+            titre: formation.titre,
+            dureeHeures: formation.dureeHeures,
+            domaine,
           }
         : undefined,
     };
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
   }
 }

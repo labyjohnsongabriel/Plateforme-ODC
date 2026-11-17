@@ -1,11 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+// src/components/qr/QrCodeDisplay.tsx
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { Download, Copy, Check, RefreshCw } from 'lucide-react';
-import { Card } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
-import { Loader } from '@/components/common/Loader';
-import { toast } from '@/components/common/Toast';
-import { cn } from '@/utils/cn';
+import { Download, Copy, Check, RefreshCw, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+/* ============================================================================
+   TYPES
+   ============================================================================ */
+
+export type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
 
 export interface QrCodeDisplayProps {
   value: string;
@@ -16,9 +25,22 @@ export interface QrCodeDisplayProps {
   copyable?: boolean;
   color?: string;
   backgroundColor?: string;
+  /** ⭐ Nouveau : niveau de correction d'erreur */
+  errorCorrectionLevel?: ErrorCorrectionLevel;
   onRefresh?: () => void;
   className?: string;
 }
+
+/* ============================================================================
+   CONSTANTES
+   ============================================================================ */
+
+const MIN_SIZE = 100;
+const MAX_SIZE = 1000;
+
+/* ============================================================================
+   COMPOSANT
+   ============================================================================ */
 
 export function QrCodeDisplay({
   value,
@@ -29,6 +51,7 @@ export function QrCodeDisplay({
   copyable = true,
   color = '#FF7900',
   backgroundColor = '#FFFFFF',
+  errorCorrectionLevel = 'H',
   onRefresh,
   className,
 }: QrCodeDisplayProps) {
@@ -37,56 +60,75 @@ export function QrCodeDisplay({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ========================================================================
-  // Générer le QR Code
-  // ========================================================================
+  // ⭐ Normaliser la taille
+  const safeSize = Math.min(MAX_SIZE, Math.max(MIN_SIZE, Number(size) || 300));
+
+  /* ==========================================================================
+     GÉNÉRATION DU QR CODE
+     ========================================================================== */
   useEffect(() => {
+    let cancelled = false;
+
     const generateQr = async () => {
-      if (!canvasRef.current || !value) return;
+      if (!canvasRef.current || !value || value === 'placeholder') {
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
         setError(null);
 
         await QRCode.toCanvas(canvasRef.current, value, {
-          width: size,
+          width: safeSize,
           margin: 2,
-          errorCorrectionLevel: 'H',
+          errorCorrectionLevel,
           color: {
             dark: color,
             light: backgroundColor,
           },
         });
-      } catch (err: any) {
-        setError('Erreur de génération du QR Code');
-        console.error(err);
+
+        if (cancelled) return;
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+        setError(`Erreur de génération : ${msg}`);
+        console.error('[QR Display]', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    generateQr();
-  }, [value, size, color, backgroundColor]);
+    void generateQr();
 
-  // ========================================================================
-  // Télécharger
-  // ========================================================================
-  const handleDownload = () => {
+    return () => {
+      cancelled = true;
+    };
+  }, [value, safeSize, color, backgroundColor, errorCorrectionLevel]);
+
+  /* ==========================================================================
+     TÉLÉCHARGEMENT
+     ========================================================================== */
+  const handleDownload = useCallback(() => {
     if (!canvasRef.current) return;
 
-    const url = canvasRef.current.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `qrcode-${Date.now()}.png`;
-    link.href = url;
-    link.click();
+    try {
+      const url = canvasRef.current.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `qrcode-${Date.now()}.png`;
+      link.href = url;
+      link.click();
+      toast.success('QR Code téléchargé');
+    } catch {
+      toast.error('Erreur lors du téléchargement');
+    }
+  }, []);
 
-    toast.success('QR Code téléchargé');
-  };
-
-  // ========================================================================
-  // Copier la valeur
-  // ========================================================================
-  const handleCopy = async () => {
+  /* ==========================================================================
+     COPIE
+     ========================================================================== */
+  const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
@@ -95,98 +137,113 @@ export function QrCodeDisplay({
     } catch {
       toast.error('Impossible de copier');
     }
-  };
+  }, [value]);
 
-  // ========================================================================
-  // RENDER
-  // ========================================================================
+  /* ==========================================================================
+     RENDU
+     ========================================================================== */
   return (
-    <Card className={cn('text-center', className)}>
-      {title && (
-        <h3 className="font-heading font-bold text-lg mb-1 text-odc-text-light dark:text-odc-text-dark">
-          {title}
-        </h3>
-      )}
-      {description && (
-        <p className="text-sm text-odc-text-muted-light dark:text-odc-text-muted-dark mb-4">
-          {description}
-        </p>
-      )}
-
-      {/* QR Code */}
-      <div
-        className={cn(
-          'relative inline-flex items-center justify-center mx-auto rounded-2xl p-4',
-          'bg-odc-surface-alt-light dark:bg-odc-surface-alt-dark',
-          'border-2 border-dashed border-odc-border-light dark:border-odc-border-dark'
+    <Card variant="elevated" padding="lg" className={cn('text-center', className)}>
+      <CardContent className="p-0">
+        {title && (
+          <h3 className="font-display mb-1 text-lg font-bold tracking-tight">
+            {title}
+          </h3>
         )}
-      >
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-odc-surface-dark/80 rounded-2xl z-10">
-            <Loader size="md" />
-          </div>
+        {description && (
+          <p className="text-odc-muted mb-4 text-sm">{description}</p>
         )}
 
-        {error ? (
-          <div className="w-[300px] h-[300px] flex items-center justify-center text-odc-error text-sm">
-            {error}
-          </div>
-        ) : (
-          <canvas
-            ref={canvasRef}
-            className="rounded-lg shadow-odc-sm"
-            style={{ maxWidth: '100%', height: 'auto' }}
-          />
-        )}
-
-        {onRefresh && (
-          <button
-            onClick={onRefresh}
-            className="absolute top-2 right-2 p-2 rounded-lg bg-white dark:bg-odc-surface-dark shadow-odc-sm hover:shadow-odc-md transition-all"
-            title="Rafraîchir"
-          >
-            <RefreshCw size={14} className="text-odc-primary" />
-          </button>
-        )}
-      </div>
-
-      {/* Valeur encodée */}
-      <div className="mt-4 p-3 bg-odc-surface-alt-light dark:bg-odc-surface-alt-dark rounded-lg">
-        <p className="text-xs text-odc-text-muted-light dark:text-odc-text-muted-dark mb-1">
-          Valeur encodée :
-        </p>
-        <p className="text-xs font-mono break-all text-odc-text-light dark:text-odc-text-dark">
-          {value.length > 100 ? `${value.substring(0, 100)}...` : value}
-        </p>
-      </div>
-
-      {/* Actions */}
-      {(downloadable || copyable) && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          {downloadable && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<Download size={14} />}
-              onClick={handleDownload}
-              disabled={loading || !!error}
-            >
-              Télécharger
-            </Button>
+        {/* QR Code */}
+        <div
+          className={cn(
+            'relative mx-auto inline-flex items-center justify-center rounded-2xl p-4',
+            'bg-odc-surface-alt/50',
+            'border-odc-border/60 border-2 border-dashed',
           )}
-          {copyable && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={copied ? <Check size={14} /> : <Copy size={14} />}
-              onClick={handleCopy}
-              disabled={loading || !!error}
+        >
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm dark:bg-odc-surface-dark/80">
+              <Skeleton className="h-3/4 w-3/4 rounded-xl" />
+            </div>
+          )}
+
+          {error ? (
+            <div
+              className="text-odc-error flex flex-col items-center justify-center gap-2"
+              style={{ width: safeSize, height: safeSize }}
             >
-              {copied ? 'Copié !' : 'Copier'}
-            </Button>
+              <AlertCircle className="h-8 w-8" />
+              <p className="px-4 text-center text-sm">{error}</p>
+            </div>
+          ) : (
+            <canvas
+              ref={canvasRef}
+              className="rounded-lg shadow-odc-sm"
+              style={{ maxWidth: '100%', height: 'auto' }}
+              aria-label={`QR code pour : ${value.substring(0, 50)}`}
+            />
+          )}
+
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="bg-odc-surface hover:bg-odc-surface-alt absolute right-2 top-2 rounded-lg p-2 shadow-odc-sm transition-all hover:shadow-odc-md active:scale-95"
+              title="Rafraîchir"
+              aria-label="Rafraîchir le QR code"
+            >
+              <RefreshCw size={14} className="text-odc-primary" />
+            </button>
           )}
         </div>
-      )}
+
+        {/* Valeur encodée */}
+        {value && value !== 'placeholder' && (
+          <div className="bg-odc-surface-alt/50 mt-4 rounded-lg p-3">
+            <p className="text-odc-muted mb-1 text-[10px] font-semibold uppercase tracking-wider">
+              Valeur encodée
+            </p>
+            <p className="text-odc-text-primary break-all font-mono text-xs">
+              {value.length > 100 ? `${value.substring(0, 100)}…` : value}
+            </p>
+          </div>
+        )}
+
+        {/* Actions */}
+        {(downloadable || copyable) && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            {downloadable && (
+              <Button
+                variant="brand"
+                size="sm"
+                onClick={handleDownload}
+                disabled={loading || !!error || !value || value === 'placeholder'}
+                leftIcon={<Download className="h-4 w-4" />}
+              >
+                Télécharger
+              </Button>
+            )}
+            {copyable && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+                disabled={loading || !!error || !value || value === 'placeholder'}
+                leftIcon={
+                  copied ? (
+                    <Check className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )
+                }
+              >
+                {copied ? 'Copié !' : 'Copier'}
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }

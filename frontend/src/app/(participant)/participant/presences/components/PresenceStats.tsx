@@ -12,6 +12,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
 
 interface PresenceStatsData {
   total: number;
@@ -127,35 +128,48 @@ function StatsSkeleton() {
 }
 
 export function PresenceStats() {
-  const { data, isLoading } = useQuery<PresenceStatsData>({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<PresenceStatsData>({
     queryKey: ['participant', 'presences', 'stats'],
     queryFn: async () => {
-      try {
-        const { data } = await api.get('/participant/presences/stats');
-        return data?.data ?? {
-          total: 0,
-          presents: 0,
-          absents: 0,
-          retards: 0,
-          excuses: 0,
-          tauxPresence: 0,
-        };
-      } catch {
-        return {
-          total: 0,
-          presents: 0,
-          absents: 0,
-          retards: 0,
-          excuses: 0,
-          tauxPresence: 0,
-        };
-      }
+      const { data } = await api.get('/participant/presences');
+      const presences = data?.data ?? [];
+      const total = presences.length;
+      const presents = presences.filter(
+        (presence: { statut: string }) => presence.statut === 'PRESENT',
+      ).length;
+      const absents = presences.filter(
+        (presence: { statut: string }) => presence.statut === 'ABSENT',
+      ).length;
+      const retards = presences.filter(
+        (presence: { statut: string }) => presence.statut === 'RETARD',
+      ).length;
+      const excuses = presences.filter(
+        (presence: { statut: string }) => presence.statut === 'EXCUSE',
+      ).length;
+      return {
+        total,
+        presents,
+        absents,
+        retards,
+        excuses,
+        tauxPresence: total > 0 ? Math.round((presents / total) * 100) : 0,
+      };
     },
     staleTime: 60_000,
-    retry: 0,
   });
 
   if (isLoading) return <StatsSkeleton />;
+  if (isError) {
+    return (
+      <Card className="p-5">
+        <QueryErrorState
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+          description="Impossible de calculer vos statistiques de présence."
+        />
+      </Card>
+    );
+  }
 
   const stats = data ?? {
     total: 0,

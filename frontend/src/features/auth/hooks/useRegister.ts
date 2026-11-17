@@ -1,16 +1,16 @@
+'use client';
+
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import toast from 'react-hot-toast';
-
-import { useAuth } from '@/context/AuthContext';
-
+import { useAuth } from '@/contexts/AuthContext';
+import { getDashboardRoute } from '@/lib/routes';
 import { registerSchema } from '../types/auth.types';
 import type { RegisterFormData } from '../types/auth.types';
 
 export function useRegister() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { register: registerUser } = useAuth();
   const [loading, setLoading] = useState(false);
 
@@ -21,10 +21,7 @@ export function useRegister() {
       prenom: '',
       email: '',
       telephone: '',
-<<<<<<< HEAD
-      roleNom: 'PARTICIPANT',   // 🆕 AJOUTÉ
-=======
->>>>>>> e54f154096b5eb84c5aa87e97113c8162d284234
+      roleNom: 'PARTICIPANT',
       motDePasse: '',
       confirmMotDePasse: '',
       acceptTerms: false,
@@ -34,11 +31,15 @@ export function useRegister() {
   const onSubmit = async (data: RegisterFormData) => {
     setLoading(true);
     try {
-      await registerUser(data);
-      toast.success('Inscription réussie ! Bienvenue 🎉');
-      navigate('/dashboard');
-    } catch {
-      // Géré
+      const user = await registerUser({
+        nom: data.nom,
+        prenom: data.prenom,
+        email: data.email,
+        telephone: data.telephone,
+        motDePasse: data.motDePasse,
+        roleNom: data.roleNom,
+      });
+      router.push(getDashboardRoute(user.role.nom));
     } finally {
       setLoading(false);
     }

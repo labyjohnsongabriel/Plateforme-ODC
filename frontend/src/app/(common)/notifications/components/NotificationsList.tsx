@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,7 +8,7 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Tabs, TabsContent, TabsList, TabsTrigger,
+  Tabs, TabsList, TabsTrigger,
 } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -16,9 +16,12 @@ import { Pagination } from '@/components/shared/Pagination';
 import { NotificationItem } from './NotificationItem';
 import { api } from '@/lib/api';
 import { getErrorMessage } from '@/lib/error-handler';
+import { QueryErrorState } from '@/components/shared/QueryErrorState';
+import { useSocket } from '@/hooks/useSocket';
 
 export function NotificationsList() {
   const qc = useQueryClient();
+  const { socket } = useSocket();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<'all' | 'unread'>('all');
 
@@ -27,13 +30,44 @@ export function NotificationsList() {
     limit: 20,
   };
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['notifications', tab, filters],
     queryFn: async () => {
-      const { data } = await api.get('/notifications', { params: filters });
+      const { data } = await api.get('/notifications', {
+        params: {
+          ...filters,
+          ...(tab === 'unread' ? { lue: false } : {}),
+        },
+      });
       return data;
     },
   });
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: async () => {
+      const { data } = await api.get('/notifications/non-lues/count');
+      return data.data.count as number;
+    },
+    refetchInterval: 60000,
+  });
+
+  useEffect(() => {
+    if (!socket) return;
+    const onNewNotification = () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    };
+    const onUnreadCount = ({ count }: { count: number }) => {
+      qc.setQueryData(['notifications', 'unread-count'], count);
+    };
+    socket.on('notification:new', onNewNotification);
+    socket.on('notifications:count', onUnreadCount);
+    return () => {
+      socket.off('notification:new', onNewNotification);
+      socket.off('notifications:count', onUnreadCount);
+    };
+  }, [socket, qc]);
 
   const markAllMutation = useMutation({
     mutationFn: async () => {
@@ -42,6 +76,7 @@ export function NotificationsList() {
     onSuccess: () => {
       toast.success('Toutes les notifications marquées comme lues');
       qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
     },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
@@ -56,19 +91,30 @@ export function NotificationsList() {
     );
   }
 
+  if (isError) {
+    return (
+      <Card className="p-6">
+        <QueryErrorState
+          onRetry={() => { void refetch(); }}
+          isRetrying={isFetching}
+        />
+      </Card>
+    );
+  }
+
   const notifications = data?.data ?? [];
-  const displayed = tab === 'unread'
-    ? notifications.filter((n: any) => !n.lue)
-    : notifications;
-  const unreadCount = notifications.filter((n: any) => !n.lue).length;
+  const displayed = notifications;
 
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-odc-border">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTab(value === 'unread' ? 'unread' : 'all')}
+        >
           <TabsList>
             <TabsTrigger value="all">
-              Toutes ({notifications.length})
+              Toutes ({data?.pagination?.total ?? notifications.length})
             </TabsTrigger>
             <TabsTrigger value="unread">
               Non lues ({unreadCount})
