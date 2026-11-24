@@ -5,45 +5,12 @@ import { Sparkles, Shield, Users, Award, ArrowLeft } from 'lucide-react';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-2 xl:grid-cols-[1.15fr_1fr]">
-      {/* ═══════════════════════════════════════════════════════════════════
-          COLONNE GAUCHE — Branding premium
-          ═══════════════════════════════════════════════════════════════════ */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-10 text-white lg:flex xl:p-14">
-        {/* Grille */}
+    <div className="grid min-h-screen lg:grid-cols-2">
+      {/* ═══════════ Colonne gauche — Branding ═══════════ */}
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-slate-900 p-10 text-white lg:flex xl:p-14">
+        {/* Fond décoratif simple */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.05]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
-            backgroundSize: '56px 56px',
-          }}
-          aria-hidden
-        />
-
-        {/* Radial orange */}
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,121,0,0.3),transparent_55%)]"
-          aria-hidden
-        />
-
-        {/* Halos */}
-        <div
-          className="pointer-events-none absolute -bottom-40 -left-40 h-[28rem] w-[28rem] rounded-full bg-orange-500/10 blur-3xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -top-40 -right-40 h-[28rem] w-[28rem] rounded-full bg-orange-500/10 blur-3xl"
-          aria-hidden
-        />
-
-        {/* Cercles outline */}
-        <div
-          className="pointer-events-none absolute -right-20 top-20 h-64 w-64 rounded-full border border-white/10"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -right-10 top-40 h-96 w-96 rounded-full border border-white/5"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.25),transparent_60%)]"
           aria-hidden
         />
 
@@ -51,10 +18,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="relative z-10">
           <Link
             href="/"
-            className="group inline-flex items-center gap-3 rounded-xl transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+            className="inline-flex items-center gap-3 rounded-xl transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
             aria-label="Retour à l'accueil"
           >
-            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-white/20 transition-transform duration-300 group-hover:scale-105">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-white/20">
               <Image
                 src="/images/brand/logo-odc.png"
                 alt="Orange Digital Center Madagascar"
@@ -77,22 +44,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Contenu */}
         <div className="relative z-10 max-w-md">
-          <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur-md">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-400" />
-            </span>
+          <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white">
+            <Sparkles className="h-3 w-3 text-orange-300" aria-hidden />
             Rejoignez la communauté
           </span>
 
-          <h1 className="mb-5 font-display text-[2.5rem] font-bold leading-[1.05] tracking-tight text-white xl:text-[3rem]">
+          <h1 className="mb-5 font-display text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl">
             Formez-vous
             <br />
-            aux métiers du{' '}
-            <span className="relative inline-block">
-              <span className="relative z-10 text-white">numérique</span>
-              <span className="absolute inset-x-0 bottom-1 z-0 h-2 bg-orange-500/40" aria-hidden />
-            </span>
+            aux métiers du <span className="text-orange-400">numérique</span>
           </h1>
 
           <p className="mb-10 text-base leading-relaxed text-white/80 xl:text-lg">
@@ -134,18 +94,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          COLONNE DROITE — Formulaire
-          ═══════════════════════════════════════════════════════════════════ */}
-      <main className="relative flex flex-col bg-slate-50 dark:bg-slate-950">
-        {/* Décoration */}
-        <div
-          className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-bl-full bg-gradient-to-br from-orange-500/5 to-transparent"
-          aria-hidden
-        />
-
+      {/* ═══════════ Colonne droite — Formulaire ═══════════ */}
+      <main className="flex flex-col bg-slate-50 dark:bg-slate-950">
         {/* Header mobile */}
-        <header className="relative flex items-center justify-between border-b border-slate-200 bg-white/60 p-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/60 lg:hidden">
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white/60 p-4 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/60 lg:hidden">
           <Link
             href="/"
             className="inline-flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
@@ -174,8 +126,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         {/* Contenu */}
-        <div className="relative flex flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:py-12">
-          <div className="w-full max-w-md animate-fade-in">{children}</div>
+        <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:py-12">
+          <div className="w-full max-w-md">{children}</div>
         </div>
 
         {/* Footer mobile */}
@@ -189,10 +141,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   FEATURE ITEM
-   ═══════════════════════════════════════════════════════════════════════════ */
-
+/* ═══════════ Feature Item ═══════════ */
 function FeatureItem({
   icon: Icon,
   title,
@@ -203,8 +152,8 @@ function FeatureItem({
   description: string;
 }) {
   return (
-    <li className="group flex items-start gap-3">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 shadow-sm backdrop-blur-md transition-all duration-300 group-hover:scale-105 group-hover:bg-white/20">
+    <li className="flex items-start gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10">
         <Icon className="h-4 w-4 text-orange-300" aria-hidden />
       </div>
       <div className="pt-0.5">

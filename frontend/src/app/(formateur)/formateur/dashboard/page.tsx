@@ -9,11 +9,8 @@ export default function FormateurDashboardPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <header>
-        <h1 className="font-display text-2xl md:text-3xl font-bold">
-          Bonjour 
-        </h1>
         <p className="text-odc-muted mt-1">
-          Bienvenue dans votre espace formateur
+          Bienvenue dans votre espace 
         </p>
       </header>
 

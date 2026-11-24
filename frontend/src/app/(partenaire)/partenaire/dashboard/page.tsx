@@ -15,9 +15,9 @@ export default function PartenaireDashboardPage() {
             <Handshake className="h-6 w-6 text-primary-foreground" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="font-display text-2xl font-bold text-foreground md:text-3xl">
-              Bienvenue 
-            </h1>
+           <h1 className="font-display text-2xl md:text-3xl font-bold">
+          Bienvenue dans votre espace 
+        </h1>
             <p className="mt-1 text-muted-foreground">
               Découvrez les formations et l&apos;activité de l&apos;Orange Digital Center
             </p>

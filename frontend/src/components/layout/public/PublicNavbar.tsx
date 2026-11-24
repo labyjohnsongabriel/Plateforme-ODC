@@ -33,6 +33,22 @@ const NAV_LINKS = [
 const LOGO_SRC = '/images/brand/logo-odc.png';
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   STYLES DE BOUTONS — alignés sur le bouton "Se connecter" du LoginForm
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const BTN_PRIMARY =
+  'h-11 rounded-lg bg-slate-900 px-5 font-medium text-white shadow-md hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200 dark:focus-visible:ring-slate-500';
+
+const BTN_OUTLINE =
+  'h-11 rounded-lg border border-slate-300 bg-transparent px-5 font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50 dark:focus-visible:ring-slate-500';
+
+const BTN_GHOST_ICON =
+  'h-9 w-9 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50 dark:focus-visible:ring-slate-500';
+
+const BTN_DESTRUCTIVE =
+  'h-11 rounded-lg px-4 font-medium text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300';
+
+/* ═══════════════════════════════════════════════════════════════════════════
    COMPOSANT PRINCIPAL
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -45,9 +61,7 @@ export function PublicNavbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -65,9 +79,7 @@ export function PublicNavbar() {
     if (!mobileOpen) return;
     const original = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileOpen(false);
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false); };
     document.addEventListener('keydown', onKey);
     return () => {
       document.body.style.overflow = original;
@@ -122,10 +134,7 @@ export function PublicNavbar() {
             </Link>
 
             {/* ═══════ NAV DESKTOP ═══════ */}
-            <nav
-              className="hidden items-center gap-0.5 lg:flex"
-              aria-label="Navigation principale"
-            >
+            <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Navigation principale">
               {NAV_LINKS.map((link) => {
                 const isActive =
                   pathname === link.href || pathname?.startsWith(link.href + '/');
@@ -160,7 +169,7 @@ export function PublicNavbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="hidden md:inline-flex"
+                className={cn('hidden md:inline-flex', BTN_GHOST_ICON)}
                 aria-label="Rechercher"
               >
                 <Search className="h-[18px] w-[18px]" />
@@ -172,7 +181,7 @@ export function PublicNavbar() {
 
               {!mounted || !isHydrated ? (
                 <div
-                  className="hidden h-9 w-32 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800 md:block"
+                  className="hidden h-11 w-32 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800 md:block"
                   aria-hidden
                 />
               ) : isAuthenticated && user ? (
@@ -192,7 +201,7 @@ export function PublicNavbar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden"
+                className={cn('lg:hidden', BTN_GHOST_ICON)}
                 onClick={() => setMobileOpen((v) => !v)}
                 aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
                 aria-expanded={mobileOpen}
@@ -226,28 +235,20 @@ export function PublicNavbar() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 interface UserAvatarProps {
-  user: {
-    nom?: string;
-    prenom?: string;
-    photoUrl?: string | null;
-  };
+  user: { nom?: string; prenom?: string; photoUrl?: string | null };
   size?: 'sm' | 'md' | 'lg';
   showStatus?: boolean;
 }
 
 function UserAvatar({ user, size = 'md', showStatus = false }: UserAvatarProps) {
   const [imageError, setImageError] = useState(false);
-
   const sizes = {
     sm: 'h-8 w-8 text-[11px]',
     md: 'h-10 w-10 text-xs',
     lg: 'h-12 w-12 text-sm',
   };
-
   const initials =
-    `${user.prenom?.charAt(0) ?? ''}${user.nom?.charAt(0) ?? ''}`.toUpperCase() ||
-    '?';
-
+    `${user.prenom?.charAt(0) ?? ''}${user.nom?.charAt(0) ?? ''}`.toUpperCase() || '?';
   const photoSrc = !imageError && user.photoUrl ? getMediaUrl(user.photoUrl) : null;
 
   return (
@@ -272,7 +273,6 @@ function UserAvatar({ user, size = 'md', showStatus = false }: UserAvatarProps) 
           <span aria-hidden>{initials}</span>
         )}
       </div>
-
       {showStatus && (
         <span
           className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900"
@@ -321,10 +321,7 @@ function UserMenu({
   useEffect(() => {
     if (!open) return;
     const handle = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-        triggerRef.current?.focus();
-      }
+      if (e.key === 'Escape') { onClose(); triggerRef.current?.focus(); }
     };
     document.addEventListener('keydown', handle);
     return () => document.removeEventListener('keydown', handle);
@@ -339,9 +336,9 @@ function UserMenu({
         onClick={onToggle}
         className={cn(
           'group relative flex items-center gap-2 rounded-full p-1 pr-2.5 transition-all duration-200',
-          'hover:bg-orange-50 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:outline-none',
-          'dark:hover:bg-orange-500/10 dark:focus-visible:ring-orange-500',
-          open && 'bg-orange-50 dark:bg-orange-500/10',
+          'hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:outline-none',
+          'dark:hover:bg-slate-800 dark:focus-visible:ring-slate-500',
+          open && 'bg-slate-100 dark:bg-slate-800',
         )}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -366,8 +363,7 @@ function UserMenu({
           role="menu"
           aria-label="Menu utilisateur"
         >
-          {/* Header profil */}
-          <div className="border-b border-slate-200 bg-orange-50/50 px-4 py-4 dark:border-slate-800 dark:bg-orange-500/5">
+          <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/50">
             <div className="flex items-center gap-3">
               <UserAvatar user={user} size="lg" showStatus />
               <div className="min-w-0 flex-1">
@@ -377,7 +373,7 @@ function UserMenu({
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                   {user.email}
                 </p>
-                <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                   <Shield className="h-2.5 w-2.5" aria-hidden />
                   {roleLabel}
                 </span>
@@ -385,7 +381,6 @@ function UserMenu({
             </div>
           </div>
 
-          {/* Liens */}
           <div className="p-1.5">
             <MenuItem href={dashboardHref} icon={LayoutDashboard} label="Tableau de bord" onClick={onClose} />
             <MenuItem href={profileHref} icon={User} label="Mon profil" onClick={onClose} />
@@ -394,11 +389,10 @@ function UserMenu({
 
           <div className="border-t border-slate-200 dark:border-slate-800" />
 
-          {/* Déconnexion */}
           <div className="p-1.5">
             <button
               onClick={() => { onClose(); onLogout(); }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none dark:text-red-400 dark:hover:bg-red-950/30"
+              className={cn('flex w-full items-center gap-2.5 px-3', BTN_DESTRUCTIVE, 'justify-start')}
               role="menuitem"
             >
               <LogOut className="h-4 w-4" aria-hidden />
@@ -423,29 +417,33 @@ function MenuItem({
     <Link
       href={href}
       onClick={onClick}
-      className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-orange-50 hover:text-orange-700 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none dark:text-slate-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+      className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
       role="menuitem"
     >
-      <Icon className="h-4 w-4 text-slate-400 transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400" aria-hidden />
+      <Icon
+        className="h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-700 dark:group-hover:text-slate-200"
+        aria-hidden
+      />
       <span>{label}</span>
     </Link>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ACTIONS INVITÉ
+   ACTIONS INVITÉ (desktop)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function GuestActions() {
   return (
     <div className="hidden items-center gap-2 md:flex">
-      <Button variant="ghost" asChild size="sm">
+      <Button asChild size="sm" variant="outline" className={BTN_OUTLINE}>
         <Link href="/connexion">
           <LogIn className="mr-1.5 h-4 w-4" aria-hidden />
           Connexion
         </Link>
       </Button>
-      <Button variant="primary" asChild size="sm">
+
+      <Button asChild size="sm" className={BTN_PRIMARY}>
         <Link href="/inscription">
           <Sparkles className="mr-1.5 h-4 w-4" aria-hidden />
           S&apos;inscrire
@@ -490,7 +488,6 @@ function MobileMenu({
 
   return (
     <>
-      {/* Overlay */}
       <div
         className={cn(
           'fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden',
@@ -500,7 +497,6 @@ function MobileMenu({
         aria-hidden
       />
 
-      {/* Drawer */}
       <aside
         id="mobile-nav-drawer"
         className={cn(
@@ -525,11 +521,13 @@ function MobileMenu({
               ODC Platform
             </span>
           </Link>
+
           <Button
             ref={closeButtonRef}
             variant="ghost"
             size="icon"
             onClick={onClose}
+            className={BTN_GHOST_ICON}
             aria-label="Fermer le menu"
           >
             <X className="h-5 w-5" />
@@ -538,9 +536,8 @@ function MobileMenu({
 
         {/* Contenu */}
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          {/* Carte utilisateur (si connecté) */}
           {mounted && isHydrated && isAuthenticated && user && (
-            <div className="mb-4 rounded-xl border border-slate-200 bg-orange-50/50 p-3 dark:border-slate-800 dark:bg-orange-500/5">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center gap-3">
                 <UserAvatar user={user} size="md" showStatus />
                 <div className="min-w-0 flex-1">
@@ -555,7 +552,6 @@ function MobileMenu({
             </div>
           )}
 
-          {/* Navigation */}
           <div className="space-y-0.5">
             <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Navigation
@@ -572,8 +568,8 @@ function MobileMenu({
                   className={cn(
                     'flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300'
-                      : 'text-slate-700 hover:bg-orange-50 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300',
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
                   )}
                 >
                   {link.label}
@@ -582,7 +578,6 @@ function MobileMenu({
             })}
           </div>
 
-          {/* Compte (si connecté) */}
           {mounted && isHydrated && isAuthenticated && user && (
             <>
               <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
@@ -592,7 +587,7 @@ function MobileMenu({
               <Link
                 href={dashboardHref}
                 onClick={onClose}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-orange-50 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
               >
                 <LayoutDashboard className="h-4 w-4 text-slate-400" aria-hidden />
                 Tableau de bord
@@ -600,7 +595,7 @@ function MobileMenu({
               <Link
                 href={profileHref}
                 onClick={onClose}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-orange-50 hover:text-orange-700 dark:text-slate-300 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
               >
                 <User className="h-4 w-4 text-slate-400" aria-hidden />
                 Mon profil
@@ -608,27 +603,28 @@ function MobileMenu({
             </>
           )}
 
-          {/* Auth (si non connecté) — SANS ICÔNES */}
+          {/* Auth — boutons alignés sur le LoginForm */}
           {mounted && isHydrated && !isAuthenticated && (
             <>
               <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
               <div className="grid grid-cols-2 gap-2 px-1">
+                {/* ✅ Connexion — outline */}
                 <Button
-                  variant="secondary"
                   asChild
                   size="sm"
-                  className="h-10 w-full justify-center rounded-lg font-medium"
+                  variant="outline"
+                  className={cn(BTN_OUTLINE, 'w-full justify-center')}
                 >
                   <Link href="/connexion" onClick={onClose}>
                     Connexion
                   </Link>
                 </Button>
 
+                {/* ✅ S'inscrire — primary slate-900 */}
                 <Button
-                  variant="primary"
                   asChild
                   size="sm"
-                  className="h-10 w-full justify-center rounded-lg font-medium shadow-sm"
+                  className={cn(BTN_PRIMARY, 'w-full justify-center')}
                 >
                   <Link href="/inscription" onClick={onClose}>
                     S&apos;inscrire
@@ -639,21 +635,15 @@ function MobileMenu({
           )}
         </div>
 
-        {/* Footer : déconnexion (si connecté) */}
+        {/* Footer déconnexion */}
         {mounted && isHydrated && isAuthenticated && (
           <div className="border-t border-slate-200 p-3 dark:border-slate-800">
             <button
               type="button"
-              onClick={() => {
-                onLogout();
-                onClose();
-              }}
+              onClick={() => { onLogout(); onClose(); }}
               className={cn(
-                'group flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5',
-                'text-sm font-medium text-red-600 transition-colors',
-                'hover:bg-red-50 hover:text-red-700',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2',
-                'dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300',
+                'group flex w-full items-center justify-center gap-2',
+                BTN_DESTRUCTIVE,
               )}
             >
               <LogOut

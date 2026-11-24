@@ -13,9 +13,7 @@ export default function LoginPage() {
     <div className="animate-fade-in">
       {/* En-tête */}
       <header className="mb-8 text-center">
-        <h1 className="mb-2 font-display text-3xl font-bold leading-tight tracking-tight text-odc-text-primary">
-          Bon retour 
-        </h1>
+  
         <p className="text-sm text-odc-text-secondary">
           Connectez-vous pour accéder à votre espace personnel
         </p>

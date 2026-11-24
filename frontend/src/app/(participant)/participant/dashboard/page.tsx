@@ -20,9 +20,10 @@ export default function ParticipantDashboardPage() {
             />
           </div>
           <div>
-            <h1 className="font-display text-2xl font-bold text-foreground md:text-3xl">
-              Bonjour 
-            </h1>
+               <h1 className="font-display text-2xl md:text-3xl font-bold">
+          Bienvenue dans votre espace 
+        </h1>
+      
             <p className="mt-1 text-muted-foreground">
               Voici votre parcours de formation chez Orange Digital Center
             </p>
