@@ -1,3 +1,4 @@
+// src/types/evaluation.types.ts
 import type { ID, PaginationParams, Timestamp } from './common.types';
 import type { User } from './user.types';
 import type { Session } from './session.types';
@@ -13,9 +14,36 @@ export enum TypeEvaluation {
   ORAL = 'ORAL',
 }
 
+// ✅ IMPORTANT : Doit être "export enum" (valeur runtime) et non "export type"
+export enum EvaluationStatus {
+  DISPONIBLE = 'DISPONIBLE',
+  EN_COURS = 'EN_COURS',
+  SOUMISE = 'SOUMISE',
+  A_VENIR = 'A_VENIR',
+  EXPIREE = 'EXPIREE',
+}
+
+export interface ParticipantEvaluation {
+  id: ID;
+  titre?: string;
+  description?: string | null;
+  type?: string;
+  noteMax: number;
+  noteObtenue?: number | null;
+  dateEvaluation?: Timestamp | null;
+  dateDebut?: Timestamp | null;
+  dateFin?: Timestamp | null;
+  dureeMinutes?: number | null;
+  estPubliee: boolean;
+  soumise: boolean;
+  demarree: boolean;
+  dateSoumission?: Timestamp | null;
+  dateDebutReponse?: Timestamp | null;
+}
+
 export interface Evaluation {
   id: ID;
-  session: Session;
+  session?: Session;
   sessionId: ID;
   titre: string;
   type: TypeEvaluation;
@@ -23,6 +51,8 @@ export interface Evaluation {
   noteMinPassage?: number;
   coefficient: number;
   dateEvaluation?: Timestamp;
+  dateDebut?: Timestamp;
+  dateFin?: Timestamp;
   dureeMinutes?: number;
   description?: string;
   consignes?: string;
@@ -32,97 +62,11 @@ export interface Evaluation {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   dejaSoumise?: boolean;
+  demarree?: boolean;
   maSoumission?: {
     reponses: Record<string, unknown>;
     soumisAt: Timestamp;
+    noteObtenue?: number | null;
   } | null;
 }
-
-export interface CreateEvaluationPayload {
-  sessionId: ID;
-  titre: string;
-  type: TypeEvaluation;
-  noteMax: number;
-  noteMinPassage?: number;
-  coefficient?: number;
-  dateEvaluation?: Timestamp;
-  dureeMinutes?: number;
-  description?: string;
-  consignes?: string;
-  publiee?: boolean;
-}
-
-export interface SaisirNotePayload {
-  participantId: ID;
-  note: number;
-  commentaire?: string;
-}
-
-export interface MoyenneResponse {
-  moyenne: number;
-  totalNotes: number;
-  notes: Note[];
-}
-
-export interface EvaluationStats {
-  moyenne: number;
-  mediane: number;
-  max: number;
-  min: number;
-  reussite: number;
-  echec: number;
-  distribution: Array<{ range: string; count: number }>;
-}
-
-export interface EvaluationFilters extends PaginationParams {
-  sessionId?: ID;
-  type?: TypeEvaluation;
-  publiee?: boolean;
-}
-
-export interface EvaluationNote {
-  evaluation: Evaluation;
-  participant: User;
-  note: Note;
-}
-
-export const TYPE_EVALUATION_CONFIG: Record<
-  TypeEvaluation,
-  { label: string; variant: string; icon: string }
-> = {
-  [TypeEvaluation.PRE_TEST]: {
-    label: 'Pré-test',
-    variant: 'info',
-    icon: 'clipboard',
-  },
-  [TypeEvaluation.POST_TEST]: {
-    label: 'Post-test',
-    variant: 'success',
-    icon: 'clipboard-check',
-  },
-  [TypeEvaluation.QUIZ]: {
-    label: 'Quiz',
-    variant: 'info',
-    icon: 'question-mark-circle',
-  },
-  [TypeEvaluation.EXAMEN]: {
-    label: 'Examen',
-    variant: 'error',
-    icon: 'document-text',
-  },
-  [TypeEvaluation.PROJET]: {
-    label: 'Projet',
-    variant: 'purple',
-    icon: 'folder',
-  },
-  [TypeEvaluation.TP]: {
-    label: 'Travaux pratiques',
-    variant: 'success',
-    icon: 'wrench',
-  },
-  [TypeEvaluation.ORAL]: {
-    label: 'Présentation orale',
-    variant: 'warning',
-    icon: 'microphone',
-  },
-};
+// ... (le reste de vos types)

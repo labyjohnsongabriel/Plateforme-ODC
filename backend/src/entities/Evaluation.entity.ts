@@ -41,6 +41,13 @@ export class Evaluation {
   @Column({ name: 'date_evaluation', type: 'date', nullable: true })
   dateEvaluation!: Date | null;
 
+  // ✅ AJOUT : Fenêtre temporelle pour la disponibilité de l'évaluation
+  @Column({ name: 'date_debut', type: 'timestamp', nullable: true })
+  dateDebut!: Date | null;
+
+  @Column({ name: 'date_fin', type: 'timestamp', nullable: true })
+  dateFin!: Date | null;
+
   @Column({ name: 'duree_minutes', type: 'integer', nullable: true })
   dureeMinutes!: number | null;
 

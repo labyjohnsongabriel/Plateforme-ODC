@@ -6,10 +6,6 @@ import { RoleName } from '../entities/enums';
 import { BadRequestError, ForbiddenError } from '../errors/AppError';
 import { uuidSchema } from '../validators/common.validator';
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
 function getUserId(req: Request): string {
   if (!req.userId) throw new BadRequestError('Utilisateur non authentifié');
   return req.userId;
@@ -30,12 +26,7 @@ function validateUuid(value: string, field: string): string {
   return value;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   CONTROLLER
-   ═══════════════════════════════════════════════════════════════════════════ */
-
 export class EvaluationController {
-  /* ─── LIST ───────────────────────────────────────────────────────────── */
   static async findAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await EvaluationService.findAll(
@@ -55,29 +46,20 @@ export class EvaluationController {
     }
   }
 
-  /* ─── CREATE ─────────────────────────────────────────────────────────── */
   static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (
-        !req.body?.sessionId ||
-        typeof req.body.titre !== 'string' ||
-        !req.body.titre.trim()
-      ) {
+      if (!req.body?.sessionId || typeof req.body.titre !== 'string' || !req.body.titre.trim()) {
         throw new BadRequestError('sessionId et titre requis');
       }
       validateUuid(req.body.sessionId, 'sessionId');
-      const evaluation = await EvaluationService.create(
-        getUserId(req),
-        getUserRole(req),
-        req.body,
-      );
+      // Le service gérera la validation des dates (dateDebut, dateFin)
+      const evaluation = await EvaluationService.create(getUserId(req), getUserRole(req), req.body);
       successResponse(res, evaluation, 'Évaluation créée', 201);
     } catch (error) {
       next(error);
     }
   }
 
-  /* ─── FIND BY SESSION ────────────────────────────────────────────────── */
   static async findBySession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const evaluations = await EvaluationService.findBySession(
@@ -91,7 +73,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── FIND ONE ───────────────────────────────────────────────────────── */
   static async findOne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const evaluation = await EvaluationService.findById(
@@ -105,7 +86,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── UPDATE ─────────────────────────────────────────────────────────── */
   static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const evaluation = await EvaluationService.update(
@@ -120,7 +100,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── PUBLIER / DÉPUBLIER ────────────────────────────────────────────── */
   static async publier(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (req.body?.publiee !== undefined && typeof req.body.publiee !== 'boolean') {
@@ -133,25 +112,17 @@ export class EvaluationController {
         getUserRole(req),
         publiee,
       );
-      successResponse(
-        res,
-        evaluation,
-        publiee ? 'Évaluation publiée' : 'Évaluation dépubliée',
-      );
+      successResponse(res, evaluation, publiee ? 'Évaluation publiée' : 'Évaluation dépubliée');
     } catch (error) {
       next(error);
     }
   }
 
-  /* ─── SAISIR NOTE ────────────────────────────────────────────────────── */
   static async saisirNote(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const participantId = validateUuid(req.body?.participantId, 'participantId');
       const note = req.body?.note;
-      if (
-        note === '' || note === null || note === undefined ||
-        !Number.isFinite(Number(note)) || Number(note) < 0
-      ) {
+      if (note === '' || note === null || note === undefined || !Number.isFinite(Number(note)) || Number(note) < 0) {
         throw new BadRequestError('La note doit être un nombre positif ou nul');
       }
       if (req.body?.commentaire !== undefined && typeof req.body.commentaire !== 'string') {
@@ -171,7 +142,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── SOUMETTRE (participant) ────────────────────────────────────────── */
   static async soumettre(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (getUserRole(req) !== RoleName.PARTICIPANT) {
@@ -192,7 +162,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── FIND SUBMISSIONS ───────────────────────────────────────────────── */
   static async findSubmissions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const submissions = await EvaluationService.findSubmissions(
@@ -206,7 +175,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── MOYENNE ────────────────────────────────────────────────────────── */
   static async moyenne(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const sessionId = validateUuid(req.params.sessionId, 'sessionId');
@@ -224,7 +192,6 @@ export class EvaluationController {
     }
   }
 
-  /* ─── DELETE ─────────────────────────────────────────────────────────── */
   static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       await EvaluationService.delete(

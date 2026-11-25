@@ -29,7 +29,7 @@ import { PresencesTable } from './PresencesTable';
 import { ManualPresence } from './ManualPresence';
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TYPES
+   TYPES & HELPERS
    ═══════════════════════════════════════════════════════════════════════════ */
 
 interface Props {
@@ -69,7 +69,7 @@ const STAT_COLORS: Record<StatColor, string> = {
 
 function StatCard({ label, value, icon: Icon, color }: StatCardProps) {
   return (
-    <Card className="overflow-hidden border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <Card className="overflow-hidden border-slate-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-800 dark:bg-slate-950">
       <CardContent className="p-5">
         <div
           className={cn(
@@ -111,9 +111,7 @@ export function PresenceSession({ sessionId }: Props) {
   const participantsQuery = useQuery({
     queryKey: ['formateur', 'session', sessionId, 'participants'],
     queryFn: async () => {
-      const { data } = await api.get(
-        `/formateur/sessions/${sessionId}/participants`,
-      );
+      const { data } = await api.get(`/formateur/sessions/${sessionId}/participants`);
       return toSafeArray(data?.data);
     },
     enabled: !!sessionId,
@@ -122,10 +120,9 @@ export function PresenceSession({ sessionId }: Props) {
   const presencesQuery = useQuery({
     queryKey: ['formateur', 'presences', sessionId],
     queryFn: async () => {
-      const { data } = await api.get(
-        `/formateur/presences/session/${sessionId}`,
-        { params: { limit: 200 } },
-      );
+      const { data } = await api.get(`/formateur/presences/session/${sessionId}`, {
+        params: { limit: 200 },
+      });
       return toSafeArray(data?.data);
     },
     enabled: !!sessionId,
@@ -134,10 +131,9 @@ export function PresenceSession({ sessionId }: Props) {
   /* ── Export PDF ─────────────────────────────────────── */
   const exportMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.get(
-        `/admin/exports/session/${sessionId}/pdf`,
-        { responseType: 'blob' },
-      );
+      const response = await api.get(`/admin/exports/session/${sessionId}/pdf`, {
+        responseType: 'blob',
+      });
       return response.data;
     },
     onSuccess: (blob) => {
@@ -180,9 +176,7 @@ export function PresenceSession({ sessionId }: Props) {
           ])
         }
         isRetrying={
-          sessionQuery.isFetching ||
-          participantsQuery.isFetching ||
-          presencesQuery.isFetching
+          sessionQuery.isFetching || participantsQuery.isFetching || presencesQuery.isFetching
         }
         description="Impossible de charger cette feuille de présence. Vérifiez vos droits et réessayez."
       />
@@ -192,34 +186,38 @@ export function PresenceSession({ sessionId }: Props) {
   /* ── Rendu ──────────────────────────────────────────── */
   return (
     <div className="space-y-6">
-      {/* Retour */}
+      {/* Bouton Retour (Amélioré) */}
       <Button
         variant="ghost"
         size="sm"
         onClick={() => router.back()}
-        className="text-slate-500 hover:bg-orange-50 hover:text-orange-600 dark:text-slate-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-400"
+        className="group -ml-2 w-fit text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-50"
       >
-        <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
+        <ArrowLeft className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:-translate-x-1" aria-hidden />
         Retour
       </Button>
 
       {/* Header */}
-      <header className="flex flex-wrap items-center justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 md:text-3xl">
             Feuille de présence
           </h1>
           {session && (
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              <span className="font-mono">{session.codeSession}</span> —{' '}
-              {session.formation?.titre ?? 'Formation'}
+              <span className="font-mono text-slate-700 dark:text-slate-300">
+                {session.codeSession}
+              </span>{' '}
+              — {session.formation?.titre ?? 'Formation'}
             </p>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {/* ── BOUTONS PROFESSIONNELS ── */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Bouton Rafraîchir */}
           <Button
-            variant="secondary"
+            variant="outline"
             size="sm"
             onClick={() =>
               qc.invalidateQueries({
@@ -227,11 +225,11 @@ export function PresenceSession({ sessionId }: Props) {
               })
             }
             disabled={presencesQuery.isFetching}
-            className="h-9 rounded-lg"
+            className="group h-10 gap-2 rounded-xl border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50"
           >
             <RefreshCw
               className={cn(
-                'mr-2 h-4 w-4',
+                'h-4 w-4 text-slate-400 transition-colors group-hover:text-slate-600 dark:group-hover:text-slate-200',
                 presencesQuery.isFetching && 'animate-spin',
               )}
               aria-hidden
@@ -239,17 +237,18 @@ export function PresenceSession({ sessionId }: Props) {
             Rafraîchir
           </Button>
 
+          {/* Bouton Export PDF */}
           <Button
             variant="primary"
             size="sm"
             onClick={() => exportMutation.mutate()}
             disabled={exportMutation.isPending}
-            className="h-9 rounded-lg"
+            className="group h-10 gap-2 rounded-xl bg-orange-600 px-4 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-orange-700 hover:shadow active:scale-[0.98] disabled:opacity-50 dark:bg-orange-600 dark:hover:bg-orange-500"
           >
             {exportMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
-              <Download className="mr-2 h-4 w-4" aria-hidden />
+              <Download className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" aria-hidden />
             )}
             Export PDF
           </Button>
@@ -272,8 +271,8 @@ export function PresenceSession({ sessionId }: Props) {
           <ManualPresence sessionId={sessionId} />
         </div>
 
-        <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <CardHeader>
+        <Card className="border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <CardHeader className="border-b border-slate-100 pb-4 dark:border-slate-800">
             <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-slate-50">
               <Users className="h-5 w-5 text-orange-600 dark:text-orange-400" aria-hidden />
               Participants ({participants.length})

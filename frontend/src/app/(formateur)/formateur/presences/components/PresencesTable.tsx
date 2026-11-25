@@ -160,6 +160,7 @@ export function PresencesTable({ sessionId, presences, participants, onRefresh }
         <TableBody>
           {rows.map((row) => {
             const p = row.participant;
+            const isRowLoading = mutation.isPending && mutation.variables?.participantId === row.participantId;
 
             return (
               <TableRow
@@ -232,7 +233,7 @@ export function PresencesTable({ sessionId, presences, participants, onRefresh }
                 {/* Action */}
                 <TableCell className="text-right">
                   <Button
-                    variant={row.present ? 'secondary' : 'primary'}
+                    variant="outline"
                     size="sm"
                     onClick={() =>
                       mutation.mutate({
@@ -240,19 +241,24 @@ export function PresencesTable({ sessionId, presences, participants, onRefresh }
                         present: !row.present,
                       })
                     }
-                    disabled={mutation.isPending}
-                    className="h-8 rounded-lg font-medium"
+                    disabled={isRowLoading}
+                    className={cn(
+                      'h-8 gap-1.5 rounded-full px-3 text-xs font-semibold shadow-sm transition-all duration-200',
+                      row.present
+                        ? 'border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:bg-transparent dark:text-red-400 dark:hover:bg-red-950/30'
+                        : 'border-emerald-500 bg-emerald-50 text-emerald-700 hover:border-emerald-600 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-500/50 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50'
+                    )}
                   >
-                    {mutation.isPending ? (
+                    {isRowLoading ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                     ) : row.present ? (
                       <>
-                        <XCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                        <XCircle className="h-3.5 w-3.5" aria-hidden />
                         Marquer absent
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
                         Marquer présent
                       </>
                     )}
